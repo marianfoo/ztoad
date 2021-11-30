@@ -2984,14 +2984,14 @@ ENDFORM.                    " REPO_FILL
 *&      Form  REPO_SAVE_CURRENT_QUERY
 *&---------------------------------------------------------------------*
 *       Save query in the history area
-*       Keep only 100 last queries
+*       Keep only 1000 last queries
 *----------------------------------------------------------------------*
 FORM repo_save_current_query.
   DATA : lt_query         TYPE soli_tab,
          ls_query         LIKE LINE OF lt_query,
          lw_query_with_cr TYPE string,
          ls_ztoad         TYPE ztoad,
-         lw_number(2)     TYPE n,
+         lw_number(3)     TYPE n,
          lw_timestamp(14) TYPE c,
          lw_dummy(1)      TYPE c,                           "#EC NEEDED
          lw_query_last    TYPE string,
