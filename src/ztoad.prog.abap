@@ -1,8 +1,8 @@
 *&---------------------------------------------------------------------*
 *& Program : ZTOAD
 *& Author  : S. Hermann
-*& Date    : 31.12.2017
-*& Version : 4.0.2
+*& Date    : 25.02.2022
+*& Version : 4.0.3
 *& Required: Table ZTOAD
 *&---------------------------------------------------------------------*
 *& This program allow you to execute query directly on the server
@@ -374,7 +374,7 @@ CONSTANTS : c_ddic_col1            TYPE mtreeitm-item_name
             c_vers_active          TYPE as4local VALUE 'A',
             c_ddic_dtelm           TYPE comptype VALUE 'E',
             c_native_command       TYPE string VALUE 'NATIVE',
-            c_query_max_exec       TYPE i VALUE 36,
+            c_query_max_exec       TYPE i VALUE 1000,
 
             c_xmlnode_root TYPE string VALUE 'root',        "#EC NOTEXT
             c_xmlnode_file TYPE string VALUE 'query',       "#EC NOTEXT
