@@ -3144,7 +3144,7 @@ ENDFORM.                    " RESULT_INIT
 *----------------------------------------------------------------------*
 FORM screen_init_listbox_0200.
   DATA lt_visibility TYPE vrm_values,
-  TYPE-POOLS vrm.
+  
   DATA : ls_visibility LIKE LINE OF lt_visibility.
 
   REFRESH lt_visibility.
