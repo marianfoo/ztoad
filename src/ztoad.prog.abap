@@ -3143,9 +3143,9 @@ ENDFORM.                    " RESULT_INIT
 *       Fill dropdown listbox with value on screen 200
 *----------------------------------------------------------------------*
 FORM screen_init_listbox_0200.
+  DATA lt_visibility TYPE vrm_values,
   TYPE-POOLS vrm.
-  DATA : lt_visibility TYPE vrm_values,
-         ls_visibility LIKE LINE OF lt_visibility.
+  DATA : ls_visibility LIKE LINE OF lt_visibility.
 
   REFRESH lt_visibility.
 
