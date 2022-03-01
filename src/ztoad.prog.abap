@@ -1260,7 +1260,6 @@ FORM query_process USING fw_display TYPE c
          lw_time2         LIKE lw_time,
          lw_count         TYPE i,
          lw_count2        LIKE lw_count,
-         lw_charnumb(12)  TYPE c,
          lw_msg           TYPE string,
          lw_noauth(1)     TYPE c,
          lw_newsyntax(1)  TYPE c,
@@ -1414,7 +1413,7 @@ FORM query_process USING fw_display TYPE c
     PERFORM ddic_set_tree USING lw_from_concat.
 
 * Display message
-    lw_charnumb = lw_time.
+    DATA(lw_charnumb) = lw_time.
     CONCATENATE 'Query executed in'(m09) lw_charnumb INTO lw_msg
                 SEPARATED BY space.
     lw_charnumb = lw_count.
