@@ -190,27 +190,24 @@
 *&---------------------------------------------------------------------*
 
 REPORT ztoad.
-TYPE-POOLS abap.
+
 
 *######################################################################*
 *
 *                        CUSTOMIZATION SECTION
 *
 *######################################################################*
-DATA : BEGIN OF s_customize,                                "#EC NEEDED
+DATA BEGIN OF s_customize,                                "#EC NEEDED
 * Default number of lines to return for SELECT if no "up to xxx rows"
 * defined in the query.
 * Set to 0 if you dont want default limit.
          default_rows    TYPE i VALUE 100,
-
 * When you dblclic on a field in the ddic tree, field is pasted to
 * editor at the cursor position
 * You could choose to add a linebreak after the field pasted
          paste_break(1)  TYPE c VALUE space, "abap_true to break
-
 * In ALV grid result, display technical name instead of column label
          techname(1)     TYPE c VALUE space, "abap_true for technical
-
 * You could define your authorization object to restrict
 * function usage by user
 * If you dont define auth object, all users will have same access as
@@ -230,7 +227,6 @@ DATA : BEGIN OF s_customize,                                "#EC NEEDED
          actvt_update    TYPE tactt-actvt VALUE '02',
          actvt_delete    TYPE tactt-actvt VALUE '06',
          actvt_native    TYPE tactt-actvt VALUE '16',
-
 * Bellow is default AUTH used if no auth_object is defined
 * Allow SELECT query on SAP table (restricted by given pattern)
          auth_select     TYPE string VALUE '*',
@@ -242,8 +238,7 @@ DATA : BEGIN OF s_customize,                                "#EC NEEDED
          auth_delete     TYPE string VALUE space, "'*',
 * Allow any native sql command (set value to space to disable)
          auth_native(1)  TYPE c VALUE space, "abap_true,
-
-       END OF s_customize.
+END OF s_customize.
 
 
 *######################################################################*
@@ -255,7 +250,7 @@ DATA : BEGIN OF s_customize,                                "#EC NEEDED
 CLASS lcl_application DEFINITION DEFERRED.
 
 * Screen objects
-DATA : o_handle_event         TYPE REF TO lcl_application,
+DATA: o_handle_event         TYPE REF TO lcl_application,
        o_container            TYPE REF TO cl_gui_custom_container,
        o_splitter             TYPE REF TO cl_gui_splitter_container,
        o_splitter_top         TYPE REF TO cl_gui_splitter_container,
@@ -267,7 +262,6 @@ DATA : o_handle_event         TYPE REF TO lcl_application,
        o_container_query      TYPE REF TO cl_gui_container,
        o_container_ddic       TYPE REF TO cl_gui_container,
        o_container_result     TYPE REF TO cl_gui_container,
-
 * Tabs objects (editor, ddic, alv)
        BEGIN OF s_tab_active,
          o_textedit             TYPE REF TO cl_gui_abapedit,
@@ -278,17 +272,15 @@ DATA : o_handle_event         TYPE REF TO lcl_application,
          row_height             TYPE i,
        END OF s_tab_active,
        t_tabs LIKE TABLE OF s_tab_active,
-
 * Repository data
        o_tree_repository      TYPE REF TO cl_gui_simple_tree,
        BEGIN OF s_node_repository.
         INCLUDE TYPE treev_node. "mtreesnode.
-DATA :  text(100) TYPE c,
+DATA  text(100) TYPE c,
         edit(1)   TYPE c,
         queryid   TYPE ztoad-queryid,
         END OF s_node_repository,
         t_node_repository      LIKE TABLE OF s_node_repository,
-
 * DDIC data
         w_dragdrop_handle_tree TYPE i,
 * DDIC toolbar
@@ -298,21 +290,18 @@ DATA :  text(100) TYPE c,
 * ZSPRO data
         t_node_zspro           LIKE s_tab_active-t_node_ddic,
         t_item_zspro           LIKE s_tab_active-t_item_ddic,
-
 * Save option
         BEGIN OF s_options,
           name          TYPE ztoad-text,
           visibility    TYPE ztoad-visibility,
           visibilitygrp TYPE usr02-class,
         END OF s_options,
-
 * Keep last loaded id
         w_last_loaded_query TYPE ztoad-queryid,
-
 * Count number of runs
         w_run               TYPE i.
 
-DATA : w_okcode LIKE sy-ucomm,
+DATA w_okcode LIKE sy-ucomm,
        BEGIN OF s_tab,
          title1 TYPE string VALUE 'Tab 1',                  "#EC NOTEXT
          title2 TYPE string VALUE 'Tab 2',                  "#EC NOTEXT
@@ -348,7 +337,7 @@ DATA : w_okcode LIKE sy-ucomm,
 CONTROLS w_tabstrip TYPE TABSTRIP.
 
 * Global types
-TYPES : BEGIN OF ty_fieldlist,
+TYPES: BEGIN OF ty_fieldlist,
           field     TYPE string,
           ref_table TYPE string,
           ref_field TYPE string,
@@ -356,7 +345,7 @@ TYPES : BEGIN OF ty_fieldlist,
         ty_fieldlist_table TYPE STANDARD TABLE OF ty_fieldlist.
 
 * Constants
-CONSTANTS : c_ddic_col1            TYPE mtreeitm-item_name
+CONSTANTS c_ddic_col1            TYPE mtreeitm-item_name
                         VALUE 'col1',                       "#EC NOTEXT
             c_ddic_col2            TYPE mtreeitm-item_name
                         VALUE 'col2',                       "#EC NOTEXT
@@ -375,8 +364,7 @@ CONSTANTS : c_ddic_col1            TYPE mtreeitm-item_name
             c_ddic_dtelm           TYPE comptype VALUE 'E',
             c_native_command       TYPE string VALUE 'NATIVE',
             c_query_max_exec       TYPE i VALUE 1000,
-
-            c_xmlnode_root TYPE string VALUE 'root',        "#EC NOTEXT
+c_xmlnode_root TYPE string VALUE 'root',        "#EC NOTEXT
             c_xmlnode_file TYPE string VALUE 'query',       "#EC NOTEXT
             c_xmlattr_visibility TYPE string VALUE 'visibility', "#EC NOTEXT
             c_xmlattr_text TYPE string VALUE 'description'. "#EC NOTEXT
@@ -404,7 +392,7 @@ ENDCLASS."lcl_drag_object DEFINITION
 *----------------------------------------------------------------------*
 CLASS lcl_application DEFINITION FINAL.
   PUBLIC SECTION.
-    METHODS :
+    METHODS
 * Handle F1 call on ABAP editor
       hnd_editor_f1
          FOR EVENT f1 OF cl_gui_abapedit,
@@ -463,20 +451,16 @@ CLASS lcl_application IMPLEMENTATION.
   METHOD hnd_repo_context_menu.
     DATA l_node_key TYPE tv_nodekey.
 
-    CALL METHOD o_tree_repository->get_selected_node
-      IMPORTING
-        node_key = l_node_key.
+    o_tree_repository->get_selected_node( IMPORTING node_key = l_node_key ).
 * For History node, add a "delete all" entry
 * Only if there is at least 1 history entry
     IF l_node_key = 'HISTO'.
       READ TABLE t_node_repository TRANSPORTING NO FIELDS
         WITH KEY relatkey = 'HISTO'.
       IF sy-subrc = 0.
-        CALL METHOD menu->add_function
-          EXPORTING
-            text  = 'Delete All'(m36)
-            icon  = '@02@'
-            fcode = 'DELETE_HIST'.
+        menu->add_function( text = 'Delete All'(m36)
+                                      icon = '@02@'
+                                      fcode = 'DELETE_HIST' ).
       ENDIF.
       RETURN.
     ENDIF.
@@ -484,15 +468,13 @@ CLASS lcl_application IMPLEMENTATION.
 * Add Delete option only for own queries
     READ TABLE t_node_repository INTO s_node_repository
                WITH KEY node_key = l_node_key.
-    IF sy-subrc NE 0 OR s_node_repository-edit = space.
+    IF sy-subrc <> 0 OR s_node_repository-edit = space.
       RETURN.
     ENDIF.
 
-    CALL METHOD menu->add_function
-      EXPORTING
-        text  = 'Delete'(m01)
-        icon  = '@02@'
-        fcode = 'DELETE_QUERY'.
+    menu->add_function( text = 'Delete'(m01)
+                                  icon = '@02@'
+                                  fcode = 'DELETE_QUERY' ).
   ENDMETHOD.                    "hnd_repo_context_menu
 
 *&---------------------------------------------------------------------*
@@ -502,16 +484,14 @@ CLASS lcl_application IMPLEMENTATION.
 *       Handle context menu clic on repository tree
 *----------------------------------------------------------------------*
   METHOD hnd_repo_context_menu_sel.
-    DATA : l_node_key TYPE tv_nodekey,
+    DATA: l_node_key TYPE tv_nodekey,
            l_subrc    TYPE i,
            ls_histo   LIKE s_node_repository,
            lw_queryid LIKE ls_histo-queryid.
 * Delete stored query
     CASE fcode.
       WHEN 'DELETE_QUERY'.
-        CALL METHOD o_tree_repository->get_selected_node
-          IMPORTING
-            node_key = l_node_key.
+        o_tree_repository->get_selected_node( IMPORTING node_key = l_node_key ).
         PERFORM repo_delete_history USING l_node_key
                                     CHANGING l_subrc.
         IF l_subrc = 0.
@@ -528,7 +508,7 @@ CLASS lcl_application IMPLEMENTATION.
                 WHERE queryid CP lw_queryid.
           PERFORM repo_delete_history USING ls_histo-node_key
                                       CHANGING l_subrc.
-          IF l_subrc NE 0.
+          IF l_subrc <> 0.
             MESSAGE 'Error when deleting the query'(m03)
                     TYPE c_msg_success DISPLAY LIKE c_msg_error.
             RETURN.
@@ -545,43 +525,35 @@ CLASS lcl_application IMPLEMENTATION.
 *       Handle F1 call on ABAP editor
 *----------------------------------------------------------------------*
   METHOD hnd_editor_f1.
-    DATA : lw_cursor_line_from TYPE i,
+    DATA: lw_cursor_line_from TYPE i,
            lw_cursor_line_to   TYPE i,
            lw_cursor_pos_from  TYPE i,
            lw_cursor_pos_to    TYPE i,
-           lw_offset           TYPE i,
-           lw_length           TYPE i,
            lt_query            TYPE soli_tab,
-           ls_query            LIKE LINE OF lt_query,
-           lw_sel              TYPE string.
+           ls_query            LIKE LINE OF lt_query.
 
 * Find active query
-    CALL METHOD s_tab_active-o_textedit->get_selection_pos
-      IMPORTING
-        from_line = lw_cursor_line_from
-        from_pos  = lw_cursor_pos_from
-        to_line   = lw_cursor_line_to
-        to_pos    = lw_cursor_pos_to.
+    s_tab_active-o_textedit->get_selection_pos(
+      IMPORTING from_line = lw_cursor_line_from
+                from_pos = lw_cursor_pos_from
+                to_line = lw_cursor_line_to
+                to_pos = lw_cursor_pos_to ).
 
 * If nothing selected, no help to display
     IF lw_cursor_line_from = lw_cursor_line_to
-    AND lw_cursor_pos_to = lw_cursor_pos_from.
+        AND lw_cursor_pos_to = lw_cursor_pos_from.
       RETURN.
     ENDIF.
 
 * Get content of abap edit box
-    CALL METHOD s_tab_active-o_textedit->get_text
-      IMPORTING
-        table  = lt_query[]
-      EXCEPTIONS
-        OTHERS = 1.
+    s_tab_active-o_textedit->get_text( IMPORTING table = lt_query[] EXCEPTIONS OTHERS = 1 ).
 
 
     READ TABLE lt_query INTO ls_query INDEX lw_cursor_line_from.
     IF lw_cursor_line_from = lw_cursor_line_to.
-      lw_length = lw_cursor_pos_to - lw_cursor_pos_from.
-      lw_offset = lw_cursor_pos_from - 1.
-      lw_sel = ls_query+lw_offset(lw_length).
+      DATA(lw_length) = lw_cursor_pos_to - lw_cursor_pos_from.
+      DATA(lw_offset) = lw_cursor_pos_from - 1.
+      DATA(lw_sel) = ls_query+lw_offset(lw_length).
     ELSE.
       lw_offset = lw_cursor_pos_from - 1.
       lw_sel = ls_query+lw_offset.
@@ -598,7 +570,7 @@ CLASS lcl_application IMPLEMENTATION.
 *       Handle Node double clic on ddic tree
 *----------------------------------------------------------------------*
   METHOD hnd_ddic_item_dblclick.
-    DATA : ls_node       LIKE LINE OF s_tab_active-t_node_ddic,
+    DATA: ls_node       LIKE LINE OF s_tab_active-t_node_ddic,
            lw_line_start TYPE i,
            lw_pos_start  TYPE i,
            lw_line_end   TYPE i,
@@ -608,7 +580,7 @@ CLASS lcl_application IMPLEMENTATION.
 * Check clicked node is valid
     READ TABLE s_tab_active-t_node_ddic INTO ls_node
                WITH KEY node_key = node_key.
-    IF sy-subrc NE 0 OR ls_node-isfolder = abap_true.
+    IF sy-subrc <> 0 OR ls_node-isfolder = abap_true.
       RETURN.
     ENDIF.
 
@@ -617,27 +589,23 @@ CLASS lcl_application IMPLEMENTATION.
                                      CHANGING lw_data.
 
 * Get current cursor position/selection in editor
-    CALL METHOD s_tab_active-o_textedit->get_selection_pos
-      IMPORTING
-        from_line = lw_line_start
-        from_pos  = lw_pos_start
-        to_line   = lw_line_end
-        to_pos    = lw_pos_end
-      EXCEPTIONS
-        OTHERS    = 4.
-    IF sy-subrc NE 0.
+    s_tab_active-o_textedit->get_selection_pos(
+      IMPORTING from_line = lw_line_start
+                from_pos = lw_pos_start
+                to_line = lw_line_end
+                to_pos = lw_pos_end
+                EXCEPTIONS OTHERS = 4 ).
+    IF sy-subrc <> 0.
       MESSAGE 'Cannot get cursor position'(m35) TYPE c_msg_error.
     ENDIF.
 
 *   If text is selected/highlighted, delete it
-    IF lw_line_start NE lw_line_end
-    OR lw_pos_start NE lw_pos_end.
-      CALL METHOD s_tab_active-o_textedit->delete_text
-        EXPORTING
-          from_line = lw_line_start
-          from_pos  = lw_pos_start
-          to_line   = lw_line_end
-          to_pos    = lw_pos_end.
+    IF lw_line_start <> lw_line_end
+        OR lw_pos_start <> lw_pos_end.
+      s_tab_active-o_textedit->delete_text( from_line = lw_line_start
+                                                      from_pos = lw_pos_start
+                                                      to_line = lw_line_end
+                                                      to_pos = lw_pos_end ).
     ENDIF.
 
     PERFORM editor_paste USING lw_data lw_line_start lw_pos_start.
@@ -653,15 +621,11 @@ CLASS lcl_application IMPLEMENTATION.
     DATA lt_query TYPE TABLE OF string.
     READ TABLE t_node_repository INTO s_node_repository
                WITH KEY node_key = node_key.
-    IF sy-subrc = 0 AND NOT s_node_repository-relatkey IS INITIAL.
+    IF sy-subrc = 0 AND s_node_repository-relatkey IS NOT INITIAL.
       PERFORM query_load USING s_node_repository-queryid
                          CHANGING lt_query.
 
-      CALL METHOD s_tab_active-o_textedit->set_text
-        EXPORTING
-          table  = lt_query
-        EXCEPTIONS
-          OTHERS = 0.
+      s_tab_active-o_textedit->set_text( EXPORTING table = lt_query EXCEPTIONS OTHERS = 0 ).
 
       PERFORM ddic_refresh_tree.
     ENDIF.
@@ -674,7 +638,7 @@ CLASS lcl_application IMPLEMENTATION.
 *       Handle grid toolbar to add specific button
 *----------------------------------------------------------------------*
   METHOD hnd_result_toolbar.
-    DATA: ls_toolbar  TYPE stb_button.
+    DATA ls_toolbar  TYPE stb_button.
 
 * Add Separator
     CLEAR ls_toolbar.
@@ -702,10 +666,8 @@ CLASS lcl_application IMPLEMENTATION.
 *----------------------------------------------------------------------*
   METHOD hnd_result_user_command.
     IF e_ucomm = 'CLOSE_GRID'.
-      CALL METHOD o_splitter->set_row_height
-        EXPORTING
-          id     = 1
-          height = 100.
+      o_splitter->set_row_height( id = 1
+                                            height = 100 ).
     ENDIF.
   ENDMETHOD. "hnd_result_user_command
 
@@ -716,13 +678,13 @@ CLASS lcl_application IMPLEMENTATION.
 *       Handle drag on DDIC field (store fieldname)
 *----------------------------------------------------------------------*
   METHOD hnd_ddic_drag.
-    DATA : lo_drag_object TYPE REF TO lcl_drag_object,
+    DATA: lo_drag_object TYPE REF TO lcl_drag_object,
            ls_node        LIKE LINE OF s_tab_active-t_node_ddic,
            lw_text        TYPE string.
 
     READ TABLE s_tab_active-t_node_ddic INTO ls_node
                WITH KEY node_key = node_key.
-    IF sy-subrc NE 0 OR ls_node-isfolder = abap_true. "may not append
+    IF sy-subrc <> 0 OR ls_node-isfolder = abap_true. "may not append
       MESSAGE 'Only fields can be drag&drop to editor'(m34)
                TYPE c_msg_success DISPLAY LIKE c_msg_error.
       RETURN.
@@ -733,7 +695,7 @@ CLASS lcl_application IMPLEMENTATION.
                                      CHANGING lw_text.
 
 * Store the node text
-    CREATE OBJECT lo_drag_object.
+    lo_drag_object = NEW #( ).
     lo_drag_object->field = lw_text.
     drag_drop_object->object = lo_drag_object.
 
@@ -806,7 +768,7 @@ MODULE status_0010 OUTPUT.
     APPEND s_tab_active TO t_tabs.
   ENDIF.
 
-  perform set_status_010.
+  PERFORM set_status_010.
 
 ENDMODULE.                 " STATUS_0010  OUTPUT
 
@@ -876,26 +838,18 @@ MODULE user_command_0010 INPUT.
     WHEN 'XMLI'.
       PERFORM import_xml.
     WHEN OTHERS.
-      IF w_okcode(3) = 'TAB' AND w_tabstrip-activetab NE w_okcode.
+      IF w_okcode(3) = 'TAB' AND w_tabstrip-activetab <> w_okcode.
         PERFORM leave_current_tab.
 
         READ TABLE t_tabs INTO s_tab_active INDEX w_okcode+3.
 * Display editor / ddic / alv
-        CALL METHOD s_tab_active-o_textedit->set_visible
-          EXPORTING
-            visible = abap_true.
-        CALL METHOD s_tab_active-o_tree_ddic->set_visible
-          EXPORTING
-            visible = abap_true.
-        IF NOT s_tab_active-o_alv_result IS INITIAL.
-          CALL METHOD s_tab_active-o_alv_result->set_visible
-            EXPORTING
-              visible = abap_true.
+        s_tab_active-o_textedit->set_visible( visible = abap_true ).
+        s_tab_active-o_tree_ddic->set_visible( visible = abap_true ).
+        IF s_tab_active-o_alv_result IS NOT INITIAL.
+          s_tab_active-o_alv_result->set_visible( visible = abap_true ).
         ENDIF.
-        CALL METHOD o_splitter->set_row_height
-          EXPORTING
-            id     = 1
-            height = s_tab_active-row_height.
+        o_splitter->set_row_height( id = 1
+                                              height = s_tab_active-row_height ).
         w_tabstrip-activetab = w_okcode.
       ENDIF.
   ENDCASE.
@@ -944,7 +898,7 @@ FORM screen_init.
   PERFORM options_load.
 
 * Create the handle object (required to catch events)
-  CREATE OBJECT o_handle_event.
+  o_handle_event = NEW #( ).
 
 * Split the screen into 4 parts
   PERFORM screen_init_splitter.
@@ -976,89 +930,53 @@ ENDFORM.                    " SCREEN_INIT
 FORM screen_init_splitter.
 
 * Create the custom container
-  CREATE OBJECT o_container
-    EXPORTING
-      container_name = 'CUSTCONT'.
+  o_container = NEW #( container_name = 'CUSTCONT' ).
 
 * Insert splitter into this container
-  CREATE OBJECT o_splitter
-    EXPORTING
-      parent  = o_container
-      rows    = 2
-      columns = 1.
+  o_splitter = NEW #( parent = o_container
+                      rows = 2
+                      columns = 1 ).
 
 * Get the first row of the main splitter
-  CALL METHOD o_splitter->get_container
-    EXPORTING
-      row       = 1
-      column    = 1
-    RECEIVING
-      container = o_container_top.
+  o_splitter->get_container( EXPORTING row = 1
+                                       column = 1 RECEIVING container = o_container_top ).
 
 *  Spliter for the high part (first row)
-  CREATE OBJECT o_splitter_top
-    EXPORTING
-      parent  = o_container_top
-      rows    = 1
-      columns = 3.
+  o_splitter_top = NEW #( parent = o_container_top
+                          rows = 1
+                          columns = 3 ).
 
 * Get the right part of the top part
-  CALL METHOD o_splitter_top->get_container
-    EXPORTING
-      row       = 1
-      column    = 3
-    RECEIVING      "container = o_container_ddic.
-      container = o_container_top_right.
+  o_splitter_top->get_container( EXPORTING row = 1
+                                           column = 3 RECEIVING container = o_container_top_right ).
 
 * Add a toolbar to the DDIC container
-  CREATE OBJECT o_splitter_top_right
-    EXPORTING
-      i_r_container = o_container_top_right.
+  o_splitter_top_right = NEW #( i_r_container = o_container_top_right ).
 
 * Affect an object to each "cell" of the high sub splitter
-  CALL METHOD o_splitter_top->get_container
-    EXPORTING
-      row       = 1
-      column    = 1
-    RECEIVING
-      container = o_container_repository.
+  o_splitter_top->get_container( EXPORTING row = 1
+                                           column = 1 RECEIVING container = o_container_repository ).
 
-  CALL METHOD o_splitter_top->get_container
-    EXPORTING
-      row       = 1
-      column    = 2
-    RECEIVING
-      container = o_container_query.
+  o_splitter_top->get_container( EXPORTING row = 1
+                                           column = 2 RECEIVING container = o_container_query ).
 
-  CALL METHOD o_splitter_top_right->get_controlcontainer
-    RECEIVING
-      e_r_container_control = o_container_ddic.
+  o_splitter_top_right->get_controlcontainer( RECEIVING e_r_container_control = o_container_ddic ).
 
-  CALL METHOD o_splitter->get_container
-    EXPORTING
-      row       = 2
-      column    = 1
-    RECEIVING
-      container = o_container_result.
+  o_splitter->get_container( EXPORTING row = 2
+                                       column = 1 RECEIVING container = o_container_result ).
 
 * Initial repartition :
 *   line 1 = 100% (code+repo+ddic)
 *   line 2 = 0% (result)
 *   line 1 col 1 & 3 = 20% (repo & ddic)
 *   line 1 col 2 = 60% (code)
-  CALL METHOD o_splitter->set_row_height
-    EXPORTING
-      id     = 1
-      height = 100.
+  o_splitter->set_row_height( id = 1
+                                        height = 100 ).
 
-  CALL METHOD o_splitter_top->set_column_width
-    EXPORTING
-      id    = 1
-      width = 20.
-  CALL METHOD o_splitter_top->set_column_width
-    EXPORTING
-      id    = 3
-      width = 20.
+  o_splitter_top->set_column_width( id = 1
+                                              width = 20 ).
+  o_splitter_top->set_column_width( id = 3
+                                              width = 20 ).
 
 ENDFORM.                    " SCREEN_INIT_SPLITTER
 
@@ -1102,17 +1020,13 @@ FORM ddic_toolbar_init.
   ls_button-butn_type = 0.
   APPEND ls_button TO lt_button.
 
-  CALL METHOD o_toolbar->add_button_group
-    EXPORTING
-      data_table = lt_button.
+  o_toolbar->add_button_group( data_table = lt_button ).
 
 * Register events
   ls_events-eventid = cl_gui_toolbar=>m_id_function_selected.
   ls_events-appl_event = space.
   APPEND ls_events TO lt_events.
-  CALL METHOD o_toolbar->set_registered_events
-    EXPORTING
-      events = lt_events.
+  o_toolbar->set_registered_events( events = lt_events ).
 
   SET HANDLER o_handle_event->hnd_ddic_toolbar_clic FOR o_toolbar.
 
@@ -1125,12 +1039,13 @@ ENDFORM.                    "ddic_toolbar_init
 *       Fill it with last query, or template if no previous query
 *----------------------------------------------------------------------*
 FORM editor_init.
-  DATA : lt_events     TYPE cntl_simple_events,
+  DATA: lt_events     TYPE cntl_simple_events,
          ls_event      TYPE cntl_simple_event,
          lt_default    TYPE TABLE OF string,
          lw_queryid    TYPE ztoad-queryid,
          lo_dragrop    TYPE REF TO cl_dragdrop,
-         lw_dummy_date TYPE timestamp.                      "#EC NEEDED
+         lw_dummy_date TYPE timestamp.
+  DATA lo_completer TYPE REF TO cl_abap_parser.                      "#EC NEEDED
 
 * For first tab, Get last query used
   IF t_tabs IS INITIAL.
@@ -1156,14 +1071,9 @@ FORM editor_init.
     PERFORM editor_get_default_query CHANGING lt_default.
   ENDIF.
 
-* Create the sql editor
-*  CREATE OBJECT s_tab_active-o_container_query
-*    EXPORTING
-*      parent = o_container_query.
 
-  CREATE OBJECT s_tab_active-o_textedit
-    EXPORTING
-      parent = o_container_query.
+
+  s_tab_active-o_textedit = NEW #( parent = o_container_query ).
 
 * Register events
   SET HANDLER o_handle_event->hnd_editor_f1 FOR s_tab_active-o_textedit.
@@ -1172,25 +1082,19 @@ FORM editor_init.
   ls_event-eventid = cl_gui_textedit=>event_f1.
   APPEND ls_event TO lt_events.
 
-  CALL METHOD s_tab_active-o_textedit->set_registered_events
-    EXPORTING
-      events                    = lt_events
-    EXCEPTIONS
-      cntl_error                = 1
-      cntl_system_error         = 2
-      illegal_event_combination = 3.
+  s_tab_active-o_textedit->set_registered_events( EXPORTING events = lt_events EXCEPTIONS cntl_error = 1 cntl_system_error = 2 illegal_event_combination = 3 ).
   IF sy-subrc <> 0.
     IF sy-msgno IS NOT INITIAL.
       MESSAGE ID sy-msgid TYPE sy-msgty NUMBER sy-msgno
               DISPLAY LIKE c_msg_error
-              WITH sy-msgv1 sy-msgv2 sy-msgv3 sy-msgv4 .
+              WITH sy-msgv1 sy-msgv2 sy-msgv3 sy-msgv4.
     ENDIF.
   ENDIF.
 
 * Activate Code Completion and Quickinfo
 * Comment the paragraph if CL_ABAP_PARSER doesnt exists on your system
 * BEGIN OF ABAP PARSER
-  DATA lo_completer TYPE REF TO cl_abap_parser.
+
   CALL METHOD s_tab_active-o_textedit->('INIT_COMPLETER').
   CALL METHOD s_tab_active-o_textedit->('GET_COMPLETER')
     RECEIVING
@@ -1204,30 +1108,18 @@ FORM editor_init.
 * END OF ABAP PARSER
 
 * Manage Drop on SQL editor
-  CREATE OBJECT lo_dragrop.
-  CALL METHOD lo_dragrop->add
-    EXPORTING
-      flavor     = 'EDIT_INSERT'
-      dragsrc    = space
-      droptarget = abap_true
-      effect     = cl_dragdrop=>copy.
-  CALL METHOD s_tab_active-o_textedit->set_dragdrop
-    EXPORTING
-      dragdrop = lo_dragrop.
+  lo_dragrop = NEW #( ).
+  lo_dragrop->add( flavor = 'EDIT_INSERT'
+                             dragsrc = space
+                             droptarget = abap_true
+                             effect = cl_dragdrop=>copy ).
+  s_tab_active-o_textedit->set_dragdrop( dragdrop = lo_dragrop ).
 
 * Set Default template
-  CALL METHOD s_tab_active-o_textedit->set_text
-    EXPORTING
-      table  = lt_default
-    EXCEPTIONS
-      OTHERS = 0.
+  s_tab_active-o_textedit->set_text( EXPORTING table = lt_default EXCEPTIONS OTHERS = 0 ).
 
 * Set focus
-  CALL METHOD cl_gui_control=>set_focus
-    EXPORTING
-      control = s_tab_active-o_textedit
-    EXCEPTIONS
-      OTHERS  = 0.
+  cl_gui_control=>set_focus( EXPORTING control = s_tab_active-o_textedit EXCEPTIONS OTHERS = 0 ).
 
   PERFORM ddic_refresh_tree.
 ENDFORM.                    " EDITOR_INIT
@@ -1242,12 +1134,11 @@ ENDFORM.                    " EDITOR_INIT
 *----------------------------------------------------------------------*
 FORM query_process USING fw_display TYPE c
                          fw_download TYPE c.
-  DATA : lw_query         TYPE string,
+  DATA: lw_query         TYPE string,
          lw_select        TYPE string,
          lw_from          TYPE string,
          lw_where         TYPE string,
          lw_union         TYPE string,
-         lw_query2        TYPE string,
          lw_command       TYPE string,
          lw_rows(6)       TYPE n,
          lw_program       TYPE sy-repid,
@@ -1255,20 +1146,17 @@ FORM query_process USING fw_display TYPE c
          lo_result2       TYPE REF TO data,
          lt_fieldlist     TYPE ty_fieldlist_table,
          lt_fieldlist2    TYPE ty_fieldlist_table,
-         lw_count_only(1) TYPE c,
          lw_time          TYPE p LENGTH 8 DECIMALS 2,
          lw_time2         LIKE lw_time,
          lw_count         TYPE i,
          lw_count2        LIKE lw_count,
-         lw_charnumb(12)  TYPE c,
          lw_msg           TYPE string,
          lw_noauth(1)     TYPE c,
          lw_newsyntax(1)  TYPE c,
          lw_answer(1)     TYPE c,
-         lw_from_concat   LIKE lw_from,
          lw_error(1)      TYPE c.
 
-  FIELD-SYMBOLS : <lft_data>  TYPE STANDARD TABLE,
+  FIELD-SYMBOLS: <lft_data>  TYPE STANDARD TABLE,
                   <lft_data2> TYPE STANDARD TABLE.
 
 * Get only usefull code for current query
@@ -1279,18 +1167,18 @@ FORM query_process USING fw_display TYPE c
                       CHANGING lw_select lw_from lw_where
                                lw_union lw_rows lw_noauth
                                lw_newsyntax lw_error.
-  IF lw_error NE space.
+  IF lw_error <> space.
     MESSAGE 'Cannot parse the query'(m07) TYPE c_msg_error.
   ENDIF.
 
 * Not a select query
   IF lw_select IS INITIAL.
-    PERFORM query_parse_noselect USING    lw_query
+    PERFORM query_parse_noselect USING lw_query
                                  CHANGING lw_noauth
                                           lw_command
                                           lw_from
                                           lw_where.
-    IF lw_noauth NE space.
+    IF lw_noauth <> space.
       PERFORM ddic_set_tree USING lw_from.
       RETURN.
     ENDIF.
@@ -1303,7 +1191,7 @@ FORM query_process USING fw_display TYPE c
     ENDIF.
 
 * For other no select command, generate program
-    IF w_run LT c_query_max_exec.
+    IF w_run < c_query_max_exec.
       PERFORM query_generate_noselect USING lw_command lw_from
                                             lw_where fw_display
                                       CHANGING lw_program.
@@ -1328,12 +1216,12 @@ FORM query_process USING fw_display TYPE c
         EXCEPTIONS
           text_not_found        = 1
           OTHERS                = 2.
-      IF sy-subrc NE 0 OR lw_answer NE '1'.
+      IF sy-subrc <> 0 OR lw_answer <> '1'.
         RETURN.
       ENDIF.
     ENDIF.
-    lw_count_only = abap_true. "no result grid to display
-  ELSEIF lw_noauth NE space.
+    DATA(lw_count_only) = abap_true. "no result grid to display
+  ELSEIF lw_noauth <> space.
     PERFORM ddic_set_tree USING lw_from.
     RETURN.
   ELSEIF lw_from IS INITIAL.
@@ -1341,7 +1229,7 @@ FORM query_process USING fw_display TYPE c
     MESSAGE 'Cannot parse the query'(m07) TYPE c_msg_error.
   ELSE.
 * Generate SELECT subroutine
-    IF w_run LT c_query_max_exec.
+    IF w_run < c_query_max_exec.
       PERFORM query_generate USING lw_select lw_from
                                    lw_where fw_display
                                    lw_newsyntax
@@ -1360,30 +1248,30 @@ FORM query_process USING fw_display TYPE c
 
 
 * Call the generated subroutine
-  IF NOT lw_program IS INITIAL.
+  IF lw_program IS NOT INITIAL.
     PERFORM run_sql IN PROGRAM (lw_program)
                     CHANGING lo_result lw_time lw_count.
-    lw_from_concat = lw_from.
+    DATA(lw_from_concat) = lw_from.
 * For union, process second (and further) query
-    WHILE NOT lw_union IS INITIAL.
+    WHILE lw_union IS NOT INITIAL.
 * Parse Query
-      lw_query2 = lw_union.
+      DATA(lw_query2) = lw_union.
       PERFORM query_parse USING lw_query2
                           CHANGING lw_select lw_from lw_where
                                    lw_union lw_rows lw_noauth
                                    lw_newsyntax lw_error.
       CONCATENATE lw_from_concat 'JOIN' lw_from INTO lw_from_concat.
-      IF lw_noauth NE space.
+      IF lw_noauth <> space.
         PERFORM ddic_set_tree USING lw_from_concat.
         RETURN.
       ELSEIF lw_select IS INITIAL OR lw_from IS INITIAL
-      OR lw_error = abap_true.
+          OR lw_error = abap_true.
         PERFORM ddic_set_tree USING lw_from_concat.
         MESSAGE 'Cannot parse the unioned query'(m08) TYPE c_msg_error.
         EXIT. "exit while
       ENDIF.
 * Generate subroutine
-      IF w_run LT c_query_max_exec.
+      IF w_run < c_query_max_exec.
         PERFORM query_generate USING lw_select lw_from
                                      lw_where fw_display
                                      lw_newsyntax
@@ -1406,7 +1294,7 @@ FORM query_process USING fw_display TYPE c
       ASSIGN lo_result->* TO <lft_data>.
       ASSIGN lo_result2->* TO <lft_data2>.
       APPEND LINES OF <lft_data2> TO <lft_data>.
-      REFRESH <lft_data2>.
+      CLEAR <lft_data2>.
       lw_time = lw_time + lw_time2.
       lw_count = lw_count + lw_count2.
     ENDWHILE.
@@ -1414,11 +1302,11 @@ FORM query_process USING fw_display TYPE c
     PERFORM ddic_set_tree USING lw_from_concat.
 
 * Display message
-    lw_charnumb = lw_time.
+    DATA(lw_charnumb) = lw_time.
     CONCATENATE 'Query executed in'(m09) lw_charnumb INTO lw_msg
                 SEPARATED BY space.
     lw_charnumb = lw_count.
-    IF NOT lw_select IS INITIAL.
+    IF lw_select IS NOT INITIAL.
       CONCATENATE lw_msg 'seconds.'(m10)
                   lw_charnumb 'entries found'(m11)
                   INTO lw_msg SEPARATED BY space.
@@ -1454,7 +1342,7 @@ ENDFORM.                    " QUERY_PROCESS
 *----------------------------------------------------------------------*
 FORM editor_get_query USING fw_force_last TYPE c
                       CHANGING fw_query TYPE string.
-  DATA : lt_query         TYPE soli_tab,
+  DATA: lt_query         TYPE soli_tab,
          ls_query         LIKE LINE OF lt_query,
          ls_find          TYPE match_result,
          lt_find          TYPE match_result_tab,
@@ -1464,23 +1352,16 @@ FORM editor_get_query USING fw_force_last TYPE c
          lw_cursor_pos    TYPE i,
          lw_delto_line    TYPE i,
          lw_delto_pos     TYPE i,
-         lw_cursor_offset TYPE i,
          lw_last          TYPE c.
 
   CLEAR fw_query.
 
 * Get selected content
-  CALL METHOD s_tab_active-o_textedit->get_selected_text_as_table
-    IMPORTING
-      table = lt_query[].
+  s_tab_active-o_textedit->get_selected_text_as_table( IMPORTING table = lt_query[] ).
 
 * if no selected content, get complete content of abap edit box
   IF lt_query[] IS INITIAL.
-    CALL METHOD s_tab_active-o_textedit->get_text
-      IMPORTING
-        table  = lt_query[]
-      EXCEPTIONS
-        OTHERS = 1.
+    s_tab_active-o_textedit->get_text( IMPORTING table = lt_query[] EXCEPTIONS OTHERS = 1 ).
   ENDIF.
 
 * Remove * comment
@@ -1491,18 +1372,18 @@ FORM editor_get_query USING fw_force_last TYPE c
 
 * Remove " comment
   LOOP AT lt_query INTO ls_query WHERE line CS '"'.
-*    condense ls_query-line.
+
     FIND ALL OCCURRENCES OF '"' IN ls_query-line RESULTS lt_find.
-    IF sy-subrc NE 0. "may not occurs
+    IF sy-subrc <> 0. "may not occurs
       CONTINUE.
     ENDIF.
     LOOP AT lt_find INTO ls_find.
-      IF ls_find-offset GT 0.
+      IF ls_find-offset > 0.
 * Search open '
         FIND ALL OCCURRENCES OF '''' IN ls_query-line(ls_find-offset)
              RESULTS lt_find_sub.
         IF sy-subrc = 0.
-          DESCRIBE TABLE lt_find_sub LINES lw_lines.
+          lw_lines = lines( lt_find_sub ).
           lw_lines = lw_lines MOD 2.
           IF lw_lines = 1.
             CONTINUE.
@@ -1519,14 +1400,11 @@ FORM editor_get_query USING fw_force_last TYPE c
   ENDLOOP.
 
 * Find active query
-  CALL METHOD s_tab_active-o_textedit->get_selection_pos
-    IMPORTING
-      from_line = lw_cursor_line
-      from_pos  = lw_cursor_pos.
-  lw_cursor_offset = lw_cursor_pos - 1.
+  s_tab_active-o_textedit->get_selection_pos( IMPORTING from_line = lw_cursor_line from_pos = lw_cursor_pos ).
+  DATA(lw_cursor_offset) = lw_cursor_pos - 1.
 
   FIND ALL OCCURRENCES OF '.' IN TABLE lt_query RESULTS lt_find.
-  CLEAR : lw_delto_line,
+  CLEAR: lw_delto_line,
           lw_delto_pos,
           lw_last.
   LOOP AT lt_find INTO ls_find.
@@ -1534,11 +1412,11 @@ FORM editor_get_query USING fw_force_last TYPE c
       lw_last = abap_true.
     ENDAT.
 * Search for open '
-    IF ls_find-offset GT 0.
+    IF ls_find-offset > 0.
       READ TABLE lt_query INTO ls_query INDEX ls_find-line.
       FIND ALL OCCURRENCES OF '''' IN ls_query(ls_find-offset)
            RESULTS lt_find_sub.
-      DESCRIBE TABLE lt_find_sub LINES lw_lines.
+      lw_lines = lines( lt_find_sub ).
       lw_lines = lw_lines MOD 2.
 * If open ' found, ignore the dot
       IF lw_lines = 1.
@@ -1547,10 +1425,10 @@ FORM editor_get_query USING fw_force_last TYPE c
     ENDIF.
 
 * Active Query
-    IF ls_find-line GT lw_cursor_line
-    OR ( ls_find-line = lw_cursor_line
-         AND ls_find-offset GE lw_cursor_offset )
-    OR ( lw_last = abap_true AND fw_force_last = abap_true ).
+    IF ls_find-line > lw_cursor_line
+        OR ( ls_find-line = lw_cursor_line
+         AND ls_find-offset >= lw_cursor_offset )
+        OR ( lw_last = abap_true AND fw_force_last = abap_true ).
 * Delete all query after query active
       ls_find-line = ls_find-line + 1.
       DELETE lt_query FROM ls_find-line.
@@ -1571,8 +1449,8 @@ FORM editor_get_query USING fw_force_last TYPE c
   ENDLOOP.
 
 * Delete all query before query active
-  IF NOT lw_delto_line IS INITIAL.
-    IF lw_delto_line GT 1.
+  IF lw_delto_line IS NOT INITIAL.
+    IF lw_delto_line > 1.
       lw_delto_line = lw_delto_line - 1.
       DELETE lt_query FROM 1 TO lw_delto_line.
     ENDIF.
@@ -1590,7 +1468,7 @@ FORM editor_get_query USING fw_force_last TYPE c
     SHIFT ls_query-line LEFT DELETING LEADING space.
     CONCATENATE fw_query ls_query-line INTO fw_query SEPARATED BY space.
   ENDLOOP.
-  IF NOT fw_query IS INITIAL.
+  IF fw_query IS NOT INITIAL.
     fw_query = fw_query+1.
   ENDIF.
 
@@ -1619,7 +1497,7 @@ ENDFORM.                    " EDITOR_GET_QUERY
 *      <--FW_NEWSYNTAX Use new SQL syntax introduced with NW7.40 SP5
 *      <--FW_ERROR   Cannot parse the query
 *----------------------------------------------------------------------*
-FORM query_parse  USING    fw_query TYPE string
+FORM query_parse  USING fw_query TYPE string
                   CHANGING fw_select TYPE string
                            fw_from TYPE string
                            fw_where TYPE string
@@ -1629,20 +1507,16 @@ FORM query_parse  USING    fw_query TYPE string
                            fw_newsyntax TYPE c
                            fw_error TYPE c.
 
-  DATA : ls_find_select TYPE match_result,
+  DATA: ls_find_select TYPE match_result,
          ls_find_from   TYPE match_result,
          ls_find_where  TYPE match_result,
          ls_sub         LIKE LINE OF ls_find_select-submatches,
-         lw_offset      TYPE i,
-         lw_length      TYPE i,
-         lw_query       TYPE string,
          lo_regex       TYPE REF TO cl_abap_regex,
          lt_split       TYPE TABLE OF string,
          lw_string      TYPE string,
-         lw_tabix       TYPE i,
          lw_table       TYPE tabname.
 
-  CLEAR : fw_select,
+  CLEAR: fw_select,
           fw_from,
           fw_where,
           fw_rows,
@@ -1650,23 +1524,21 @@ FORM query_parse  USING    fw_query TYPE string
           fw_noauth,
           fw_newsyntax.
 
-  lw_query = fw_query.
+  DATA(lw_query) = fw_query.
 
 * Search union
   FIND FIRST OCCURRENCE OF ' UNION SELECT ' IN lw_query
        RESULTS ls_find_select IGNORING CASE.
   IF sy-subrc = 0.
-    lw_offset = ls_find_select-offset + 7.
+    DATA(lw_offset) = ls_find_select-offset + 7.
     fw_union = lw_query+lw_offset.
     lw_query = lw_query(ls_find_select-offset).
   ENDIF.
 
 * Search UP TO xxx ROWS.
 * Catch the number of rows, delete command in query
-  CREATE OBJECT lo_regex
-    EXPORTING
-      pattern     = 'UP TO ([0-9]+) ROWS'
-      ignore_case = abap_true.
+  lo_regex = NEW #( pattern = 'UP TO ([0-9]+) ROWS'
+                    ignore_case = abap_true ).
   FIND FIRST OCCURRENCE OF REGEX lo_regex
        IN lw_query RESULTS ls_find_select.
   IF sy-subrc = 0.
@@ -1686,15 +1558,13 @@ FORM query_parse  USING    fw_query TYPE string
               '| CORRESPONDING FIELDS OF TABLE |'
               'CORRESPONDING FIELDS OF | )(\S*)'
               INTO lw_string SEPARATED BY space.
-  CREATE OBJECT lo_regex
-    EXPORTING
-      pattern     = lw_string
-      ignore_case = abap_true.
+  lo_regex = NEW #( pattern = lw_string
+                    ignore_case = abap_true ).
   FIND FIRST OCCURRENCE OF REGEX lo_regex
        IN lw_query RESULTS ls_find_select.
   IF sy-subrc = 0.
-    IF ls_find_select-length NE 0
-    AND fw_query+ls_find_select-offset(ls_find_select-length) CS '@'.
+    IF ls_find_select-length <> 0
+        AND fw_query+ls_find_select-offset(ls_find_select-length) CS '@'.
       fw_newsyntax = abap_true.
     ENDIF.
     REPLACE FIRST OCCURRENCE OF REGEX lo_regex IN lw_query WITH ''.
@@ -1703,7 +1573,7 @@ FORM query_parse  USING    fw_query TYPE string
 * Search SELECT
   FIND FIRST OCCURRENCE OF 'SELECT ' IN lw_query
        RESULTS ls_find_select IGNORING CASE.
-  IF sy-subrc NE 0.
+  IF sy-subrc <> 0.
     RETURN.
   ENDIF.
 
@@ -1711,7 +1581,7 @@ FORM query_parse  USING    fw_query TYPE string
   FIND FIRST OCCURRENCE OF ' FROM '
        IN SECTION OFFSET ls_find_select-offset OF lw_query
        RESULTS ls_find_from IGNORING CASE.
-  IF sy-subrc NE 0.
+  IF sy-subrc <> 0.
     fw_error = abap_true.
     RETURN.
   ENDIF.
@@ -1720,22 +1590,22 @@ FORM query_parse  USING    fw_query TYPE string
   FIND FIRST OCCURRENCE OF ' WHERE '
        IN SECTION OFFSET ls_find_from-offset OF lw_query
        RESULTS ls_find_where IGNORING CASE.
-  IF sy-subrc NE 0.
+  IF sy-subrc <> 0.
     FIND FIRST OCCURRENCE OF ' GROUP BY ' IN lw_query
          RESULTS ls_find_where IGNORING CASE.
   ENDIF.
-  IF sy-subrc NE 0.
+  IF sy-subrc <> 0.
     FIND FIRST OCCURRENCE OF ' HAVING ' IN lw_query
          RESULTS ls_find_where IGNORING CASE.
   ENDIF.
-  IF sy-subrc NE 0.
+  IF sy-subrc <> 0.
     FIND FIRST OCCURRENCE OF ' ORDER BY ' IN lw_query
          RESULTS ls_find_where IGNORING CASE.
   ENDIF.
 
   lw_offset = ls_find_select-offset + 7.
-  lw_length = ls_find_from-offset - ls_find_select-offset - 7.
-  IF lw_length LE 0.
+  DATA(lw_length) = ls_find_from-offset - ls_find_select-offset - 7.
+  IF lw_length <= 0.
     fw_error = abap_true.
     RETURN.
   ENDIF.
@@ -1758,26 +1628,26 @@ FORM query_parse  USING    fw_query TYPE string
   ENDIF.
 
 * Authority-check on used select tables
-  IF s_customize-auth_object NE space OR s_customize-auth_select NE '*'.
+  IF s_customize-auth_object <> space OR s_customize-auth_select <> '*'.
     CONCATENATE 'JOIN' fw_from INTO lw_string SEPARATED BY space.
     TRANSLATE lw_string TO UPPER CASE.
     SPLIT lw_string AT space INTO TABLE lt_split.
     LOOP AT lt_split INTO lw_string.
-      lw_tabix = sy-tabix + 1.
+      DATA(lw_tabix) = sy-tabix + 1.
       CHECK lw_string = 'JOIN'.
 * Read next line (table name)
       READ TABLE lt_split INTO lw_table INDEX lw_tabix.
       CHECK sy-subrc = 0.
 
-      IF s_customize-auth_object NE space.
+      IF s_customize-auth_object <> space.
         AUTHORITY-CHECK OBJECT s_customize-auth_object
                  ID 'TABLE' FIELD lw_table
                  ID 'ACTVT' FIELD s_customize-actvt_select.
-      ELSEIF s_customize-auth_select NE '*'
-      AND NOT lw_table CP s_customize-auth_select.
+      ELSEIF s_customize-auth_select <> '*'
+          AND NOT lw_table CP s_customize-auth_select.
         sy-subrc = 4.
       ENDIF.
-      IF sy-subrc NE 0.
+      IF sy-subrc <> 0.
         CONCATENATE 'No authorisation for table'(m13) lw_table
                     INTO lw_string SEPARATED BY space.
         MESSAGE lw_string TYPE c_msg_success DISPLAY LIKE c_msg_error.
@@ -1801,21 +1671,19 @@ ENDFORM.                    " QUERY_PARSE
 *----------------------------------------------------------------------*
 FORM add_line_to_table USING fw_line TYPE string
                        CHANGING ft_table TYPE table.
-  DATA : lw_length TYPE i,
-         lw_offset TYPE i,
-         ls_find   TYPE match_result.
+  DATA ls_find   TYPE match_result.
 
-  lw_length = strlen( fw_line ).
-  lw_offset = 0.
+  DATA(lw_length) = strlen( fw_line ).
+  DATA(lw_offset) = 0.
   DO.
-    IF lw_length LE c_line_max.
+    IF lw_length <= c_line_max.
       APPEND fw_line+lw_offset(lw_length) TO ft_table.
       EXIT. "exit do
     ELSE.
       FIND ALL OCCURRENCES OF REGEX '\s' "search space
            IN SECTION OFFSET lw_offset LENGTH c_line_max
            OF fw_line RESULTS ls_find.
-      IF sy-subrc NE 0.
+      IF sy-subrc <> 0.
         APPEND fw_line+lw_offset(c_line_max) TO ft_table.
         lw_length = lw_length - c_line_max.
         lw_offset = lw_offset + c_line_max.
@@ -1845,7 +1713,7 @@ ENDFORM.                    "add_line_to_table
 *      <--FT_FIELDLIST List of fields to display
 *      <--FW_COUNT     = true if query is only count( * )
 *----------------------------------------------------------------------*
-FORM query_generate  USING    fw_select TYPE string
+FORM query_generate  USING fw_select TYPE string
                               fw_from TYPE string
                               fw_where TYPE string
                               fw_display TYPE c
@@ -1855,24 +1723,15 @@ FORM query_generate  USING    fw_select TYPE string
                               ft_fieldlist TYPE ty_fieldlist_table
                               fw_count TYPE c.
 
-  DATA : lt_code_string TYPE TABLE OF string,
+  DATA: lt_code_string TYPE TABLE OF string,
          lt_split       TYPE TABLE OF string,
-         lw_string      TYPE string,
          lw_string2     TYPE string,
          BEGIN OF ls_table_alias,
            table(50) TYPE c,
            alias(50) TYPE c,
          END OF ls_table_alias,
          lt_table_alias      LIKE TABLE OF ls_table_alias,
-         lw_select           TYPE string,
-         lw_from             TYPE string,
-         lw_index            TYPE i,
          lw_select_distinct  TYPE c,
-         lw_select_length    TYPE i,
-         lw_char_10(10)      TYPE c,
-         lw_field_number(6)  TYPE n,
-         lw_current_line     TYPE i,
-         lw_current_length   TYPE i,
          lw_struct_line      TYPE string,
          lw_struct_line_type TYPE string,
          lw_select_table     TYPE string,
@@ -1892,7 +1751,7 @@ FORM query_generate  USING    fw_select TYPE string
                               changing lt_code_string.
   END-OF-DEFINITION.
 
-  CLEAR : lw_select_distinct,
+  CLEAR: lw_select_distinct,
           fw_count.
 
 * Write Header
@@ -1901,16 +1760,16 @@ FORM query_generate  USING    fw_select TYPE string
   c 'TYPE-POOLS: slis.'.                                    "#EC NOTEXT
   c ''.
 
-  lw_select = fw_select.
+  DATA(lw_select) = fw_select.
   TRANSLATE lw_select TO UPPER CASE.
 
-  lw_from = fw_from.
+  DATA(lw_from) = fw_from.
   TRANSLATE lw_from TO UPPER CASE.
 
 * Search special term "single" or "distinct"
-  lw_select_length = strlen( lw_select ).
-  IF lw_select_length GE 7.
-    lw_char_10 = lw_select(7).
+  DATA(lw_select_length) = strlen( lw_select ).
+  IF lw_select_length >= 7.
+    DATA(lw_char_10) = lw_select(7).
     IF lw_char_10 = 'SINGLE'.
 * Force rows number = 1 for select single
       fw_rows = 1.
@@ -1918,7 +1777,7 @@ FORM query_generate  USING    fw_select TYPE string
       lw_select_length = lw_select_length - 7.
     ENDIF.
   ENDIF.
-  IF lw_select_length GE 9.
+  IF lw_select_length >= 9.
     lw_char_10 = lw_select(9).
     IF lw_char_10 = 'DISTINCT'.
       lw_select_distinct = abap_true.
@@ -1934,17 +1793,17 @@ FORM query_generate  USING    fw_select TYPE string
 
 * Create alias table mapping
   SPLIT lw_from AT space INTO TABLE lt_split.
-  LOOP AT lt_split INTO lw_string.
+  LOOP AT lt_split INTO DATA(lw_string).
     IF lw_string IS INITIAL OR lw_string CO space.
       DELETE lt_split.
     ENDIF.
   ENDLOOP.
   DO.
     READ TABLE lt_split TRANSPORTING NO FIELDS WITH KEY = 'AS'.
-    IF sy-subrc NE 0.
+    IF sy-subrc <> 0.
       EXIT. "exit do
     ENDIF.
-    lw_index = sy-tabix - 1.
+    DATA(lw_index) = sy-tabix - 1.
     READ TABLE lt_split INTO lw_string INDEX lw_index.
     ls_table_alias-table = lw_string.
     DELETE lt_split INDEX lw_index. "delete table field
@@ -1969,7 +1828,7 @@ FORM query_generate  USING    fw_select TYPE string
   c '*   Used to store lines of the query  *'.              "#EC NOTEXT
   c '***************************************'.              "#EC NOTEXT
   c 'DATA: BEGIN OF s_result'.                              "#EC NOTEXT
-  lw_field_number = 1.
+  DATA(lw_field_number) = 1.
 
   lw_string = lw_select.
   IF fw_newsyntax = abap_true.
@@ -1979,7 +1838,7 @@ FORM query_generate  USING    fw_select TYPE string
   SPLIT lw_string AT space INTO TABLE lt_split.
 
   LOOP AT lt_split INTO lw_string.
-    lw_current_line = sy-tabix.
+    DATA(lw_current_line) = sy-tabix.
     IF lw_string IS INITIAL OR lw_string CO space.
       CONTINUE.
     ENDIF.
@@ -1988,7 +1847,7 @@ FORM query_generate  USING    fw_select TYPE string
       DELETE lt_split INDEX lw_current_line. "delete the alias name
       CONTINUE.
     ENDIF.
-    lw_current_length = strlen( lw_string ).
+    DATA(lw_current_length) = strlen( lw_string ).
 
     CLEAR ls_fieldlist.
     ls_fieldlist-ref_field = lw_string.
@@ -1999,7 +1858,7 @@ FORM query_generate  USING    fw_select TYPE string
       DO.
         lw_index = lw_index + 1.
         READ TABLE lt_split INTO lw_string INDEX lw_index.
-        IF sy-subrc NE 0.
+        IF sy-subrc <> 0.
           MESSAGE 'Incorrect syntax in Case statement'(m62)
                    TYPE c_msg_success DISPLAY LIKE c_msg_error.
           RETURN.
@@ -2007,7 +1866,7 @@ FORM query_generate  USING    fw_select TYPE string
         IF lw_string = 'END'.
           lw_index = lw_index + 1.
           READ TABLE lt_split INTO lw_string INDEX lw_index.
-          IF lw_string NE 'AS'.
+          IF lw_string <> 'AS'.
             lw_index = lw_index - 1.
             CONTINUE.
           ENDIF.
@@ -2036,7 +1895,7 @@ FORM query_generate  USING    fw_select TYPE string
     ENDIF.
 
 * Manage "Count"
-    IF lw_current_length GE 6.
+    IF lw_current_length >= 6.
       lw_char_10 = lw_string(6).
     ELSE.
       CLEAR lw_char_10.
@@ -2053,7 +1912,7 @@ FORM query_generate  USING    fw_select TYPE string
         ELSE.
 * If there is space in the "count()", delete next lines
           READ TABLE lt_split INTO lw_string INDEX lw_index.
-          IF sy-subrc NE 0.
+          IF sy-subrc <> 0.
             EXIT.
           ENDIF.
           CONCATENATE ls_fieldlist-ref_field lw_string
@@ -2070,7 +1929,7 @@ FORM query_generate  USING    fw_select TYPE string
     ENDIF.
 
 * Manage Agregate AVG
-    IF lw_current_length GE 4.
+    IF lw_current_length >= 4.
       lw_char_10 = lw_string(4).
     ELSE.
       CLEAR lw_char_10.
@@ -2087,7 +1946,7 @@ FORM query_generate  USING    fw_select TYPE string
         ELSE.
 * If there is space in the agregate, delete next lines
           READ TABLE lt_split INTO lw_string INDEX lw_index.
-          IF sy-subrc NE 0.
+          IF sy-subrc <> 0.
             EXIT.
           ENDIF.
           CONCATENATE ls_fieldlist-ref_field lw_string
@@ -2104,14 +1963,14 @@ FORM query_generate  USING    fw_select TYPE string
     ENDIF.
 
 * Manage agregate SUM, MAX, MIN
-    IF lw_current_length GE 4.
+    IF lw_current_length >= 4.
       lw_char_10 = lw_string(4).
     ELSE.
       CLEAR lw_char_10.
     ENDIF.
     IF lw_char_10 = 'SUM(' OR lw_char_10 = 'MAX('
-    OR lw_char_10 = 'MIN('.
-      clear lw_string2.
+        OR lw_char_10 = 'MIN('.
+      CLEAR lw_string2.
       lw_index = lw_current_line + 1.
       DO.
         SEARCH lw_string FOR ')'.
@@ -2120,7 +1979,7 @@ FORM query_generate  USING    fw_select TYPE string
         ELSE.
 * Search name of the field in next lines.
           READ TABLE lt_split INTO lw_string INDEX lw_index.
-          IF sy-subrc NE 0.
+          IF sy-subrc <> 0.
             EXIT.
           ENDIF.
           CONCATENATE ls_fieldlist-ref_field lw_string
@@ -2154,15 +2013,15 @@ FORM query_generate  USING    fw_select TYPE string
     IF lw_string = '*' OR lw_select_field = '*'. " expansion table~*
       CLEAR lw_explicit.
       SELECT fieldname position
-      INTO   (lw_dd03l_fieldname,lw_position_dummy)
-      FROM   dd03l
-      WHERE  tabname    = lw_select_table
-      AND    fieldname <> 'MANDT'
-      AND    as4local   = c_vers_active
-      AND    as4vers    = space
-      AND (  comptype   = c_ddic_dtelm
+          INTO (lw_dd03l_fieldname,lw_position_dummy)
+          FROM dd03l
+          WHERE tabname    = lw_select_table
+          AND fieldname <> 'MANDT'
+          AND as4local   = c_vers_active
+          AND as4vers    = space
+          AND (  comptype   = c_ddic_dtelm
           OR comptype   = space )
-      ORDER BY position.
+          ORDER BY position.
 
         lw_select_field = lw_dd03l_fieldname.
 
@@ -2190,10 +2049,10 @@ FORM query_generate  USING    fw_select TYPE string
         ENDIF.
         CONCATENATE lw_explicit '~' lw_select_field INTO lw_explicit.
       ENDSELECT.
-      IF sy-subrc NE 0.
+      IF sy-subrc <> 0.
         MESSAGE e701(1r) WITH lw_select_table. "table does not exist
       ENDIF.
-      IF NOT lw_explicit IS INITIAL.
+      IF lw_explicit IS NOT INITIAL.
         REPLACE FIRST OCCURRENCE OF lw_string
                 IN lw_select WITH lw_explicit.
       ENDIF.
@@ -2248,7 +2107,7 @@ FORM query_generate  USING    fw_select TYPE string
       c 'INTO s_result-f000001'.                            "#EC NOTEXT
     ENDIF.
   ELSE.
-    IF lw_select_distinct NE space.
+    IF lw_select_distinct <> space.
       CONCATENATE 'SELECT DISTINCT' lw_select               "#EC NOTEXT
                   INTO lw_select SEPARATED BY space.
     ELSE.
@@ -2263,7 +2122,7 @@ FORM query_generate  USING    fw_select TYPE string
     ENDIF.
 
 * Add UP TO xxx ROWS
-    IF NOT fw_rows IS INITIAL.
+    IF fw_rows IS NOT INITIAL.
       c 'UP TO'.                                            "#EC NOTEXT
       c fw_rows.
       c 'ROWS'.                                             "#EC NOTEXT
@@ -2274,7 +2133,7 @@ FORM query_generate  USING    fw_select TYPE string
   c lw_from.
 
 * Where, group by, having, order by
-  IF NOT fw_where IS INITIAL.
+  IF fw_where IS NOT INITIAL.
     c fw_where.
   ENDIF.
   c '.'.
@@ -2285,7 +2144,7 @@ FORM query_generate  USING    fw_select TYPE string
   c 'fw_count = sy-dbcnt.'.                                 "#EC NOTEXT
 
 * If select count( * ), display number of results
-  IF fw_count NE space.
+  IF fw_count <> space.
     c 'MESSAGE i753(TG) WITH s_result-f000001.'.            "#EC NOTEXT
   ENDIF.
   c 'loop at t_result assigning <fs_result>.'.              "#EC NOTEXT
@@ -2293,12 +2152,12 @@ FORM query_generate  USING    fw_select TYPE string
   c 'endloop.'.                                             "#EC NOTEXT
   c 'GET REFERENCE OF t_result INTO fo_result.'.            "#EC NOTEXT
   c 'ENDFORM.'.                                             "#EC NOTEXT
-  CLEAR : lw_line,
+  CLEAR: lw_line,
           lw_word,
           lw_mess.
   SYNTAX-CHECK FOR lt_code_string PROGRAM sy-repid
                MESSAGE lw_mess LINE lw_line WORD lw_word.
-  IF sy-subrc NE 0 AND fw_display = space.
+  IF sy-subrc <> 0 AND fw_display = space.
     MESSAGE lw_mess TYPE c_msg_success DISPLAY LIKE c_msg_error.
     CLEAR fw_program.
     RETURN.
@@ -2334,16 +2193,15 @@ FORM result_display  USING fo_result TYPE REF TO data
                            fw_title TYPE string.
 *  TYPE-POOLS lvc. "for older sap system only
 
-  DATA : ls_layout    TYPE lvc_s_layo,
+  DATA: ls_layout    TYPE lvc_s_layo,
          lt_fieldcat  TYPE lvc_t_fcat,
-         ls_fieldlist TYPE ty_fieldlist,
          ls_fieldcat  LIKE LINE OF lt_fieldcat.
-  DATA : lo_descr_table TYPE REF TO cl_abap_tabledescr,
+  DATA: lo_descr_table TYPE REF TO cl_abap_tabledescr,
          lo_descr_line  TYPE REF TO cl_abap_structdescr,
          ls_compx       TYPE abap_compdescr,
          lw_height      TYPE i.
 
-  FIELD-SYMBOLS: <lft_data> TYPE ANY TABLE.
+  FIELD-SYMBOLS <lft_data> TYPE ANY TABLE.
 
   ASSIGN fo_result->* TO <lft_data>.
 
@@ -2352,11 +2210,11 @@ FORM result_display  USING fo_result TYPE REF TO data
     cl_abap_typedescr=>describe_by_data_ref( fo_result ).
   lo_descr_line ?= lo_descr_table->get_table_line_type( ).
 
-  LOOP AT ft_fieldlist INTO ls_fieldlist.
+  LOOP AT ft_fieldlist INTO DATA(ls_fieldlist).
     CLEAR ls_fieldcat.
     ls_fieldcat-fieldname = ls_fieldlist-field.
 
-    IF NOT ls_fieldlist-ref_table IS INITIAL.
+    IF ls_fieldlist-ref_table IS NOT INITIAL.
       ls_fieldcat-ref_field = ls_fieldlist-ref_field.
       ls_fieldcat-ref_table = ls_fieldlist-ref_table.
       IF s_customize-techname = space.
@@ -2389,27 +2247,16 @@ FORM result_display  USING fo_result TYPE REF TO data
   ls_layout-countfname = 'COUNT'.
 
 * Set the grid config and content
-  CALL METHOD s_tab_active-o_alv_result->set_table_for_first_display
-    EXPORTING
-      is_layout       = ls_layout
-    CHANGING
-      it_outtab       = <lft_data>
-      it_fieldcatalog = lt_fieldcat.
+  s_tab_active-o_alv_result->set_table_for_first_display( EXPORTING is_layout = ls_layout CHANGING it_outtab = <lft_data> it_fieldcatalog = lt_fieldcat ).
 
 * Search if grid is currently displayed
-  CALL METHOD o_splitter->get_row_height
-    EXPORTING
-      id     = 1
-    IMPORTING
-      result = lw_height.
-  CALL METHOD cl_gui_cfw=>flush.
+  o_splitter->get_row_height( EXPORTING id = 1 IMPORTING result = lw_height ).
+  cl_gui_cfw=>flush( ).
 
 * If grid is hidden, display it
   IF lw_height = 100.
-    CALL METHOD o_splitter->set_row_height
-      EXPORTING
-        id     = 1
-        height = 20.
+    o_splitter->set_row_height( id = 1
+                                          height = 20 ).
   ENDIF.
 ENDFORM.                    " RESULT_DISPLAY
 
@@ -2419,15 +2266,14 @@ ENDFORM.                    " RESULT_DISPLAY
 *       Initialize ddic tree
 *----------------------------------------------------------------------*
 FORM ddic_init.
-  DATA : ls_header   TYPE treev_hhdr,
+  DATA: ls_header   TYPE treev_hhdr,
          ls_event    TYPE cntl_simple_event,
          lt_events   TYPE cntl_simple_events,
-         lo_dragdrop TYPE REF TO cl_dragdrop,
-         lw_mode     TYPE i.
+         lo_dragdrop TYPE REF TO cl_dragdrop.
 
   ls_header-heading = 'SAP Table/Fields'(t02).
   ls_header-width = 30.
-  lw_mode = cl_gui_column_tree=>node_sel_mode_single.
+  DATA(lw_mode) = cl_gui_column_tree=>node_sel_mode_single.
 
   CREATE OBJECT s_tab_active-o_tree_ddic
     EXPORTING
@@ -2448,48 +2294,27 @@ FORM ddic_init.
   ENDIF.
 
 * Column2
-  CALL METHOD s_tab_active-o_tree_ddic->add_column
-    EXPORTING
-      name                         = c_ddic_col2
-      width                        = 21
-      header_text                  = 'Description'(t03)
-    EXCEPTIONS
-      column_exists                = 1
-      illegal_column_name          = 2
-      too_many_columns             = 3
-      illegal_alignment            = 4
-      different_column_types       = 5
-      cntl_system_error            = 6
-      failed                       = 7
-      predecessor_column_not_found = 8.
+  s_tab_active-o_tree_ddic->add_column( EXPORTING name = c_ddic_col2
+                                                  width = 21
+                                                  header_text = 'Description'(t03) EXCEPTIONS column_exists = 1 illegal_column_name = 2 too_many_columns = 3 illegal_alignment = 4 different_column_types = 5 cntl_system_error = 6 failed = 7 predecessor_column_not_found = 8 ).
 
 * Manage Item clic event to copy value in clipboard
   ls_event-eventid = cl_gui_column_tree=>eventid_item_double_click.
   ls_event-appl_event = abap_true.
   APPEND ls_event TO lt_events.
 
-  CALL METHOD s_tab_active-o_tree_ddic->set_registered_events
-    EXPORTING
-      events                    = lt_events
-    EXCEPTIONS
-      cntl_error                = 1
-      cntl_system_error         = 2
-      illegal_event_combination = 3.
+  s_tab_active-o_tree_ddic->set_registered_events( EXPORTING events = lt_events EXCEPTIONS cntl_error = 1 cntl_system_error = 2 illegal_event_combination = 3 ).
   IF sy-subrc <> 0.
     MESSAGE a000(tree_control_msg).
   ENDIF.
 
 * Manage Drag from DDIC editor
-  CREATE OBJECT lo_dragdrop.
-  CALL METHOD lo_dragdrop->add
-    EXPORTING
-      flavor     = 'EDIT_INSERT'
-      dragsrc    = abap_true
-      droptarget = space
-      effect     = cl_dragdrop=>copy.
-  CALL METHOD lo_dragdrop->get_handle
-    IMPORTING
-      handle = w_dragdrop_handle_tree.
+  lo_dragdrop = NEW #( ).
+  lo_dragdrop->add( flavor = 'EDIT_INSERT'
+                              dragsrc = abap_true
+                              droptarget = space
+                              effect = cl_dragdrop=>copy ).
+  lo_dragdrop->get_handle( IMPORTING handle = w_dragdrop_handle_tree ).
 
   SET HANDLER o_handle_event->hnd_ddic_item_dblclick FOR s_tab_active-o_tree_ddic.
   SET HANDLER o_handle_event->hnd_ddic_drag FOR s_tab_active-o_tree_ddic.
@@ -2509,16 +2334,13 @@ ENDFORM.                    " DDIC_INIT
 *----------------------------------------------------------------------*
 FORM ddic_set_tree USING fw_from TYPE string.
 
-  DATA : lw_from   TYPE string,
+  DATA: lw_from   TYPE string,
          lt_split  TYPE TABLE OF string,
-         lw_string TYPE string,
-         lw_tabix  TYPE i,
          BEGIN OF ls_table_list,
            table(30),
            alias(30),
          END OF ls_table_list,
          lt_table_list     LIKE TABLE OF ls_table_list,
-         lw_node_number(6) TYPE n,
          ls_node           LIKE LINE OF s_tab_active-t_node_ddic,
          ls_item           LIKE LINE OF s_tab_active-t_item_ddic,
          lw_parent_node    LIKE ls_node-node_key,
@@ -2537,8 +2359,8 @@ FORM ddic_set_tree USING fw_from TYPE string.
   TRANSLATE lw_from TO UPPER CASE.
 
   SPLIT lw_from AT space INTO TABLE lt_split.
-  LOOP AT lt_split INTO lw_string.
-    lw_tabix = sy-tabix + 1.
+  LOOP AT lt_split INTO DATA(lw_string).
+    DATA(lw_tabix) = sy-tabix + 1.
     CHECK sy-tabix = 1 OR lw_string = 'JOIN'.
 * Read next line (table name)
     READ TABLE lt_split INTO lw_string INDEX lw_tabix.
@@ -2561,7 +2383,7 @@ FORM ddic_set_tree USING fw_from TYPE string.
   ENDLOOP.
 
 * Get list of fields for selected tables
-  IF NOT lt_table_list IS INITIAL.
+  IF lt_table_list IS NOT INITIAL.
     SELECT dd03l~tabname dd03l~fieldname dd03l~position
            dd03l~keyflag dd03t~ddtext dd04t~ddtext
            INTO TABLE lt_ddic_fields
@@ -2580,21 +2402,21 @@ FORM ddic_set_tree USING fw_from TYPE string.
            AND dd03l~as4local = c_vers_active
            AND dd03l~as4vers = space
            AND ( dd03l~comptype = c_ddic_dtelm
-           OR    dd03l~comptype = space ).
+           OR dd03l~comptype = space ).
     SORT lt_ddic_fields BY tabname keyflag DESCENDING position.
     DELETE ADJACENT DUPLICATES FROM lt_ddic_fields
                                COMPARING tabname fieldname.
   ENDIF.
 
 * Build Node & Item tree
-  REFRESH : s_tab_active-t_node_ddic,
+  CLEAR: s_tab_active-t_node_ddic,
             s_tab_active-t_item_ddic.
-  lw_node_number = 0.
+  DATA(lw_node_number) = 0.
   LOOP AT lt_table_list INTO ls_table_list.
 * Check table exists (has at least one field)
     READ TABLE lt_ddic_fields TRANSPORTING NO FIELDS
                WITH KEY tabname = ls_table_list-table.
-    IF sy-subrc NE 0.
+    IF sy-subrc <> 0.
       DELETE lt_table_list.
       CONTINUE.
     ENDIF.
@@ -2626,7 +2448,7 @@ FORM ddic_set_tree USING fw_from TYPE string.
            AND ddlanguage = sy-langu
            AND as4local = c_vers_active
            AND as4vers = space.
-    IF sy-subrc NE 0.
+    IF sy-subrc <> 0.
       ls_item-text = ls_table_list-table.
     ENDIF.
     APPEND ls_item TO s_tab_active-t_item_ddic.
@@ -2657,7 +2479,7 @@ FORM ddic_set_tree USING fw_from TYPE string.
       ls_item-text = ls_ddic_fields-fieldname.
       APPEND ls_item TO s_tab_active-t_item_ddic.
       ls_item-item_name = c_ddic_col2.
-      IF NOT ls_ddic_fields-ddtext1 IS INITIAL.
+      IF ls_ddic_fields-ddtext1 IS NOT INITIAL.
         ls_item-text = ls_ddic_fields-ddtext1.
       ELSE.
         ls_item-text = ls_ddic_fields-ddtext2.
@@ -2667,29 +2489,21 @@ FORM ddic_set_tree USING fw_from TYPE string.
   ENDLOOP.
 
 * Add User defined tree from ZSPRO (if relevant)
-  IF NOT t_node_zspro IS INITIAL.
+  IF t_node_zspro IS NOT INITIAL.
     APPEND LINES OF t_node_zspro TO s_tab_active-t_node_ddic.
     APPEND LINES OF t_item_zspro TO s_tab_active-t_item_ddic.
   ENDIF.
 
-  CALL METHOD s_tab_active-o_tree_ddic->delete_all_nodes.
+  s_tab_active-o_tree_ddic->delete_all_nodes( ).
 
-  CALL METHOD s_tab_active-o_tree_ddic->add_nodes_and_items
-    EXPORTING
-      node_table                     = s_tab_active-t_node_ddic
-      item_table                     = s_tab_active-t_item_ddic
-      item_table_structure_name      = 'MTREEITM'
-    EXCEPTIONS
-      failed                         = 1
-      cntl_system_error              = 3
-      error_in_tables                = 4
-      dp_error                       = 5
-      table_structure_name_not_found = 6.
+  s_tab_active-o_tree_ddic->add_nodes_and_items( EXPORTING node_table = s_tab_active-t_node_ddic
+                                                           item_table = s_tab_active-t_item_ddic
+                                                           item_table_structure_name = 'MTREEITM' EXCEPTIONS failed = 1 cntl_system_error = 3 error_in_tables = 4 dp_error = 5 table_structure_name_not_found = 6 ).
   IF sy-subrc <> 0.
     MESSAGE a000(tree_control_msg).
   ENDIF.
 
-  DESCRIBE TABLE lt_table_list LINES lw_tabix.
+  lw_tabix = lines( lt_table_list ).
 
 * If no table found, display message
   IF lw_tabix = 0.
@@ -2707,7 +2521,7 @@ ENDFORM.                    " DDIC_SET_TREE
 *       Save query
 *----------------------------------------------------------------------*
 FORM repo_save_query.
-  DATA : lt_query         TYPE soli_tab,
+  DATA: lt_query         TYPE soli_tab,
          ls_query         LIKE LINE OF lt_query,
          lw_query_with_cr TYPE string,
          lw_guid          TYPE guid_32,
@@ -2730,11 +2544,7 @@ FORM repo_save_query.
   ENDIF.
 
 * Get content of abap edit box
-  CALL METHOD s_tab_active-o_textedit->get_text
-    IMPORTING
-      table  = lt_query[]
-    EXCEPTIONS
-      OTHERS = 1.
+  s_tab_active-o_textedit->get_text( IMPORTING table = lt_query[] EXCEPTIONS OTHERS = 1 ).
 
 * Serialize query into a string
   CLEAR lw_query_with_cr.
@@ -2749,18 +2559,13 @@ FORM repo_save_query.
     CALL FUNCTION 'GUID_CREATE'
       IMPORTING
         ev_guid_32 = lw_guid.
-* New function to get an unique id (do not work on older sap system)
-*    TRY.
-*        lw_guid = cl_system_uuid=>create_uuid_c32_static( ).
-*      CATCH cx_uuid_error.
-*        EXIT. "exit do
-*    ENDTRY.
+
 
 * Check that this uid is not already used
     SELECT SINGLE queryid INTO ls_ztoad-queryid
            FROM ztoad
            WHERE queryid = lw_guid.
-    IF sy-subrc NE 0.
+    IF sy-subrc <> 0.
       EXIT. "exit do
     ENDIF.
   ENDDO.
@@ -2825,13 +2630,7 @@ FORM repo_init.
   ls_event-appl_event = abap_true. " no PAI if event occurs
   APPEND ls_event TO lt_event.
 
-  CALL METHOD o_tree_repository->set_registered_events
-    EXPORTING
-      events                    = lt_event
-    EXCEPTIONS
-      cntl_error                = 1
-      cntl_system_error         = 2
-      illegal_event_combination = 3.
+  o_tree_repository->set_registered_events( EXPORTING events = lt_event EXCEPTIONS cntl_error = 1 cntl_system_error = 2 illegal_event_combination = 3 ).
   IF sy-subrc <> 0.
     MESSAGE a000(tree_control_msg).
   ENDIF.
@@ -2854,7 +2653,7 @@ ENDFORM.                    " REPO_INIT
 *       Fill repository tree with all allowed queries
 *----------------------------------------------------------------------*
 FORM repo_fill.
-  DATA : lw_usergroup TYPE usr02-class,
+  DATA: lw_usergroup TYPE usr02-class,
          BEGIN OF ls_query,
            queryid    TYPE ztoad-queryid,
            aedat      TYPE ztoad-aedat,
@@ -2881,14 +2680,13 @@ FORM repo_fill.
 * Get all queries that i can use
   SELECT queryid aedat visibility text INTO TABLE lt_query_shared
          FROM ztoad
-         WHERE owner NE sy-uname
+         WHERE owner <> sy-uname
          AND ( visibility = c_visibility_all
                OR ( visibility = c_visibility_shared
-                    AND visibility_group = lw_usergroup )
-             ).
-  REFRESH t_node_repository.
+                    AND visibility_group = lw_usergroup ) ).
+  CLEAR t_node_repository.
 
-  CALL METHOD o_tree_repository->delete_all_nodes.
+  o_tree_repository->delete_all_nodes( ).
 
   CLEAR s_node_repository.
   s_node_repository-node_key = c_nodekey_repo_my.
@@ -2962,22 +2760,14 @@ FORM repo_fill.
     APPEND s_node_repository TO t_node_repository.
   ENDLOOP.
 
-  CALL METHOD o_tree_repository->add_nodes
-    EXPORTING
-      table_structure_name           = 'MTREESNODE'
-      node_table                     = t_node_repository
-    EXCEPTIONS
-      failed                         = 1
-      error_in_node_table            = 2
-      dp_error                       = 3
-      table_structure_name_not_found = 4
-      OTHERS                         = 5.
+  o_tree_repository->add_nodes( EXPORTING table_structure_name = 'MTREESNODE'
+                                          node_table = t_node_repository EXCEPTIONS failed = 1 error_in_node_table = 2 dp_error = 3 table_structure_name_not_found = 4 OTHERS = 5 ).
   IF sy-subrc <> 0.
     MESSAGE a000(tree_control_msg).
   ENDIF.
 
 * Exand all root nodes (my, shared, history)
-  CALL METHOD o_tree_repository->expand_root_nodes.
+  o_tree_repository->expand_root_nodes( ).
 ENDFORM.                    " REPO_FILL
 
 *&---------------------------------------------------------------------*
@@ -2987,7 +2777,7 @@ ENDFORM.                    " REPO_FILL
 *       Keep only 1000 last queries
 *----------------------------------------------------------------------*
 FORM repo_save_current_query.
-  DATA : lt_query         TYPE soli_tab,
+  DATA: lt_query         TYPE soli_tab,
          ls_query         LIKE LINE OF lt_query,
          lw_query_with_cr TYPE string,
          ls_ztoad         TYPE ztoad,
@@ -3000,11 +2790,7 @@ FORM repo_save_current_query.
          lw_dummy_date    TYPE timestamp.                   "#EC NEEDED
 
 * Get content of abap edit box
-  CALL METHOD s_tab_active-o_textedit->get_text
-    IMPORTING
-      table  = lt_query[]
-    EXCEPTIONS
-      OTHERS = 1.
+  s_tab_active-o_textedit->get_text( IMPORTING table = lt_query[] EXCEPTIONS OTHERS = 1 ).
 
 * Serialize query into a string
   CLEAR lw_query_with_cr.
@@ -3086,7 +2872,7 @@ ENDFORM.                    " REPO_SAVE_CURRENT_QUERY
 FORM query_load USING fw_queryid TYPE ztoad-queryid
                 CHANGING ft_query TYPE table.
   DATA lw_query_with_cr TYPE string.
-  REFRESH ft_query.
+  CLEAR ft_query.
 
   SELECT SINGLE query INTO lw_query_with_cr
          FROM ztoad
@@ -3109,13 +2895,11 @@ FORM repo_focus_query USING fw_queryid TYPE ztoad-queryid.
 
   READ TABLE t_node_repository INTO s_node_repository
              WITH KEY queryid = fw_queryid.
-  IF sy-subrc NE 0.
+  IF sy-subrc <> 0.
     RETURN.
   ENDIF.
 
-  CALL METHOD o_tree_repository->set_selected_node
-    EXPORTING
-      node_key = s_node_repository-node_key.
+  o_tree_repository->set_selected_node( node_key = s_node_repository-node_key ).
 
 ENDFORM.                    " FOCUS_REPOSITORY
 
@@ -3127,9 +2911,7 @@ ENDFORM.                    " FOCUS_REPOSITORY
 FORM result_init.
 
 * Create ALV
-  CREATE OBJECT s_tab_active-o_alv_result
-    EXPORTING
-      i_parent = o_container_result.
+  s_tab_active-o_alv_result = NEW #( i_parent = o_container_result ).
 
 * Register event toolbar to add button
   SET HANDLER o_handle_event->hnd_result_toolbar FOR s_tab_active-o_alv_result.
@@ -3143,11 +2925,11 @@ ENDFORM.                    " RESULT_INIT
 *       Fill dropdown listbox with value on screen 200
 *----------------------------------------------------------------------*
 FORM screen_init_listbox_0200.
-  TYPE-POOLS vrm.
-  DATA : lt_visibility TYPE vrm_values,
-         ls_visibility LIKE LINE OF lt_visibility.
+  DATA lt_visibility TYPE vrm_values,
 
-  REFRESH lt_visibility.
+  DATA:ls_visibility LIKE LINE OF lt_visibility.
+
+  CLEAR lt_visibility.
 
   ls_visibility-key = c_visibility_my.
   ls_visibility-text = 'Personal'(m19).
@@ -3175,35 +2957,27 @@ ENDFORM.                    " SCREEN_INIT_LISTBOX_0200
 *       If sql text area is modified, ask confirmation before leave
 *----------------------------------------------------------------------*
 FORM screen_exit.
-  DATA : lw_status    TYPE i,
+  DATA: lw_status    TYPE i,
          lw_answer(1) TYPE c,
          lw_size      TYPE i,
          lw_string    TYPE string.
 
 * Check if grid is displayed
-  CALL METHOD o_splitter->get_row_height
-    EXPORTING
-      id     = 1
-    IMPORTING
-      result = lw_size.
-  CALL METHOD cl_gui_cfw=>flush.
+  o_splitter->get_row_height( EXPORTING id = 1 IMPORTING result = lw_size ).
+  cl_gui_cfw=>flush( ).
 
 * If grid is displayed, BACK action is only to close the grid
   IF lw_size < 100.
-    CALL METHOD o_splitter->set_row_height
-      EXPORTING
-        id     = 1
-        height = 100.
+    o_splitter->set_row_height( id = 1
+                                          height = 100 ).
     RETURN.
   ENDIF.
 
 * Check if textedit is modified
-  CALL METHOD s_tab_active-o_textedit->get_textmodified_status
-    IMPORTING
-      status = lw_status.
-  IF lw_status NE 0.
+  s_tab_active-o_textedit->get_textmodified_status( IMPORTING status = lw_status ).
+  IF lw_status <> 0.
     CONCATENATE 'Current query is not saved. Do you want'(m22)
-'to exit without saving or save into history then exit ?'(m56)
+      'to exit without saving or save into history then exit ?'(m56)
                 INTO lw_string SEPARATED BY space.
     CALL FUNCTION 'POPUP_TO_CONFIRM'
       EXPORTING
@@ -3230,9 +3004,7 @@ ENDFORM.                    " SCREEN_EXIT
 *       Display help for this program
 *----------------------------------------------------------------------*
 FORM screen_display_help.
-  DATA : l_report          TYPE string,
-         l_report_char1(1) TYPE c,
-         l_report_char3(3) TYPE c,
+  DATA: l_report          TYPE string,
          l_comment_found   TYPE i,
          lt_report         LIKE TABLE OF l_report,
          lt_lines          TYPE rcl_bag_tline,
@@ -3252,15 +3024,15 @@ FORM screen_display_help.
   APPEND ls_line TO lt_lines.
 
   LOOP AT lt_report INTO l_report.
-    l_report_char1 = l_report.
+    DATA(l_report_char1) = l_report.
     CHECK l_report_char1 = '*'.
 
 * Keep only the second block of comment
 * (first block is technical info, third is history)
-    l_report_char3 = l_report.
+    DATA(l_report_char3) = l_report.
     IF l_report_char3 = '*&-'.
       l_comment_found = l_comment_found + 1.
-      IF l_comment_found LE 2.
+      IF l_comment_found <= 2.
         CONTINUE.
       ELSE. "l_comment_found > 2
         EXIT.
@@ -3279,7 +3051,7 @@ FORM screen_display_help.
         WHEN OTHERS.
           ls_line-tdformat = '*'.
       ENDCASE.
-      IF NOT l_report_char1 IS INITIAL.
+      IF l_report_char1 IS NOT INITIAL.
         l_report = l_report+1.
       ENDIF.
       IF l_report IS INITIAL.
@@ -3310,20 +3082,19 @@ ENDFORM.                    " SCREEN_DISPLAY_HELP
 *      <--FW_TABLE   Target table of the query
 *      <--FW_PARAM   Parameters for the command (WHERE, SET, ...)
 *----------------------------------------------------------------------*
-FORM query_parse_noselect  USING    fw_query TYPE string
+FORM query_parse_noselect  USING fw_query TYPE string
                            CHANGING fw_noauth TYPE c
                                     fw_command TYPE string
                                     fw_table TYPE string
                                     fw_param TYPE string.
-  DATA : lw_query TYPE string,
-         lw_table TYPE tabname.
+  DATA lw_table TYPE tabname.
 
-  CLEAR : fw_noauth,
+  CLEAR: fw_noauth,
           fw_table,
           fw_command,
           fw_param.
 
-  lw_query = fw_query.
+  DATA(lw_query) = fw_query.
   SPLIT lw_query AT space INTO fw_command lw_query.
   TRANSLATE fw_command TO UPPER CASE.
   CASE fw_command.
@@ -3331,16 +3102,16 @@ FORM query_parse_noselect  USING    fw_query TYPE string
       SPLIT lw_query AT space INTO fw_table fw_param.
       TRANSLATE fw_table TO UPPER CASE.
       CLEAR sy-subrc.
-      IF s_customize-auth_object NE space.
+      IF s_customize-auth_object <> space.
         lw_table = fw_table.
         AUTHORITY-CHECK OBJECT s_customize-auth_object
                  ID 'TABLE' FIELD lw_table
                  ID 'ACTVT' FIELD s_customize-actvt_insert.
-      ELSEIF s_customize-auth_insert NE '*'
-      AND fw_table NP s_customize-auth_insert.
+      ELSEIF s_customize-auth_insert <> '*'
+          AND fw_table NP s_customize-auth_insert.
         sy-subrc = 4.
       ENDIF.
-      IF sy-subrc NE 0.
+      IF sy-subrc <> 0.
         CONCATENATE 'No authorisation for table'(m13) fw_table
                     INTO lw_query SEPARATED BY space.
         MESSAGE lw_query TYPE c_msg_success DISPLAY LIKE c_msg_error.
@@ -3352,16 +3123,16 @@ FORM query_parse_noselect  USING    fw_query TYPE string
       SPLIT lw_query AT space INTO fw_table fw_param.
       TRANSLATE fw_table TO UPPER CASE.
       CLEAR sy-subrc.
-      IF s_customize-auth_object NE space.
+      IF s_customize-auth_object <> space.
         lw_table = fw_table.
         AUTHORITY-CHECK OBJECT s_customize-auth_object
                  ID 'TABLE' FIELD lw_table
                  ID 'ACTVT' FIELD s_customize-actvt_update.
-      ELSEIF s_customize-auth_update NE '*'
-      AND fw_table NP s_customize-auth_update.
+      ELSEIF s_customize-auth_update <> '*'
+          AND fw_table NP s_customize-auth_update.
         sy-subrc = 4.
       ENDIF.
-      IF sy-subrc NE 0.
+      IF sy-subrc <> 0.
         CONCATENATE 'No authorisation for table'(m13) fw_table
                     INTO lw_query SEPARATED BY space.
         MESSAGE lw_query TYPE c_msg_success DISPLAY LIKE c_msg_error.
@@ -3377,16 +3148,16 @@ FORM query_parse_noselect  USING    fw_query TYPE string
         TRANSLATE fw_table TO UPPER CASE.
       ENDIF.
       CLEAR sy-subrc.
-      IF s_customize-auth_object NE space.
+      IF s_customize-auth_object <> space.
         lw_table = fw_table.
         AUTHORITY-CHECK OBJECT s_customize-auth_object
                  ID 'TABLE' FIELD lw_table
                  ID 'ACTVT' FIELD s_customize-actvt_delete.
-      ELSEIF s_customize-auth_delete NE '*'
-      AND NOT fw_table CP s_customize-auth_delete.
+      ELSEIF s_customize-auth_delete <> '*'
+          AND NOT fw_table CP s_customize-auth_delete.
         sy-subrc = 4.
       ENDIF.
-      IF sy-subrc NE 0.
+      IF sy-subrc <> 0.
         CONCATENATE 'No authorisation for table'(m13) fw_table
                     INTO lw_query SEPARATED BY space.
         MESSAGE lw_query TYPE c_msg_success DISPLAY LIKE c_msg_error.
@@ -3395,13 +3166,13 @@ FORM query_parse_noselect  USING    fw_query TYPE string
       ENDIF.
 
     WHEN c_native_command.
-      IF s_customize-auth_object NE space.
+      IF s_customize-auth_object <> space.
         AUTHORITY-CHECK OBJECT s_customize-auth_object
                  ID 'ACTVT' FIELD s_customize-actvt_native.
-      ELSEIF s_customize-auth_native NE abap_true.
+      ELSEIF s_customize-auth_native <> abap_true.
         sy-subrc = 4.
       ENDIF.
-      IF sy-subrc NE 0.
+      IF sy-subrc <> 0.
         CONCATENATE 'SQL command not allowed :'(m25) fw_command
                     INTO lw_query.
         MESSAGE lw_query TYPE c_msg_success DISPLAY LIKE c_msg_error.
@@ -3433,25 +3204,18 @@ ENDFORM.                    " QUERY_PARSE_NOSELECT
 *      -->FW_DISPLAY   Display code instead of generated routine
 *      <--FW_PROGRAM Name of the generated program
 *----------------------------------------------------------------------*
-FORM query_generate_noselect  USING    fw_command TYPE string
+FORM query_generate_noselect  USING fw_command TYPE string
                                        fw_table TYPE string
                                        fw_param TYPE string
                                        fw_display TYPE c
                               CHANGING fw_program TYPE sy-repid.
 
-  DATA : lt_code_string      TYPE TABLE OF string,
+  DATA: lt_code_string      TYPE TABLE OF string,
          lw_mess(255),
          lw_line             TYPE i,
          lw_word(30),
          lw_strlen_string    TYPE string,
-         lw_explicit         TYPE string,
-         lw_length           TYPE i,
-         lw_pos              TYPE i,
-         lw_fieldnum         TYPE i,
-         lw_fieldval         TYPE string,
          lw_fieldname        TYPE string,
-         lw_wait_name(1)     TYPE c,
-         lw_char(1)          TYPE c,
          lw_started(1)       TYPE c,
          lw_started_field(1) TYPE c.
 
@@ -3501,14 +3265,14 @@ FORM query_generate_noselect  USING    fw_command TYPE string
     WHEN 'INSERT'.
 
       IF fw_param(6) = 'VALUES'.
-        lw_length = strlen( fw_param ).
-        lw_pos = 6.
-        lw_fieldnum = 0.
+        DATA(lw_length) = strlen( fw_param ).
+        DATA(lw_pos) = 6.
+        DATA(lw_fieldnum) = 0.
         WHILE lw_pos < lw_length.
-          lw_char = fw_param+lw_pos(1).
+          DATA(lw_char) = fw_param+lw_pos(1).
           lw_pos = lw_pos + 1.
           IF lw_started = space.
-            IF lw_char NE '('. "begin of the list
+            IF lw_char <> '('. "begin of the list
               CONTINUE.
             ENDIF.
             lw_started = abap_true.
@@ -3519,11 +3283,11 @@ FORM query_generate_noselect  USING    fw_command TYPE string
               EXIT. "exit while
             ENDIF.
 
-            IF lw_char NE ''''. "field value must start by '
+            IF lw_char <> ''''. "field value must start by '
               CONTINUE.
             ENDIF.
             lw_started_field = abap_true.
-            lw_fieldval = lw_char.
+            DATA(lw_fieldval) = lw_char.
             lw_fieldnum = lw_fieldnum + 1.
             CONTINUE.
           ENDIF.
@@ -3560,7 +3324,7 @@ FORM query_generate_noselect  USING    fw_command TYPE string
         lw_length = strlen( fw_param ).
         lw_pos = 3.
         lw_fieldnum = 0.
-        lw_wait_name = abap_true.
+        DATA(lw_wait_name) = abap_true.
         WHILE lw_pos < lw_length.
           lw_char = fw_param+lw_pos(1).
           lw_pos = lw_pos + 1.
@@ -3590,8 +3354,8 @@ FORM query_generate_noselect  USING    fw_command TYPE string
             CONTINUE.
           ENDIF.
 
-          IF lw_started_field NE abap_true.
-            IF lw_char NE ''''. "field value must start by '
+          IF lw_started_field <> abap_true.
+            IF lw_char <> ''''. "field value must start by '
               CONTINUE.
             ENDIF.
             lw_started_field = abap_true.
@@ -3642,12 +3406,12 @@ FORM query_generate_noselect  USING    fw_command TYPE string
   c 'fw_time = w_timeend - w_timestart.'.                   "#EC NOTEXT
   c 'ENDFORM.'.                                             "#EC NOTEXT
 
-  CLEAR : lw_line,
+  CLEAR: lw_line,
           lw_word,
           lw_mess.
   SYNTAX-CHECK FOR lt_code_string PROGRAM sy-repid
                MESSAGE lw_mess LINE lw_line WORD lw_word.
-  IF sy-subrc NE 0 AND fw_display = space.
+  IF sy-subrc <> 0 AND fw_display = space.
     MESSAGE lw_mess TYPE c_msg_error.
   ENDIF.
 
@@ -3655,7 +3419,7 @@ FORM query_generate_noselect  USING    fw_command TYPE string
     GENERATE SUBROUTINE POOL lt_code_string NAME fw_program.
   ELSE.
     IF lw_mess IS NOT INITIAL.
-      lw_explicit = lw_line.
+      DATA(lw_explicit) = lw_line.
       CONCATENATE lw_mess '(line'(m28) lw_explicit ',word'(m29)
                   lw_word ')'(m30)
                   INTO lw_mess SEPARATED BY space.
@@ -3676,10 +3440,10 @@ ENDFORM.                    " QUERY_GENERATE_NOSELECT
 *      -->FW_RELAT_KEY  DDIC parent node key
 *      -->FW_TEXT       Text
 *----------------------------------------------------------------------*
-FORM ddic_get_field_from_node  USING    fw_node_key TYPE tv_nodekey
+FORM ddic_get_field_from_node  USING fw_node_key TYPE tv_nodekey
                                         fw_relat_key TYPE tv_nodekey
                                CHANGING fw_text TYPE string.
-  DATA : ls_item        LIKE LINE OF s_tab_active-t_item_ddic,
+  DATA: ls_item        LIKE LINE OF s_tab_active-t_item_ddic,
          ls_item_parent LIKE LINE OF s_tab_active-t_item_ddic,
          lw_table       TYPE string,
          lw_alias       TYPE string.
@@ -3696,7 +3460,7 @@ FORM ddic_get_field_from_node  USING    fw_node_key TYPE tv_nodekey
 
 * Search for alias
   SPLIT ls_item_parent-text AT ' AS ' INTO lw_table lw_alias.
-  IF NOT lw_alias IS INITIAL.
+  IF lw_alias IS NOT INITIAL.
     lw_table = lw_alias.
   ENDIF.
 
@@ -3718,15 +3482,13 @@ ENDFORM.                    " DDIC_GET_FIELD_FROM_NODE
 FORM editor_paste  USING fw_text TYPE string
                          fw_line TYPE i
                          fw_pos TYPE i.
-  DATA : lt_text    TYPE TABLE OF string,
-         lw_pos     TYPE i,
-         lw_line    TYPE i,
+  DATA: lt_text    TYPE TABLE OF string,
          lw_message TYPE string.
 
 *   Set text with new line
   APPEND fw_text TO lt_text.
   IF s_customize-paste_break = abap_true.
-    lw_pos = fw_pos - 1.
+    DATA(lw_pos) = fw_pos - 1.
     CLEAR lw_message.
     DO lw_pos TIMES.
       CONCATENATE lw_message space INTO lw_message RESPECTING BLANKS.
@@ -3734,37 +3496,25 @@ FORM editor_paste  USING fw_text TYPE string
     APPEND lw_message TO lt_text.
   ENDIF.
 
-  CALL METHOD s_tab_active-o_textedit->insert_block_at_position
-    EXPORTING
-      line     = fw_line
-      pos      = fw_pos
-      text_tab = lt_text
-    EXCEPTIONS
-      OTHERS   = 0.
+  s_tab_active-o_textedit->insert_block_at_position( EXPORTING line = fw_line
+                                                               pos = fw_pos
+                                                               text_tab = lt_text EXCEPTIONS OTHERS = 0 ).
 
 * Set cursor at end of pasted field
   IF s_customize-paste_break = abap_true.
     lw_pos = fw_pos.
-    lw_line = fw_line + 1.
+    DATA(lw_line) = fw_line + 1.
   ELSE.
     lw_pos = strlen( fw_text ).
     lw_pos = lw_pos + fw_pos.
     lw_line = fw_line.
   ENDIF.
 
-  CALL METHOD s_tab_active-o_textedit->set_selection_pos_in_line
-    EXPORTING
-      line   = lw_line
-      pos    = lw_pos
-    EXCEPTIONS
-      OTHERS = 0.
+  s_tab_active-o_textedit->set_selection_pos_in_line( EXPORTING line = lw_line
+                                                                pos = lw_pos EXCEPTIONS OTHERS = 0 ).
 
 * Focus on editor
-  CALL METHOD cl_gui_control=>set_focus
-    EXPORTING
-      control = s_tab_active-o_textedit
-    EXCEPTIONS
-      OTHERS  = 0.
+  cl_gui_control=>set_focus( EXPORTING control = s_tab_active-o_textedit EXCEPTIONS OTHERS = 0 ).
 
   CONCATENATE fw_text 'pasted to SQL Editor'(m27)
               INTO lw_message SEPARATED BY space.
@@ -3779,16 +3529,12 @@ ENDFORM.                    " EDITOR_PASTE
 *      -->FW_COMMAND Native SQL Command to execute
 *----------------------------------------------------------------------*
 FORM query_process_native USING fw_command TYPE string.
-  DATA : lw_lines        TYPE i,
-         lw_sql_code     TYPE i,
+  DATA: lw_sql_code     TYPE i,
          lw_sql_msg(255) TYPE c,
          lw_row_num      TYPE i,
-         lw_command(255) TYPE c,
          lw_msg          TYPE string,
          lw_timestart    TYPE timestampl,
          lw_timeend      TYPE timestampl,
-         lw_time         TYPE p LENGTH 8 DECIMALS 2,
-         lw_charnumb(12) TYPE c,
          lw_answer(1)    TYPE c.
 
 * Have a user confirmation before execute Native SQL Command
@@ -3806,12 +3552,12 @@ FORM query_process_native USING fw_command TYPE string.
     EXCEPTIONS
       text_not_found        = 1
       OTHERS                = 2.
-  IF sy-subrc NE 0 OR lw_answer NE '1'.
+  IF sy-subrc <> 0 OR lw_answer <> '1'.
     RETURN.
   ENDIF.
 
-  lw_command = fw_command.
-  lw_lines = strlen( lw_command ).
+  DATA(lw_command) = fw_command.
+  DATA(lw_lines) = strlen( lw_command ).
   GET TIME STAMP FIELD lw_timestart.
   CALL 'C_DB_EXECUTE'
        ID 'STATLEN' FIELD lw_lines
@@ -3819,16 +3565,15 @@ FORM query_process_native USING fw_command TYPE string.
        ID 'SQLERR'  FIELD lw_sql_code
        ID 'ERRTXT'  FIELD lw_sql_msg
        ID 'ROWNUM'  FIELD lw_row_num.
-  IF sy-subrc NE 0.
+  IF sy-subrc <> 0.
     MESSAGE lw_sql_msg TYPE c_msg_success DISPLAY LIKE c_msg_error.
     RETURN.
   ELSE.
     GET TIME STAMP FIELD lw_timeend.
-    lw_time = cl_abap_tstmp=>subtract(
+    DATA(lw_time) = cl_abap_tstmp=>subtract(
                 tstmp1 = lw_timeend
-                tstmp2 = lw_timestart
-              ).
-    lw_charnumb = lw_time.
+                tstmp2 = lw_timestart ).
+    DATA(lw_charnumb) = lw_time.
     CONCATENATE 'Query executed in'(m09) lw_charnumb 'seconds.'(m10)
                 INTO lw_msg SEPARATED BY space.
     CONDENSE lw_msg.
@@ -3844,7 +3589,7 @@ ENDFORM.                    " QUERY_PROCESS_NATIVE
 *       hierarchy in ZSPRO
 *----------------------------------------------------------------------*
 FORM ddic_add_tree_zspro.
-  DATA : lo_zspro   TYPE REF TO data,
+  DATA: lo_zspro   TYPE REF TO data,
          ls_node    LIKE LINE OF s_tab_active-t_node_ddic,
          ls_item    LIKE LINE OF s_tab_active-t_item_ddic,
          lw_nodekey TYPE tv_nodekey,
@@ -3857,13 +3602,12 @@ FORM ddic_add_tree_zspro.
            ddtext2   TYPE dd04t-ddtext,
          END OF ls_ddic_fields,
          lt_ddic_fields     LIKE TABLE OF ls_ddic_fields,
-         lw_node_number(11) TYPE n,
-         lw_found(1)        TYPE c.
+         lw_node_number(11) TYPE n.
   CONSTANTS lc_zspro(30) TYPE c VALUE 'ZSPRO'.
-  FIELD-SYMBOLS : <ft_zspro> TYPE standard table,
+  FIELD-SYMBOLS: <ft_zspro> TYPE STANDARD TABLE,
                   <fs_zspro> TYPE any,
                   <fw_zspro> TYPE any.
-  REFRESH : t_node_zspro, t_item_zspro.
+  CLEAR: t_node_zspro, t_item_zspro.
 
 * Try to create zspro internal table
   TRY.
@@ -3882,14 +3626,14 @@ FORM ddic_add_tree_zspro.
            OR nodetype = space
            ORDER BY relatkey sort.
 * If ZSPRO does not contain any valuable data, leave the subroutine
-  IF sy-subrc NE 0.
+  IF sy-subrc <> 0.
     RETURN.
   ENDIF.
 
 * Get field list for each table
   LOOP AT <ft_zspro> ASSIGNING <fs_zspro>.
     ASSIGN COMPONENT 'NODETYPE' OF STRUCTURE <fs_zspro> TO <fw_zspro>.
-    IF sy-subrc NE 0 OR <fw_zspro> NE 1.
+    IF sy-subrc <> 0 OR <fw_zspro> <> 1.
       CONTINUE.
     ENDIF.
     ASSIGN COMPONENT 'NODEPARAM' OF STRUCTURE <fs_zspro> TO <fw_zspro>.
@@ -3898,7 +3642,7 @@ FORM ddic_add_tree_zspro.
       APPEND ls_ddic_fields TO lt_ddic_fields.
     ENDIF.
   ENDLOOP.
-  IF NOT lt_ddic_fields IS INITIAL.
+  IF lt_ddic_fields IS NOT INITIAL.
     SELECT dd03l~tabname dd03l~fieldname dd03l~position
            dd03l~keyflag dd03t~ddtext dd04t~ddtext
            INTO TABLE lt_ddic_fields
@@ -3917,7 +3661,7 @@ FORM ddic_add_tree_zspro.
            AND dd03l~as4local = c_vers_active
            AND dd03l~as4vers = space
            AND ( dd03l~comptype = c_ddic_dtelm
-           OR    dd03l~comptype = space ).
+           OR dd03l~comptype = space ).
     SORT lt_ddic_fields BY tabname keyflag DESCENDING position.
     DELETE ADJACENT DUPLICATES FROM lt_ddic_fields
            COMPARING tabname fieldname.
@@ -4014,7 +3758,7 @@ FORM ddic_add_tree_zspro.
         ls_item-text = ls_ddic_fields-fieldname.
         APPEND ls_item TO t_item_zspro.
         ls_item-item_name = c_ddic_col2.
-        IF NOT ls_ddic_fields-ddtext1 IS INITIAL.
+        IF ls_ddic_fields-ddtext1 IS NOT INITIAL.
           ls_item-text = ls_ddic_fields-ddtext1.
         ELSE.
           ls_item-text = ls_ddic_fields-ddtext2.
@@ -4026,11 +3770,11 @@ FORM ddic_add_tree_zspro.
 
 * Clean Empty nodes
   DO.
-    lw_found = space.
+    DATA(lw_found) = space.
     LOOP AT t_node_zspro INTO ls_node WHERE isfolder = abap_true.
       READ TABLE t_node_zspro WITH KEY relatkey = ls_node-node_key
                  TRANSPORTING NO FIELDS.
-      IF sy-subrc NE 0.
+      IF sy-subrc <> 0.
         lw_found = abap_true.
         DELETE t_node_zspro.
         DELETE t_item_zspro WHERE node_key = ls_node-node_key.
@@ -4056,12 +3800,10 @@ FORM repo_delete_history USING fw_node_key TYPE tv_nodekey
 
   READ TABLE t_node_repository INTO ls_histo
              WITH KEY node_key = fw_node_key.
-  IF sy-subrc = 0 AND ls_histo-edit NE space.
+  IF sy-subrc = 0 AND ls_histo-edit <> space.
     DELETE FROM ztoad WHERE queryid = ls_histo-queryid.
     IF sy-subrc = 0.
-      CALL METHOD o_tree_repository->delete_node
-        EXPORTING
-          node_key = fw_node_key.
+      o_tree_repository->delete_node( node_key = fw_node_key ).
     ENDIF.
   ENDIF.
   fw_subrc = sy-subrc.
@@ -4073,7 +3815,7 @@ ENDFORM.                    " REPO_DELETE_HISTORY
 *       Get saved options from user parameters table
 *----------------------------------------------------------------------*
 FORM options_load.
-  DATA : lw_options  TYPE usr05-parva,
+  DATA: lw_options  TYPE usr05-parva,
          lw_rows(10) TYPE c.
   GET PARAMETER ID 'ZTOAD' FIELD lw_options.                "#EC EXISTS
   IF sy-subrc = 0.
@@ -4091,10 +3833,9 @@ ENDFORM.                    " options_load
 *       Save user options in standard user parameters table
 *----------------------------------------------------------------------*
 FORM options_save.
-  DATA : lw_options  TYPE usr05-parva,
-         lw_rows(10) TYPE c.
+  DATA lw_options  TYPE usr05-parva.
 
-  lw_rows =   s_customize-default_rows.
+  DATA(lw_rows) = s_customize-default_rows.
   CONDENSE lw_rows NO-GAPS.
   CONCATENATE lw_rows
               s_customize-paste_break
@@ -4120,8 +3861,7 @@ ENDFORM.                    "options_save
 *       Refresh DDIC tree with current query
 *----------------------------------------------------------------------*
 FORM ddic_refresh_tree.
-  DATA : lw_query        TYPE string,
-         lw_query2       TYPE string,
+  DATA: lw_query        TYPE string,
          lw_select       TYPE string,
          lw_from         TYPE string,
          lw_from2        TYPE string,
@@ -4141,29 +3881,29 @@ FORM ddic_refresh_tree.
                                lw_union lw_rows lw_noauth
                                lw_newsyntax lw_error.
 
-  IF lw_noauth NE space OR lw_error NE space.
+  IF lw_noauth <> space OR lw_error <> space.
     RETURN.
   ELSEIF lw_select IS INITIAL.
     PERFORM query_parse_noselect USING lw_query
                                  CHANGING lw_noauth lw_select
                                           lw_from lw_where.
-    IF lw_noauth NE space OR lw_select = c_native_command.
+    IF lw_noauth <> space OR lw_select = c_native_command.
       RETURN.
     ENDIF.
   ENDIF.
 * Manage unioned queries
-  WHILE NOT lw_union IS INITIAL.
+  WHILE lw_union IS NOT INITIAL.
 * Parse Query
-    lw_query2 = lw_union.
+    DATA(lw_query2) = lw_union.
     PERFORM query_parse USING lw_query2
                         CHANGING lw_select lw_from2 lw_where
                                  lw_union lw_rows lw_noauth
                                  lw_newsyntax lw_error.
-    IF NOT lw_from2 IS INITIAL.
+    IF lw_from2 IS NOT INITIAL.
       CONCATENATE lw_from 'JOIN' lw_from2
                   INTO lw_from SEPARATED BY space.
     ENDIF.
-    IF lw_noauth NE space OR lw_error NE space.
+    IF lw_noauth <> space OR lw_error <> space.
       RETURN.
     ENDIF.
   ENDWHILE.
@@ -4180,20 +3920,18 @@ ENDFORM.                    " DDIC_REFRESH_TREE
 *       Display popup to search a table in DDIC tree
 *----------------------------------------------------------------------*
 FORM ddic_find_in_tree.
-  DATA : ls_sval        TYPE sval,
+  DATA: ls_sval        TYPE sval,
          lt_sval        LIKE TABLE OF ls_sval,
          lw_returncode  TYPE c,
          lw_search      TYPE string,
          lt_search      LIKE TABLE OF lw_search,
          ls_item_ddic   LIKE LINE OF s_tab_active-t_item_ddic,
          lw_search_term TYPE string,
-         lw_search_line TYPE i,
-         lw_rest        TYPE i,
          lw_node_key    TYPE tv_nodekey,
          lt_nodekey     TYPE TABLE OF tv_nodekey.
 
 * Build search table
-  REFRESH lt_search.
+  CLEAR lt_search.
   LOOP AT s_tab_active-t_item_ddic INTO ls_item_ddic.
     lw_search = ls_item_ddic-text.
     APPEND lw_search TO lt_search.
@@ -4216,7 +3954,7 @@ FORM ddic_find_in_tree.
       EXCEPTIONS
         error_in_fields = 1
         OTHERS          = 2.
-    IF sy-subrc NE 0 OR lw_returncode NE space.
+    IF sy-subrc <> 0 OR lw_returncode <> space.
       EXIT. "exit do
     ENDIF.
     READ TABLE lt_sval INTO ls_sval INDEX 1.
@@ -4225,12 +3963,12 @@ FORM ddic_find_in_tree.
     ENDIF.
 
 * For new search, start from line 1
-    IF lw_search_term NE ls_sval-value.
+    IF lw_search_term <> ls_sval-value.
       lw_search_term = ls_sval-value.
-      lw_search_line = 1.
+      DATA(lw_search_line) = 1.
 * For next result of same search, start from next line
     ELSE.
-      lw_rest = lw_search_line MOD 2.
+      DATA(lw_rest) = lw_search_line MOD 2.
       lw_search_line = lw_search_line + 1 + lw_rest.
     ENDIF.
 
@@ -4240,13 +3978,13 @@ FORM ddic_find_in_tree.
          MATCH LINE lw_search_line.
 
 * Search string &1 not found
-    IF sy-subrc NE 0 AND lw_search_line = 1.
+    IF sy-subrc <> 0 AND lw_search_line = 1.
       MESSAGE s065(0k) WITH lw_search_term DISPLAY LIKE c_msg_error.
       CLEAR lw_search_line.
       CLEAR lw_search_term.
 
 * Last selected entry reached
-    ELSEIF sy-subrc NE 0.
+    ELSEIF sy-subrc <> 0.
       MESSAGE s066(0k) DISPLAY LIKE c_msg_error.
       CLEAR lw_search_line.
       CLEAR lw_search_term.
@@ -4255,12 +3993,8 @@ FORM ddic_find_in_tree.
     ELSE.
       MESSAGE 'String found'(m04) TYPE c_msg_success.
       READ TABLE lt_nodekey INTO lw_node_key INDEX lw_search_line.
-      CALL METHOD s_tab_active-o_tree_ddic->set_selected_node
-        EXPORTING
-          node_key = lw_node_key.
-      CALL METHOD s_tab_active-o_tree_ddic->ensure_visible
-        EXPORTING
-          node_key = lw_node_key.
+      s_tab_active-o_tree_ddic->set_selected_node( node_key = lw_node_key ).
+      s_tab_active-o_tree_ddic->ensure_visible( node_key = lw_node_key ).
     ENDIF.
 
   ENDDO.
@@ -4272,7 +4006,7 @@ ENDFORM.                    " DDIC_FIND_IN_TREE
 *       Create option panel
 *----------------------------------------------------------------------*
 FORM options_init.
-  DATA : lt_ptab TYPE wdy_wb_property_tab,
+  DATA: lt_ptab TYPE wdy_wb_property_tab,
          ls_ptab TYPE wdy_wb_property.
 
 * Create a custom container linked to the custom controm on screen 300
@@ -4306,12 +4040,10 @@ FORM options_init.
   ENDIF.
 
 * Define Column title of the property object
-  CALL METHOD o_options->initialize
-    EXPORTING
-      property_column_title = 'Property'(m44)
-      value_column_title    = 'Value'(m45)
-      focus_row             = 1
-      scrollable            = abap_true.
+  o_options->initialize( property_column_title = 'Property'(m44)
+                                   value_column_title = 'Value'(m45)
+                                   focus_row = 1
+                                   scrollable = abap_true ).
 
   o_options->set_enabled( abap_true ).
 
@@ -4346,10 +4078,8 @@ FORM options_init.
   APPEND ls_ptab TO lt_ptab.
 
 * Fill properties/values
-  CALL METHOD o_options->set_properties
-    EXPORTING
-      properties = lt_ptab
-      refresh    = abap_true.
+  o_options->set_properties( properties = lt_ptab
+                                       refresh = abap_true ).
 ENDFORM.                    " OPTIONS_INIT
 
 *&---------------------------------------------------------------------*
@@ -4358,11 +4088,11 @@ ENDFORM.                    " OPTIONS_INIT
 *       Display options panel
 *----------------------------------------------------------------------*
 FORM options_display.
-  DATA : lt_ptab TYPE wdy_wb_property_tab,
+  DATA: lt_ptab TYPE wdy_wb_property_tab,
          ls_ptab TYPE wdy_wb_property.
 
 * If not first display, refresh properties values
-  IF NOT o_options IS INITIAL.
+  IF o_options IS NOT INITIAL.
     lt_ptab = o_options->get_properties( ).
     LOOP AT lt_ptab INTO ls_ptab.
       CASE ls_ptab-name.
@@ -4373,28 +4103,22 @@ FORM options_display.
         WHEN 'TECH'.
           ls_ptab-value = s_customize-techname.
       ENDCASE.
-      CALL METHOD o_options->update_property
-        EXPORTING
-          property = ls_ptab.
+      o_options->update_property( property = ls_ptab ).
     ENDLOOP.
   ENDIF.
 
 * Display properties panel
   CALL SCREEN 300 STARTING AT 60 10
                   ENDING AT 90 16.
-  IF w_okcode NE 'OK'.
+  IF w_okcode <> 'OK'.
     RETURN.
   ENDIF.
 
 * Update values if not well refreshed in o_options
-  CALL METHOD o_options->dispatch
-    EXPORTING
-      cargo             = w_okcode
-      eventid           = 18
-      is_shellevent     = space
-      is_systemdispatch = space
-    EXCEPTIONS
-      OTHERS            = 0.
+  o_options->dispatch( EXPORTING cargo = w_okcode
+                                 eventid = 18
+                                 is_shellevent = space
+                                 is_systemdispatch = space EXCEPTIONS OTHERS = 0 ).
 
 * Update values in s_customize
   lt_ptab = o_options->get_properties( ).
@@ -4427,53 +4151,36 @@ ENDFORM.                    " OPTIONS_DISPLAY
 FORM result_save_file USING fo_result TYPE REF TO data
                             ft_fields TYPE ty_fieldlist_table.
 
-  DATA : lw_filename TYPE string,
-         lt_file_f4  TYPE filetable,
+  DATA: lt_file_f4  TYPE filetable,
          ls_file_f4  LIKE LINE OF lt_file_f4,
          lw_rc       TYPE i,
-         lw_filter   TYPE string,
-         lw_title    TYPE string,
          BEGIN OF ls_field_out,
            name TYPE char30,
          END OF ls_field_out,
-         lt_fields   LIKE TABLE OF ls_field_out,
-         ls_field_in LIKE LINE OF ft_fields.
+         lt_fields   LIKE TABLE OF ls_field_out.
 
-  FIELD-SYMBOLS: <lft_data> TYPE ANY TABLE.
+  FIELD-SYMBOLS <lft_data> TYPE ANY TABLE.
 
-  lw_filter = 'CSV File (*.csv)|*.csv'(m51).
-  lw_title = 'Download results into file'(m63).
-  CALL METHOD cl_gui_frontend_services=>file_open_dialog
-    EXPORTING
-      window_title = lw_title
-      file_filter  = lw_filter
-    CHANGING
-      file_table   = lt_file_f4
-      rc           = lw_rc
-    EXCEPTIONS
-      OTHERS       = 0.
+  DATA(lw_filter) = 'CSV File (*.csv)|*.csv'(m51).
+  DATA(lw_title) = 'Download results into file'(m63).
+  cl_gui_frontend_services=>file_open_dialog( EXPORTING window_title = lw_title
+                                                        file_filter = lw_filter CHANGING file_table = lt_file_f4 rc = lw_rc EXCEPTIONS OTHERS = 0 ).
   READ TABLE lt_file_f4 INTO ls_file_f4 INDEX 1.
   IF sy-subrc = 0.
-    lw_filename = ls_file_f4.
+    DATA(lw_filename) = ls_file_f4.
   ENDIF.
   IF lw_filename IS INITIAL.
     RETURN.
   ENDIF.
 
   ASSIGN fo_result->* TO <lft_data>.
-  LOOP AT ft_fields INTO ls_field_in.
+  LOOP AT ft_fields INTO DATA(ls_field_in).
     APPEND ls_field_in-ref_field TO lt_fields.
   ENDLOOP.
-  CALL METHOD cl_gui_frontend_services=>gui_download
-    EXPORTING
-      filename              = lw_filename
-      write_field_separator = abap_true
-      trunc_trailing_blanks = abap_true
-      fieldnames            = lt_fields
-    CHANGING
-      data_tab              = <lft_data>
-    EXCEPTIONS
-      OTHERS                = 0.
+  cl_gui_frontend_services=>gui_download( EXPORTING filename = lw_filename
+                                                    write_field_separator = abap_true
+                                                    trunc_trailing_blanks = abap_true
+                                                    fieldnames = lt_fields CHANGING data_tab = <lft_data> EXCEPTIONS OTHERS = 0 ).
 
 ENDFORM.                    " RESULT_SAVE_FILE
 
@@ -4484,7 +4191,7 @@ ENDFORM.                    " RESULT_SAVE_FILE
 *       Paste selected value in SQL Editor
 *----------------------------------------------------------------------*
 FORM ddic_f4.
-  DATA : lw_table      TYPE dfies-tabname,
+  DATA: lw_table      TYPE dfies-tabname,
          lw_field      TYPE dfies-fieldname,
          lt_val        TYPE TABLE OF ddshretval,
          ls_val        LIKE LINE OF lt_val,
@@ -4497,17 +4204,12 @@ FORM ddic_f4.
          lw_line_end   TYPE i,
          lw_pos_end    TYPE i,
          lw_val        TYPE string,
-         lw_dummy      type c.                              "#EC NEEDED
+         lw_dummy      TYPE c.                              "#EC NEEDED
 
 * Get selection in ddic tree
-  CALL METHOD s_tab_active-o_tree_ddic->get_selected_node "line selected
-    IMPORTING
-      node_key = lw_nodekey.
+  s_tab_active-o_tree_ddic->get_selected_node( IMPORTING node_key = lw_nodekey ).
   IF lw_nodekey IS INITIAL.
-    CALL METHOD s_tab_active-o_tree_ddic->get_selected_item "item selected
-      IMPORTING
-        node_key  = lw_nodekey
-        item_name = lw_item.
+    s_tab_active-o_tree_ddic->get_selected_item( IMPORTING node_key = lw_nodekey item_name = lw_item ).
   ENDIF.
   IF lw_nodekey IS INITIAL.
     RETURN.
@@ -4516,7 +4218,7 @@ FORM ddic_f4.
 * Check selection is a field
   READ TABLE s_tab_active-t_node_ddic INTO ls_node
              WITH KEY node_key = lw_nodekey.
-  IF sy-subrc NE 0 OR ls_node-isfolder = abap_true.
+  IF sy-subrc <> 0 OR ls_node-isfolder = abap_true.
     RETURN.
   ENDIF.
 
@@ -4548,27 +4250,18 @@ FORM ddic_f4.
     CONCATENATE space lw_val INTO lw_val RESPECTING BLANKS.
 
 * Get current cursor position/selection in editor
-    CALL METHOD s_tab_active-o_textedit->get_selection_pos
-      IMPORTING
-        from_line = lw_line_start
-        from_pos  = lw_pos_start
-        to_line   = lw_line_end
-        to_pos    = lw_pos_end
-      EXCEPTIONS
-        OTHERS    = 4.
-    IF sy-subrc NE 0.
+    s_tab_active-o_textedit->get_selection_pos( IMPORTING from_line = lw_line_start from_pos = lw_pos_start to_line = lw_line_end to_pos = lw_pos_end EXCEPTIONS OTHERS = 4 ).
+    IF sy-subrc <> 0.
       MESSAGE 'Cannot get cursor position'(m35) TYPE c_msg_error.
     ENDIF.
 
 *   If text is selected/highlighted, delete it
-    IF lw_line_start NE lw_line_end
-    OR lw_pos_start NE lw_pos_end.
-      CALL METHOD s_tab_active-o_textedit->delete_text
-        EXPORTING
-          from_line = lw_line_start
-          from_pos  = lw_pos_start
-          to_line   = lw_line_end
-          to_pos    = lw_pos_end.
+    IF lw_line_start <> lw_line_end
+        OR lw_pos_start <> lw_pos_end.
+      s_tab_active-o_textedit->delete_text( from_line = lw_line_start
+                                                      from_pos = lw_pos_start
+                                                      to_line = lw_line_end
+                                                      to_pos = lw_pos_end ).
     ENDIF.
 
     PERFORM editor_paste USING lw_val lw_line_start lw_pos_start.
@@ -4584,15 +4277,15 @@ ENDFORM.                    " DDIC_F4
 *      <--FT_QUERY  Default query content
 *----------------------------------------------------------------------*
 FORM editor_get_default_query  CHANGING ft_query TYPE table.
-  DATA lw_string TYPE string.
+
 
   APPEND '* Type here your query title' TO ft_query.        "#EC NOTEXT
   APPEND '' TO ft_query.
   APPEND 'SELECT *' TO ft_query.                            "#EC NOTEXT
   APPEND 'FROM <table_name>' TO ft_query.                   "#EC NOTEXT
 
-  IF s_customize-default_rows NE 0.
-    lw_string = s_customize-default_rows.
+  IF s_customize-default_rows <> 0.
+    DATA(lw_string) = s_customize-default_rows.
     CONDENSE lw_string NO-GAPS.
     CONCATENATE 'UP TO'
                 lw_string
@@ -4612,11 +4305,10 @@ ENDFORM.                    " EDITOR_GET_DEFAULT_QUERY
 *       Open a new tab
 *----------------------------------------------------------------------*
 FORM tab_new.
-  DATA : l_numb TYPE i,
-         l_tab TYPE string.
+  DATA l_numb TYPE i.
 
-  DESCRIBE TABLE t_tabs LINES l_numb.
-  IF l_numb GE 30.
+  l_numb = lines( t_tabs ).
+  IF l_numb >= 30.
     MESSAGE 'You cannot open more than 30 tabs'(m64)
             TYPE c_msg_success DISPLAY LIKE c_msg_error.
     RETURN.
@@ -4626,13 +4318,11 @@ FORM tab_new.
 
 * Hide alv pane if displayed
   s_tab_active-row_height = 100.
-  CALL METHOD o_splitter->set_row_height
-    EXPORTING
-      id     = 1
-      height = s_tab_active-row_height.
+  o_splitter->set_row_height( id = 1
+                                        height = s_tab_active-row_height ).
 
 * Start new tab
-  l_tab = l_numb + 1.
+  DATA(l_tab) = l_numb + 1.
   CONCATENATE 'TAB' l_tab INTO l_tab.
   CONDENSE l_tab NO-GAPS.
   w_tabstrip-activetab = l_tab.
@@ -4655,26 +4345,16 @@ ENDFORM.                    " TAB_NEW
 *----------------------------------------------------------------------*
 FORM leave_current_tab.
 * Hide current editor / ddic / alv
-  CALL METHOD s_tab_active-o_textedit->set_visible
-    EXPORTING
-      visible = space.
+  s_tab_active-o_textedit->set_visible( visible = space ).
 
-  CALL METHOD s_tab_active-o_tree_ddic->set_visible
-    EXPORTING
-      visible = space.
+  s_tab_active-o_tree_ddic->set_visible( visible = space ).
 
-  IF NOT s_tab_active-o_alv_result IS INITIAL.
-    CALL METHOD s_tab_active-o_alv_result->set_visible
-      EXPORTING
-        visible = space.
+  IF s_tab_active-o_alv_result IS NOT INITIAL.
+    s_tab_active-o_alv_result->set_visible( visible = space ).
   ENDIF.
 * Save ALV split height
-  CALL METHOD o_splitter->get_row_height
-    EXPORTING
-      id     = 1
-    IMPORTING
-      result = s_tab_active-row_height.
-  CALL METHOD cl_gui_cfw=>flush.
+  o_splitter->get_row_height( EXPORTING id = 1 IMPORTING result = s_tab_active-row_height ).
+  cl_gui_cfw=>flush( ).
 
   PERFORM tab_update_title USING space.
 
@@ -4692,29 +4372,24 @@ ENDFORM.                    " LEAVE_CURRENT_TAB
 *      -->FW_QUERY Complete query
 *----------------------------------------------------------------------*
 FORM tab_update_title USING fw_query TYPE string.
-  DATA : lw_name(30) TYPE c,
-         lt_query TYPE soli_tab,
+  DATA: lt_query TYPE soli_tab,
          ls_query LIKE LINE OF lt_query,
          lw_query TYPE string.
   FIELD-SYMBOLS <fs> TYPE any.
   IF w_tabstrip-activetab IS INITIAL.
-    lw_name = 'S_TAB-TITLE1'.
+    DATA(lw_name) = 'S_TAB-TITLE1'.
   ELSE.
     CONCATENATE 'S_TAB-TITLE' w_tabstrip-activetab+3 INTO lw_name.
   ENDIF.
   ASSIGN (lw_name) TO <fs>.
-  IF sy-subrc NE 0.
+  IF sy-subrc <> 0.
     RETURN.
   ENDIF.
 
 * Basic read query to check if first line is a comment
-  CALL METHOD s_tab_active-o_textedit->get_text
-    IMPORTING
-      table  = lt_query[]
-    EXCEPTIONS
-      OTHERS = 1.
+  s_tab_active-o_textedit->get_text( IMPORTING table = lt_query[] EXCEPTIONS OTHERS = 1 ).
   READ TABLE lt_query INTO ls_query INDEX 1.
-  IF sy-subrc NE 0.
+  IF sy-subrc <> 0.
     <fs> = 'Empty tab'(m65).
     RETURN.
   ENDIF.
@@ -4724,7 +4399,7 @@ FORM tab_update_title USING fw_query TYPE string.
   ENDIF.
 
 * Query given, use it as title
-  IF NOT fw_query IS INITIAL.
+  IF fw_query IS NOT INITIAL.
     <fs> = fw_query.
     RETURN.
   ENDIF.
@@ -4741,24 +4416,17 @@ ENDFORM.                    " TAB_UPDATE_TITLE
 *       Export Saved Queries in xml format
 *----------------------------------------------------------------------*
 FORM export_xml.
-  DATA : BEGIN OF ls_xml,
+  DATA: BEGIN OF ls_xml,
            line(256) TYPE x,
          END OF ls_xml,
          lt_xml LIKE TABLE OF ls_xml,
-
-         lw_filename TYPE string,
+    lw_filename TYPE string,
          lw_path TYPE string,
          lw_fullpath TYPE string.
-  DATA : lo_xml TYPE REF TO if_ixml,
-         lo_document TYPE REF TO if_ixml_document,
-         lo_root TYPE REF TO if_ixml_element,
-         lo_element TYPE REF TO if_ixml_element,
-         lw_string TYPE string,
+  DATA: lo_xml TYPE REF TO if_ixml,
          lo_streamfactory TYPE REF TO if_ixml_stream_factory,
          lo_ostream TYPE REF TO if_ixml_ostream,
          lo_renderer TYPE REF TO if_ixml_renderer,
-         lw_title TYPE string,
-         lw_filter TYPE string,
          lw_name TYPE string,
          BEGIN OF ls_ztoad,
            queryid TYPE ztoad-queryid,
@@ -4769,19 +4437,11 @@ FORM export_xml.
          lt_ztoad LIKE TABLE OF ls_ztoad.
 
 * Ask name of file to generate
-  lw_title = 'Choose file to create'(m57).
-  lw_filter = 'XML File (*.xml)|*.xml'(m58).
-  CALL METHOD cl_gui_frontend_services=>file_save_dialog
-    EXPORTING
-      window_title = lw_title
-      file_filter  = lw_filter
-    CHANGING
-      path         = lw_path
-      filename     = lw_filename
-      fullpath     = lw_fullpath
-    EXCEPTIONS
-      OTHERS       = 1.
-  IF sy-subrc NE 0 OR lw_filename IS INITIAL OR lw_path IS INITIAL.
+  DATA(lw_title) = 'Choose file to create'(m57).
+  DATA(lw_filter) = 'XML File (*.xml)|*.xml'(m58).
+  cl_gui_frontend_services=>file_save_dialog( EXPORTING window_title = lw_title
+                                                        file_filter = lw_filter CHANGING path = lw_path filename = lw_filename fullpath = lw_fullpath EXCEPTIONS OTHERS = 1 ).
+  IF sy-subrc <> 0 OR lw_filename IS INITIAL OR lw_path IS INITIAL.
     MESSAGE 'Action cancelled'(m14) TYPE c_msg_success
             DISPLAY LIKE c_msg_error.
     RETURN.
@@ -4798,18 +4458,20 @@ FORM export_xml.
          AND NOT queryid LIKE lw_name.
 
   lo_xml = cl_ixml=>create( ).
-  lo_document = lo_xml->create_document( ).
+  DATA(lo_document) = lo_xml->create_document( ).
 
-  lo_root  = lo_document->create_simple_element( name = c_xmlnode_root
+  DATA(lo_root) = lo_document->create_simple_element( name = c_xmlnode_root
                                                  parent = lo_document ).
   LOOP AT lt_ztoad INTO ls_ztoad.
-    lo_element  = lo_document->create_simple_element( name = c_xmlnode_file
+    DATA(lo_element) = lo_document->create_simple_element( name = c_xmlnode_file
                                                       parent = lo_root ).
-    lw_string = ls_ztoad-visibility.
-    lo_element->set_attribute( name = c_xmlattr_visibility value = lw_string ).
+    DATA(lw_string) = ls_ztoad-visibility.
+    lo_element->set_attribute( name = c_xmlattr_visibility
+                               value = lw_string ).
 
     lw_string = ls_ztoad-text.
-    lo_element->set_attribute( name = c_xmlattr_text value = lw_string ).
+    lo_element->set_attribute( name = c_xmlattr_text
+                               value = lw_string ).
 
     lw_string = ls_ztoad-query.
     lo_element->set_value( lw_string ).
@@ -4824,12 +4486,8 @@ FORM export_xml.
   lo_ostream->set_pretty_print( abap_true ).
   lo_renderer->render( ).
 
-  CALL METHOD cl_gui_frontend_services=>gui_download
-    EXPORTING
-      filename = lw_fullpath
-      filetype = 'BIN'
-    CHANGING
-      data_tab = lt_xml.
+  cl_gui_frontend_services=>gui_download( EXPORTING filename = lw_fullpath
+                                                    filetype = 'BIN' CHANGING data_tab = lt_xml ).
 ENDFORM.                    "Export_xml
 
 *&---------------------------------------------------------------------*
@@ -4838,22 +4496,14 @@ ENDFORM.                    "Export_xml
 *       Import Saved Queries from xml format
 *----------------------------------------------------------------------*
 FORM import_xml.
-  DATA : lt_filetab TYPE filetable,
+  DATA: lt_filetab TYPE filetable,
          ls_file    TYPE file_table,
-         lw_filename TYPE string,
          lw_subrc    LIKE sy-subrc,
-         lw_xmldata   TYPE xstring,
          lo_xml TYPE REF TO if_ixml,
-         lo_document TYPE REF TO if_ixml_document,
          lo_streamfactory TYPE REF TO if_ixml_stream_factory,
          lo_stream TYPE REF TO if_ixml_istream,
          lo_parser TYPE REF TO if_ixml_parser.
-  DATA : lo_iterator TYPE REF TO if_ixml_node_iterator,
-         lo_node  TYPE REF TO if_ixml_node,
-         lw_node_name TYPE string,
-         lo_element TYPE REF TO if_ixml_element,
-         lw_title TYPE string,
-         lw_filter TYPE string,
+  DATA: lo_element TYPE REF TO if_ixml_element,
          lw_guid TYPE guid_32,
          lw_group TYPE usr02-class,
          lw_string TYPE string,
@@ -4861,19 +4511,14 @@ FORM import_xml.
          lt_ztoad LIKE TABLE OF ls_ztoad.
 
 * Choose file to import
-  lw_title = 'Choose file to import'(m59).
-  lw_filter = 'XML File (*.xml)|*.xml'(m58).
-  CALL METHOD cl_gui_frontend_services=>file_open_dialog
-    EXPORTING
-      window_title   = lw_title
-      file_filter    = lw_filter
-      multiselection = space
-    CHANGING
-      file_table     = lt_filetab
-      rc             = lw_subrc.
+  DATA(lw_title) = 'Choose file to import'(m59).
+  DATA(lw_filter) = 'XML File (*.xml)|*.xml'(m58).
+  cl_gui_frontend_services=>file_open_dialog( EXPORTING window_title = lw_title
+                                                        file_filter = lw_filter
+                                                        multiselection = space CHANGING file_table = lt_filetab rc = lw_subrc ).
 
 * Check user action (1 OPEN, 2 CANCEL)
-  IF lw_subrc NE 1.
+  IF lw_subrc <> 1.
     MESSAGE 'Action cancelled'(m14) TYPE c_msg_success
             DISPLAY LIKE c_msg_error.
     RETURN.
@@ -4881,14 +4526,14 @@ FORM import_xml.
 
 * Read filetable
   READ TABLE lt_filetab INTO ls_file INDEX 1.
-  lw_filename = ls_file-filename.
+  DATA(lw_filename) = ls_file-filename.
 
 * Get xml flow from file
 * Or alternatively (if method does not exist) use the method
 * cl_gui_frontend_services=>gui_upload and then convert the
 * x-tab to xstring
   TRY.
-      lw_xmldata = cl_openxml_helper=>load_local_file( lw_filename ).
+      DATA(lw_xmldata) = cl_openxml_helper=>load_local_file( lw_filename ).
     CATCH cx_openxml_not_found.
       MESSAGE 'Error when opening the input XML file'(m60)
               TYPE c_msg_error.
@@ -4897,7 +4542,7 @@ FORM import_xml.
 
   lo_xml = cl_ixml=>create( ).
 
-  lo_document = lo_xml->create_document( ).
+  DATA(lo_document) = lo_xml->create_document( ).
   lo_streamfactory = lo_xml->create_stream_factory( ).
   lo_stream = lo_streamfactory->create_istream_xstring( string = lw_xmldata ).
 
@@ -4905,8 +4550,8 @@ FORM import_xml.
                                      istream        = lo_stream
                                      document       = lo_document ).
 *-- parse the stream
-  IF lo_parser->parse( ) NE 0.
-    IF lo_parser->num_errors( ) NE 0.
+  IF lo_parser->parse( ) <> 0.
+    IF lo_parser->num_errors( ) <> 0.
       MESSAGE 'Error when parsing the input XML file'(m61)
               TYPE c_msg_error.
       RETURN.
@@ -4914,7 +4559,7 @@ FORM import_xml.
   ENDIF.
 
 *-- we don't need the stream any more, so let's close it...
-  CALL METHOD lo_stream->close( ).
+  lo_stream->close( ).
   CLEAR lo_stream.
 
 * Get usergroup
@@ -4923,10 +4568,10 @@ FORM import_xml.
          WHERE bname = sy-uname.
 
 * Rebuild itab t_zspro
-  lo_iterator = lo_document->create_iterator( ).
-  lo_node = lo_iterator->get_next( ).
-  WHILE NOT lo_node IS INITIAL.
-    lw_node_name = lo_node->get_name( ).
+  DATA(lo_iterator) = lo_document->create_iterator( ).
+  DATA(lo_node) = lo_iterator->get_next( ).
+  WHILE lo_node IS NOT INITIAL.
+    DATA(lw_node_name) = lo_node->get_name( ).
     IF lw_node_name = c_xmlnode_file.
 * Cast node to element
       lo_element ?= lo_node. "->query_interface( ixml_iid_element ).
@@ -4942,28 +4587,23 @@ FORM import_xml.
         CALL FUNCTION 'GUID_CREATE'
           IMPORTING
             ev_guid_32 = lw_guid.
-* New function to get an unique id (do not work on older sap system)
-*    TRY.
-*        lw_guid = cl_system_uuid=>create_uuid_c32_static( ).
-*      CATCH cx_uuid_error.
-*        EXIT. "exit do
-*    ENDTRY.
+
 
 * Check that this uid is not already used
         SELECT SINGLE queryid INTO ls_ztoad-queryid
                FROM ztoad
                WHERE queryid = lw_guid.
-        IF sy-subrc NE 0.
+        IF sy-subrc <> 0.
           READ TABLE lt_ztoad WITH KEY queryid = lw_guid TRANSPORTING NO FIELDS.
-          IF sy-subrc NE 0.
+          IF sy-subrc <> 0.
             EXIT. "exit do
           ENDIF.
         ENDIF.
       ENDDO.
       ls_ztoad-queryid = lw_guid.
-      lw_string = lo_element->get_attribute( name = c_xmlattr_visibility ).
+      lw_string = lo_element->get_attribute( c_xmlattr_visibility ).
       ls_ztoad-visibility = lw_string.
-      lw_string = lo_element->get_attribute( name = c_xmlattr_text ).
+      lw_string = lo_element->get_attribute( c_xmlattr_text ).
       ls_ztoad-text = lw_string.
       lw_string = lo_element->get_value( ).
       ls_ztoad-query = lw_string.
@@ -4990,9 +4630,8 @@ ENDFORM.                    "import_xml
 *       Set PF-STATUS for main scren
 *       Adjust list of visible tabs
 *----------------------------------------------------------------------*
-FORM SET_STATUS_010 .
-  DATA : lw_numb TYPE i,
-         lw_max TYPE i.
+FORM set_status_010.
+  DATA lw_max TYPE i.
 
   AUTHORITY-CHECK OBJECT 'S_DEVELOP' ID 'ACTVT' FIELD '03'
                                      ID 'DEVCLASS' DUMMY
@@ -5008,11 +4647,11 @@ FORM SET_STATUS_010 .
   ENDIF.
   SET TITLEBAR 'STATUS010'.
 
-  DESCRIBE TABLE t_tabs LINES lw_max.
+  lw_max = lines( t_tabs ).
 
   LOOP AT SCREEN.
     IF screen-name(6) = 'S_TAB-'.
-      lw_numb = screen-name+11.
+      DATA(lw_numb) = screen-name+11.
       IF lw_numb > lw_max.
         screen-invisible = 1.
       ELSE.
