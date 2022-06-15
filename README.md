@@ -118,7 +118,7 @@ before your query
 
 `DELETE SEOCLASSTX WHERE CLSNAME = 'ZZMACLASS'`
 
-## Add Authorization
+## Add Authorization with Object
 
 You could define your authorization object to restrict function usage by user.  
 If you dont define auth object, all users will have same access as defined bellow.  
@@ -134,6 +134,35 @@ By default :
 - TABLE contain allowed table name pattern
 
 The Authorization object name ist `ZTOAD_AUTH`.
+
+## Add Authorization in code
+
+Alternatively, you could define your authorization in code.  
+First, make the `auth_object` object initial.
+
+```abap
+auth_object(20) TYPE c VALUE 'ZTOAD_AUTH',
+```
+
+```abap
+auth_object(20) TYPE c VALUE '', " 'ZTOAD_AUTH',
+```
+
+No you define globally the authorizations:
+
+```abap
+* Bellow is default AUTH used if no auth_object is defined
+* Allow SELECT query on SAP table (restricted by given pattern)
+         auth_select     TYPE string VALUE '*',
+* Allow INSERT query on SAP table (restricted by given pattern)
+         auth_insert     TYPE string VALUE space, "'*',
+* Allow UPDATE query on SAP table (restricted by given pattern)
+         auth_update     TYPE string VALUE space, "'*',
+* Allow DELETE query on SAP table (restricted by given pattern)
+         auth_delete     TYPE string VALUE space, "'*',
+* Allow any native sql command (set value to space to disable)
+         auth_native(1)  TYPE c VALUE space, "abap_true,
+```
 
 ## Changelog
 
