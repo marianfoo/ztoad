@@ -102,6 +102,8 @@
 *& Please send comment & improvements to http://quelquepart.biz
 *&---------------------------------------------------------------------*
 *& History :
+*& 2017.12.31 v4.0.4:Add add authorization object 'ZTOAD_AUTH'
+*& 2017.12.31 v4.0.3:Fix increase saving queries to 1000
 *& 2017.12.31 v4.0.2:Fix dump in case of multiple aggregations
 *&                       Thanks to Sabrina Villa for the fix
 *& 2017.04.01 v4.0.1:Fix new Tab dump
@@ -224,7 +226,7 @@ DATA : BEGIN OF s_customize,                                "#EC NEEDED
 * 16 for EXECUTE NATIVE SQL command
 * TABLE contain allowed table name pattern
 * '*' to allow all table, 'Z*' to allow all specific tables...
-         auth_object(20) TYPE c VALUE '', "'ZTOAD_AUTH',
+         auth_object(20) TYPE c VALUE 'ZTOAD_AUTH',
          actvt_select    TYPE tactt-actvt VALUE '03',
          actvt_insert    TYPE tactt-actvt VALUE '01',
          actvt_update    TYPE tactt-actvt VALUE '02',
