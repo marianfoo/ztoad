@@ -525,7 +525,7 @@ CLASS lcl_application IMPLEMENTATION.
         ENDIF.
 
       WHEN 'DELETE_HIST'.
-        CONCATENATE sy-uname '+++' INTO lw_queryid.
+        CONCATENATE sy-uname '***' INTO lw_queryid. " Change +++ to wildcard symbol ***
         LOOP AT t_node_repository INTO ls_histo
                 WHERE queryid CP lw_queryid.
           PERFORM repo_delete_history USING ls_histo-node_key
@@ -2899,7 +2899,7 @@ FORM repo_fill.
   APPEND s_node_repository TO t_node_repository.
 
   CLEAR lw_node_key.
-  CONCATENATE sy-uname '+++' INTO lw_queryid.
+  CONCATENATE sy-uname '***' INTO lw_queryid. " Change +++ to wildcard symbol ***
   LOOP AT lt_query_my INTO ls_query WHERE queryid NP lw_queryid.
     lw_node_key = lw_node_key + 1.
     CLEAR s_node_repository.
