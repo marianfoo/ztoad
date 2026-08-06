@@ -5527,6 +5527,13 @@ CLASS ltc_query_parser DEFINITION FINAL
     METHODS detects_comma_syntax FOR TESTING.
     METHODS strips_into_target FOR TESTING.
     METHODS rejects_missing_from FOR TESTING.
+    METHODS rejects_unauthorized_subquery FOR TESTING.
+    METHODS accepts_authorized_subquery FOR TESTING.
+    METHODS rejects_two_level_subquery FOR TESTING.
+    METHODS ignores_literal_source_keyword FOR TESTING.
+    METHODS accepts_authorized_join FOR TESTING.
+    METHODS rejects_dynamic_source FOR TESTING.
+    METHODS rejects_unsupported_cte FOR TESTING.
 
     METHODS parse_select
       IMPORTING query TYPE string
@@ -5841,6 +5848,121 @@ CLASS ltc_query_parser IMPLEMENTATION.
       act = parse_error
       exp = abap_true
       msg = 'SELECT without FROM must be rejected' ).
+  ENDMETHOD.
+
+  METHOD rejects_unauthorized_subquery.
+    DATA no_authority TYPE abap_bool.
+    DATA parse_error TYPE abap_bool.
+
+    s_customize-auth_select = 'SCARR'.
+
+    parse_select(
+      EXPORTING
+        query = `SELECT carrid FROM scarr WHERE carrid IN ( SELECT carrid FROM sflight )`
+      IMPORTING no_authority = no_authority
+                parse_error = parse_error ).
+
+    cl_abap_unit_assert=>assert_true(
+      act = no_authority
+      msg = 'Unauthorized subquery source must be rejected' ).
+    cl_abap_unit_assert=>assert_initial( act = parse_error ).
+  ENDMETHOD.
+
+  METHOD accepts_authorized_subquery.
+    DATA no_authority TYPE abap_bool.
+    DATA parse_error TYPE abap_bool.
+
+    s_customize-auth_select = 'S*'.
+
+    parse_select(
+      EXPORTING
+        query = `SELECT carrid FROM scarr WHERE carrid IN ( SELECT carrid FROM sflight )`
+      IMPORTING no_authority = no_authority
+                parse_error = parse_error ).
+
+    cl_abap_unit_assert=>assert_initial( act = no_authority ).
+    cl_abap_unit_assert=>assert_initial( act = parse_error ).
+  ENDMETHOD.
+
+  METHOD rejects_two_level_subquery.
+    DATA no_authority TYPE abap_bool.
+
+    s_customize-auth_select = 'SCARR'.
+
+    parse_select(
+      EXPORTING
+        query = `SELECT carrid FROM scarr WHERE EXISTS ( SELECT carrid FROM spfli WHERE EXISTS ( SELECT carrid FROM sflight ) )`
+      IMPORTING no_authority = no_authority ).
+
+    cl_abap_unit_assert=>assert_true(
+      act = no_authority
+      msg = 'Every nested physical source must be authorized' ).
+  ENDMETHOD.
+
+  METHOD ignores_literal_source_keyword.
+    DATA no_authority TYPE abap_bool.
+
+    s_customize-auth_select = 'SCARR'.
+
+    parse_select(
+      EXPORTING
+        query = `SELECT carrid FROM scarr WHERE carrid = 'FROM SFLIGHT' " JOIN sflight`
+      IMPORTING no_authority = no_authority ).
+
+    cl_abap_unit_assert=>assert_initial(
+      act = no_authority
+      msg = 'Keywords in literals or comments are not data sources' ).
+  ENDMETHOD.
+
+  METHOD accepts_authorized_join.
+    DATA no_authority TYPE abap_bool.
+    DATA parse_error TYPE abap_bool.
+
+    s_customize-auth_select = 'S*'.
+
+    parse_select(
+      EXPORTING
+        query = `SELECT a~carrid FROM scarr AS a INNER JOIN sflight AS b ON b~carrid = a~carrid`
+      IMPORTING no_authority = no_authority
+                parse_error = parse_error ).
+
+    cl_abap_unit_assert=>assert_initial( act = no_authority ).
+    cl_abap_unit_assert=>assert_initial( act = parse_error ).
+  ENDMETHOD.
+
+  METHOD rejects_dynamic_source.
+    DATA no_authority TYPE abap_bool.
+    DATA parse_error TYPE abap_bool.
+
+    s_customize-auth_select = '*'.
+
+    parse_select(
+      EXPORTING query = `SELECT * FROM (dynamic_table)`
+      IMPORTING no_authority = no_authority
+                parse_error = parse_error ).
+
+    cl_abap_unit_assert=>assert_equals(
+      act = parse_error
+      exp = abap_true
+      msg = 'Unprovable dynamic data sources must fail closed' ).
+  ENDMETHOD.
+
+  METHOD rejects_unsupported_cte.
+    DATA no_authority TYPE abap_bool.
+    DATA parse_error TYPE abap_bool.
+
+    s_customize-auth_select = '*'.
+
+    parse_select(
+      EXPORTING
+        query = `WITH +cte AS ( SELECT carrid FROM sflight ) SELECT carrid FROM +cte`
+      IMPORTING no_authority = no_authority
+                parse_error = parse_error ).
+
+    cl_abap_unit_assert=>assert_equals(
+      act = parse_error
+      exp = abap_true
+      msg = 'Unsupported CTE input must fail before generation' ).
   ENDMETHOD.
 ENDCLASS.
 
