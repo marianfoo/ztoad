@@ -1,0 +1,51 @@
+name: Feature request
+description: Propose a compatible and testable improvement
+title: "feat: "
+labels:
+  - enhancement
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem to solve
+      description: Describe the user need before describing an implementation.
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed behavior
+    validations:
+      required: true
+
+  - type: dropdown
+    id: compatibility
+    attributes:
+      label: Required compatibility
+      multiple: true
+      options:
+        - ABAP 7.50
+        - S/4HANA 2023
+        - Other
+    validations:
+      required: true
+
+  - type: textarea
+    id: tests
+    attributes:
+      label: Acceptance examples
+      description: Include safe example queries and expected results where possible.
+
+  - type: textarea
+    id: security
+    attributes:
+      label: Authorization and security impact
+      description: Explain any effect on table access, write operations, native SQL, or saved-query visibility.
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered

@@ -1,0 +1,15 @@
+{
+  "name": "ztoad-development",
+  "private": true,
+  "description": "Local quality tooling for the ZTOAD abapGit repository",
+  "scripts": {
+    "lint": "abaplint",
+    "test": "npm run lint"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "devDependencies": {
+    "@abaplint/cli": "2.120.18"
+  }
+}

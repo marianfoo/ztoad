@@ -1,0 +1,208 @@
+# ZTOAD development and live-test playbook
+
+This is the normative workflow for future issues and features. Its goal is fast local development without losing the SAP repository metadata or the evidence that a change works on both supported runtimes. The detailed red–green–refactor contract is in [test-strategy.md](test-strategy.md), and the ordered work list is [baseline-findings.md](baseline-findings.md).
+
+## 1. Architecture and trust boundaries
+
+ZTOAD is not only `src/ztoad.prog.abap`. The report also depends on its program metadata and dynpros (`ztoad.prog.xml`), persisted-query table (`ztoad.tabl.xml`), and authorization object (`ztoad_auth.suso.xml`). Future transaction codes or other repository objects will add more serialized files.
+
+Use each tool for the part it can represent faithfully:
+
+| Tool/location | Role | Source of truth? |
+|---|---|---|
+| Git repository | Versioned source, reviews, CI, releases | Yes, for released versions |
+| Native abapGit | Complete SAP-object serialization/deserialization and branch pull/push | Yes, for system ↔ Git round trips |
+| abaplint | Fast local parsing, 7.50 syntax floor, and XML consistency | No; local preflight only |
+| ARC-1 | System discovery, dependency reads, object state, syntax, ABAP Unit, ATC, and controlled targeted writes | Authoritative for the connected live system |
+| ARC-1 source mirror | Searchable read-only snapshot | No; it does not contain all abapGit metadata |
+| ABAP 7.50 system | Minimum-release compile/runtime gate | Yes, for 7.50 behavior |
+| S/4HANA 2023 system | Current-platform compile/runtime gate | Yes, for 2023 behavior |
+
+The local repository and SAP systems must not diverge silently. Every system-side correction is exported through native abapGit and reviewed as a Git diff.
+
+## 2. Local environment
+
+Prerequisites:
+
+- Git
+- Node.js 18 or newer (CI uses Node.js 22)
+- npm
+- Access to native abapGit in each test system
+- Optional but recommended: ARC-1 connections for both test systems, one server instance per SAP destination
+
+Bootstrap and run the local gate:
+
+```sh
+npm ci
+npm test
+```
+
+`@abaplint/cli` is pinned exactly because the project does not claim semantic-version compatibility. The config uses abaplint's canonical release `v762`, which maps to on-premise SAP_BASIS 750. The initial rule set deliberately concentrates on parsing, syntax, type resolution, includes, method consistency, line endings, and abapGit XML consistency. It creates a zero-warning baseline for this legacy report. Add stricter rules only with the refactoring that resolves their existing findings.
+
+## 3. Native abapGit setup on each SAP system
+
+Use a separate native-abapGit repository link in each test system. The repository already declares `/src/` as its starting folder and `PREFIX` folder logic, so the root package name may differ per system.
+
+For an isolated sandbox with no transport requirement, use a local package such as `$ZTOAD`. For a shared/transportable test package, use a customer package selected by the system owner and record its transport layer. A4H now uses transportable package `ZTOAD`, layer `ZDEV`, and request `A4HK906379`. Do not create a second clone in the same system: ABAP object names are system-global, so two ZTOAD work states cannot coexist under different packages.
+
+Setup procedure:
+
+1. Open transaction `ZABAPGIT`.
+2. Create an online repository for `https://github.com/marianfoo/ztoad`.
+3. Select `master` for the initial installation and bind it to the chosen empty package.
+4. Pull and activate all objects.
+5. Confirm that the repository status is clean.
+6. Run ZTOAD once with the read-only smoke query below.
+
+On A4H, the Fiori-shell URL for the transaction is:
+
+`https://a4h.marianzeis.de/sap/bc/ui2/flp?sap-client=001#Shell-startGUI?sap-ui2-tcode=ZABAPGIT`
+
+Do not manually install only the report source. That omits the dynpros, table, and authorization object and cannot reproduce a supported installation.
+
+## 4. Local-first TDD flow on `master`
+
+The current maintainer decision is to stay on `master`. This works only with one owner per live package and with red/incomplete states kept local rather than pushed.
+
+1. Synchronize local `master`, select one finding ID, and confirm the target SAP repositories have no unrelated local differences.
+2. Reproduce the problem on the oldest available affected system and save a sanitized regression input.
+3. Add the smallest ABAP Unit or integration test that fails for the intended reason.
+4. Edit source locally and make the smallest production change that turns the test green. Keep serializer XML unchanged for a source-only fix.
+5. Run the full local suite with `npm test`.
+6. Deploy the local source to SAP_BASIS 750 first through the configured ARC-1 destination, or push/pull `master` through native abapGit only after the complete local state is green.
+7. Activate and run syntax, all ABAP Unit tests, the recorded ATC variants, a safe smoke test, and an ST22 delta check.
+8. Repeat step 6–7 on A4H/SAP_BASIS 758.
+9. If a correction must be made in SAP, stage only the intended objects in native abapGit, round-trip it to Git, and review the complete diff.
+10. Update the finding evidence, commit with a Conventional Commit subject, and push `master` only when all required gates are green or an unavailable gate is explicitly recorded.
+
+Always test 7.50 first when the destination is available. A change that uses newer syntax may appear correct on 2023 yet be impossible to deserialize or activate on the compatibility floor. Until the 7.50 ARC-1 profile is configured, this is a recorded missing gate rather than a pass.
+
+If concurrent development becomes necessary, move to short-lived branches and pull requests. Native abapGit branch switching changes the real objects in the system, and abapGit Flow remains beta, so neither is enabled by default now.
+
+## 5. Structural object changes
+
+Examples include adding issue #2's transaction code, changing the table definition, changing dynpros or text elements, and adding a global class.
+
+For these changes:
+
+1. Create/change the object on the ABAP 7.50 development system when the object type exists there.
+2. Activate and run the relevant checks.
+3. Stage only the affected object in native abapGit and push it to `master` only after its relevant checks are green.
+4. Pull locally and inspect every generated file.
+5. Run `npm test`.
+6. Pull the same `master` state into 2023 and validate deserialization/activation.
+
+If an object can only be created correctly on 2023, export it there first, then prove that the serialized form can be pulled and activated on 7.50 before accepting it. Do not fix serializer XML by guesswork.
+
+## 6. ABAP Unit policy
+
+The current program is a large procedural report with GUI and database dependencies. The sustainable route is incremental extraction, not a one-time rewrite:
+
+- Move parsing/tokenization and generated-query construction behind small local classes.
+- Keep pure methods data-in/data-out.
+- Inject database, authorization, frontend, and repository access behind narrow interfaces when a changed path needs them.
+- Put report-local tests at the end of the report so they remain with the code under test.
+- Use `setup` for a fresh fixture per test; avoid shared mutable fixtures.
+- Prefer clear Arrange–Act–Assert tests with one behavior per test method.
+- Use test seams only for legacy statements that cannot yet be dependency-inverted, then remove the seam during later refactoring.
+
+Required declaration pattern:
+
+```abap
+CLASS ltc_query_parser DEFINITION
+  FOR TESTING
+  RISK LEVEL HARMLESS
+  DURATION SHORT.
+  PRIVATE SECTION.
+    METHODS parses_case_in_aggregate FOR TESTING.
+ENDCLASS.
+```
+
+The baseline now contains 14 live-passing characterization tests across `LTC_QUERY_PARSER`, `LTC_LINE_SPLITTER`, and `LTC_COMMAND_PARSER`. The next regression corpus should cover the existing open parser reports:
+
+- aggregate functions around `CASE` (issue #7)
+- SQL string functions such as `SUBSTRING` and `CONCAT` (issue #4)
+- placement of `INTO TABLE` after `HAVING`/`ORDER BY` in strict SQL mode (issue #6)
+- comments, quoted dots, aliases, joins, unions, old syntax, and 7.50 new syntax
+
+ABAP Unit tests should be `HARMLESS` and `SHORT`. Tests that alter persistent data are integration tests and need a disposable Z table, a dedicated user/role, and explicit cleanup.
+
+## 7. Live quality gate
+
+Run these checks for the complete ZTOAD object set on both systems:
+
+1. Native abapGit status and deserialization check are clean.
+2. All imported objects activate.
+3. SAP syntax check passes for program `ZTOAD`.
+4. ABAP Unit passes with no skipped relevant tests.
+5. ATC passes with the recorded project variants and no new unapproved findings. On A4H, `S4HANA_READINESS_2023` currently reports 0 findings; `ABAP_CLOUD_READINESS` reports 758 architectural findings and is an information/burn-down signal, not a zero baseline.
+6. Manual read-only smoke tests pass.
+7. Authorization-negative tests confirm that unauthorized tables/activities remain blocked.
+8. ST22 and, when relevant, Gateway/system logs contain no new errors from the test.
+
+When ARC-1 is connected, use the equivalent read-only/diagnostic calls:
+
+```text
+SAPRead(type="SYSTEM")
+SAPRead(type="COMPONENTS")
+SAPManage(action="probe")
+SAPLint(action="list_rules")
+SAPDiagnose(action="syntax", name="ZTOAD", type="PROG")
+SAPDiagnose(action="unittest", name="ZTOAD", type="PROG")
+SAPDiagnose(action="atc_variants")
+SAPDiagnose(action="atc", name="ZTOAD", type="PROG", variant="<recorded variant>")
+```
+
+ARC-1 is intentionally one destination per server instance. Configure distinct server entries, for example `arc-1-750` and `arc-1-2023`, instead of changing credentials in place and losing which system produced a result.
+
+Minimal read-only smoke query:
+
+```abap
+SELECT SINGLE mandt FROM t000
+```
+
+Then exercise the parser feature being changed with a sanitized query and verify both the generated source and result. Never use INSERT, UPDATE, DELETE, or native SQL against SAP/business tables for smoke testing. Such tests are permitted only against an isolated disposable Z table with explicit authorization.
+
+The current A4H WebGUI smoke is not green: startup dumps in `CL_GUI_ABAPEDIT=>CONSTRUCTOR` (`BASE-RUN-001`). Do not report browser E2E as passed until that finding is fixed and the post-run ST22 check is clean.
+
+## 8. Security review for every parser/execution change
+
+ZTOAD accepts dynamic ABAP SQL from a user, generates executable code, and can support DML/native SQL. A functional parser fix can therefore change an authorization boundary.
+
+For every relevant change, verify:
+
+- table and activity authorization checks still occur for every accessed/modified table;
+- external table and column names cannot bypass intended restrictions;
+- values are bound or safely quoted instead of concatenated where possible;
+- comments, aliases, nested expressions, subqueries, and unions cannot hide additional statements;
+- row limits remain enforced unless the user explicitly requests the documented override;
+- native SQL remains disabled by default;
+- error/generated-code displays do not leak credentials or confidential values.
+
+Run ATC security checks on the live systems. Local abaplint cannot prove runtime authorization or dynamic-SQL safety.
+
+## 9. Release flow
+
+Release Please runs on pushes to `master` and reads Conventional Commit messages. The repository starts from version `4.0.4`; its manifest avoids replaying old history. It maintains:
+
+- `CHANGELOG.md`
+- `version.txt`
+- the annotated version in `README.md`
+- the annotated version comment in `src/ztoad.prog.abap`
+
+When a `fix:` or `feat:` change reaches `master`, Release Please opens or updates one release PR. Review its version and changelog, let Quality pass, and merge it to create the unprefixed SemVer tag and GitHub Release. The action intentionally uses the repository `GITHUB_TOKEN` by default; see [setup-evaluation.md](setup-evaluation.md) before switching to a PAT or GitHub App token.
+
+## 10. Primary references
+
+- [SAP ABAP Unit test class documentation](https://help.sap.com/doc/abapdocu_latest_index_htm/latest/en-US/ABAPCLASS_FOR_TESTING.html)
+- [SAP ATC development guideline](https://help.sap.com/doc/abapdocu_latest_index_htm/latest/en-US/ABENABAP-TESTCOCKPIT_GUIDL.html)
+- [SAP dynamic ABAP SQL injection guidance](https://help.sap.com/doc/abapdocu_latest_index_htm/latest/en-US/ABENSQL_INJ_DYN_TOKENS_SCRTY.html)
+- [SAP ABAP 7.50 SQL strict mode](https://help.sap.com/doc/abapdocu_latest_index_htm/latest/en-US/ABENABAP_SQL_STRICTMODE_750.html)
+- [SAP Clean ABAP](https://github.com/SAP/styleguides/blob/main/clean-abap/CleanABAP.md)
+- [abapGit repository settings](https://docs.abapgit.org/user-guide/repo-settings/dot-abapgit.html)
+- [abapGit folders and files](https://docs.abapgit.org/user-guide/reference/folders-filenames.html)
+- [abapGit stage and commit](https://docs.abapgit.org/user-guide/projects/online/stage-commit.html)
+- [abapGit Flow (beta)](https://docs.abapgit.org/user-guide/reference/flow.html)
+- [abaplint local setup](https://github.com/abaplint/abaplint/blob/main/docs/getting_started.md)
+- [Release Please Action](https://github.com/googleapis/release-please-action)
+- [Release Please manifest configuration](https://github.com/googleapis/release-please/blob/main/docs/manifest-releaser.md)

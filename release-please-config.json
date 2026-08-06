@@ -1,0 +1,22 @@
+{
+  "$schema": "https://raw.githubusercontent.com/googleapis/release-please/main/schemas/config.json",
+  "bootstrap-sha": "cae4dea2062b6d843f2164852dd7e46ee297f7d7",
+  "packages": {
+    ".": {
+      "release-type": "simple",
+      "package-name": "ztoad",
+      "include-component-in-tag": false,
+      "include-v-in-tag": false,
+      "extra-files": [
+        {
+          "type": "generic",
+          "path": "README.md"
+        },
+        {
+          "type": "generic",
+          "path": "src/ztoad.prog.abap"
+        }
+      ]
+    }
+  }
+}
