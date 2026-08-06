@@ -31,10 +31,10 @@ _Updated: 2026-08-06_ · _Source: live ARC-1 discovery on A4H and NPL, native ab
 |---|---|---|---|
 | HANA | Yes | database | Database-specific paths can be tested, but tests must remain safe and sanitized |
 | RAP / CDS | Yes | ADT | Not used by the current classic report |
-| abapGit | Yes | native, online | `ZABAPGIT` 1.133.0; ZTOAD repository key `000000000017`, package `ZTOAD`, branch `master` |
+| abapGit | Yes | native, online | `ZABAPGIT` 1.133.0; ZTOAD repository key `000000000017`, package `ZTOAD`, temporarily coordinated on branch `codex/fix-base-bug-006` for the structural-object round trip |
 | gCTS | Endpoint available | no ZTOAD repository | Native abapGit remains the selected round-trip mechanism |
 | Transports | Yes | CTS | Transportable package `ZTOAD`; active request `A4HK906379`, target `DEV`, layer `ZDEV` |
-| FLP / WebGUI | Yes | HTTPS | WebGUI starts, but ZTOAD currently dumps while constructing `CL_GUI_ABAPEDIT`; see `BASE-RUN-001` |
+| FLP / WebGUI | Yes | HTTPS | Serialized transaction `ZTOAD` resolves through both direct paths and reaches the editor; query dispatch is still blocked by missing `STATUS010` |
 | UI5 repository | Yes | ADT | Not required for ZTOAD |
 | AMDP debugging | No endpoint | — | Not required for ZTOAD |
 | Text search | No | ICF disabled | Use object search/source reads instead |
@@ -64,15 +64,16 @@ The first request created during setup, `A4HK906377`, is an empty local request 
 
 | Check | Result on A4H |
 |---|---|
-| Git branch / remote commit imported | `master` / `cae4dea2062b` |
+| Candidate branch / transaction commit | `codex/fix-base-bug-006` / `8fb3131` |
 | Package / transport | `ZTOAD` / `A4HK906379` |
-| Repository objects | PROG `ZTOAD`, TABL `ZTOAD`, SUSO `ZTOAD_AUTH` |
-| Active/inactive source | Identical; no inactive divergence |
+| Repository objects | PROG `ZTOAD`, TABL `ZTOAD`, SUSO `ZTOAD_AUTH`, TRAN `ZTOAD` |
+| Active/inactive state | Main-source hashes are identical; ARC-1 still lists program parts/screens/texts as inactive, tracked as installation drift for the process audit/`BASE-BUG-007` |
 | SAP syntax | 0 errors; 4 warnings |
 | ABAP Unit | 19 passed, 0 failed |
 | ATC `S4HANA_READINESS_2023` | 0 rows returned; non-authoritative because known prerequisites are unavailable |
 | ATC `ABAP_CLOUD_READINESS` | 768 findings (463 P1, 305 P2); classic Dynpro/GUI design is not ABAP Cloud compatible |
 | WebGUI smoke | Fresh final launch renders the plain text editor and accepts `SELECT SINGLE mandt FROM t000`; no new ST22 dump |
+| Transaction launch | Standalone WebGUI and FLP `Shell-startGUI` intent both reach ZTOAD; pre/post launch ST22 lists are identical |
 | Remaining UI prerequisite | A4H installation lacks GUI status `STATUS010`, so query dispatch is blocked by `BASE-BUG-007` |
 
 ## Coding Guidance
@@ -94,7 +95,7 @@ The first request created during setup, `A4HK906377`, is an empty local request 
 | Purpose | ADT-only minimum-release activation, syntax, ABAP Unit, and ATC gate |
 | ARC-1 | Separate `arc-1-750` profile, pinned to ARC-1 1.0.2; write/activate/syntax/Unit/cleanup lifecycle proven |
 | UI boundary | No FLP, WebGUI, SAP GUI, or browser automation; A4H owns UI smoke |
-| ZTOAD state | Program and transparent table are absent |
+| ZTOAD state | Exact ADT search finds no objects; program and transparent table are absent; the transaction reader returns an empty placeholder rather than reliable not-found evidence |
 | Blocking prerequisite | SAP_BASIS 750 exposes no ADT transparent-table create endpoint, so table `ZTOAD` cannot be safely provisioned through ARC-1 |
 | Completion status | Connection usable; exact ZTOAD activation/syntax/Unit/ATC blocked until the real table exists |
 

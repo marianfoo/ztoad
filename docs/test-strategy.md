@@ -25,6 +25,7 @@ For every bug or feature:
 | SAP syntax + activation | Authoritative compiler and repository consistency | Both SAP targets | Every `src/` change |
 | ATC | Security, performance, released API, and migration checks | Both SAP targets | Every `src/` change |
 | Native-abapGit check | Complete object serialization and remote/local consistency | Both SAP targets | Every structural/deployment change |
+| Repository contract | Required cross-object launcher semantics not inferred by abaplint | Local and GitHub Actions | Every change |
 | Integration test | DB/auth/executor behavior against disposable objects | Dedicated test client only | Parser/execution/security changes |
 | WebGUI/FLP smoke | Startup, controls, basic read-only query, navigation | A4H only | UI/startup changes and release candidates |
 | ST22/log check | Detect uncaught regressions even if the browser returns to SAP Easy Access | A4H | Every live browser smoke test |
@@ -69,10 +70,10 @@ Do not use ports 50000 or 50001. Credentials stay in the ignored `.env` file and
 
 Run this sequence after deployment:
 
-1. Confirm native abapGit points at `master` and its check is clean.
-2. Confirm no unrelated inactive divergence and record the exact candidate commit/source hash being tested.
+1. Confirm native abapGit points at the expected coordinated branch, refresh it, and review the complete system/Git diff. For normal source work this is `master`; a structural-object feature branch must be explicit in the evidence.
+2. Confirm no unrelated inactive divergence and record the exact candidate commit/source hash being tested. If unrelated drift exists, leave it unselected and list it; never use **Add All**.
 3. Deploy and explicitly activate only the intended changed objects. Do not describe an unmerged directly deployed source as a native-abapGit `master` pull, and do not rely on a write request's activation option.
-4. Confirm active and inactive source are identical, then run active SAP syntax.
+4. Confirm active and inactive main source are identical, query inactive child parts for changed composite objects, then run active SAP syntax. Screens, GUI statuses, text elements, and includes must be checked separately; main-source equality does not clear an inactive child part.
 5. Run all ABAP Unit tests; require zero failures.
 6. Run the recorded ATC variants and inspect prerequisite/check errors. A result with missing prerequisites is incomplete even when no finding rows are displayed.
 7. Record the latest ST22 dump timestamp before UI execution.
@@ -82,7 +83,7 @@ Run this sequence after deployment:
 
 If FLP cannot open WebGUI because the automation browser blocks a popup, record that environmental failure and use the standalone HTTPS WebGUI URL as a secondary diagnostic path. Before interpreting a runtime failure, verify that the installed report contains the serialized dynpros and GUI statuses required by the test. Classify missing installation metadata separately from a product-code regression, but keep the overall smoke gate blocked until both are green.
 
-For `BASE-RUN-001`, editor startup/render/input and the ST22 delta are green on A4H. Query dispatch remains blocked because installed GUI status `STATUS010` is missing (`BASE-BUG-007`), despite being present in repository XML.
+For `BASE-RUN-001`, editor startup/render/input and the ST22 delta are green on A4H. `BASE-BUG-006` adds the serialized report transaction and proves both direct launch paths reach that editor. Query dispatch remains blocked because installed GUI status `STATUS010` is missing (`BASE-BUG-007`), despite being present in repository XML.
 
 For GUI-control changes, a green policy Unit test proves only the selection decision. The chosen control remains a spike until a fresh live session renders it, the intended interaction works, and ST22 stays unchanged. If a spike merely moves the dump to another constructor or event path, reject it and update the root-cause model before implementation continues.
 

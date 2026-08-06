@@ -5,7 +5,8 @@
   "scripts": {
     "lint": "abaplint",
     "lint:quality": "node scripts/abaplint-quality.mjs",
-    "test": "npm run lint"
+    "test:repository": "node scripts/repository-contract.mjs",
+    "test": "npm run lint && npm run test:repository"
   },
   "engines": {
     "node": ">=18"

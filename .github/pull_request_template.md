@@ -10,8 +10,10 @@
 
 - [ ] `npm ci` and `npm test` pass locally.
 - [ ] Serialized files were produced or verified with native abapGit; XML was not hand-authored without a system round trip.
+- [ ] Native abapGit staging contained only intended objects; unrelated system/Git drift was documented and left unselected.
 - [ ] ABAP 7.50: pull, activation, syntax check, ABAP Unit, and ATC pass, or this is not applicable and is explained below.
 - [ ] S/4HANA 2023: pull, activation, syntax check, ABAP Unit, and ATC pass, or this is not applicable and is explained below.
+- [ ] Activation evidence covers affected child parts (screens, GUI statuses, text elements, and includes), not only main-source equality.
 - [ ] A safe manual ZTOAD smoke test passes on both systems, or the omitted system/check is explained below.
 - [ ] ST22 was checked before/after live smoke; known and new dumps are distinguished.
 - [ ] ATC prerequisite/check errors were reviewed; an incomplete run is not reported as zero findings.
