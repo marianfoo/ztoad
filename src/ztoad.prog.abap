@@ -354,7 +354,9 @@ TYPES : BEGIN OF ty_fieldlist,
           ref_table TYPE string,
           ref_field TYPE string,
         END OF ty_fieldlist,
-        ty_fieldlist_table TYPE STANDARD TABLE OF ty_fieldlist.
+        ty_fieldlist_table TYPE STANDARD TABLE OF ty_fieldlist,
+        ty_table_names TYPE SORTED TABLE OF tabname
+                       WITH UNIQUE KEY table_line.
 
 * Constants
 CONSTANTS : c_ddic_col1            TYPE mtreeitm-item_name
@@ -454,6 +456,28 @@ CLASS lcl_generated_line_splitter DEFINITION FINAL.
     CLASS-METHODS is_whitespace
       IMPORTING character TYPE c
       RETURNING VALUE(result) TYPE abap_bool.
+ENDCLASS.
+
+*----------------------------------------------------------------------*
+*       CLASS lcl_sql_source_scanner DEFINITION
+*----------------------------------------------------------------------*
+*       Find physical SELECT sources outside literals and comments
+*----------------------------------------------------------------------*
+CLASS lcl_sql_source_scanner DEFINITION FINAL.
+  PUBLIC SECTION.
+    CLASS-METHODS scan
+      IMPORTING query TYPE string
+      EXPORTING sources TYPE ty_table_names
+                invalid TYPE abap_bool.
+
+  PRIVATE SECTION.
+    CLASS-METHODS process_token
+      IMPORTING token TYPE string
+      CHANGING sources TYPE ty_table_names
+               invalid TYPE abap_bool
+               expect_source TYPE abap_bool
+               source_parenthesized TYPE abap_bool
+               first_token TYPE abap_bool.
 ENDCLASS.
 
 *----------------------------------------------------------------------*
@@ -772,6 +796,179 @@ CLASS lcl_generated_line_splitter IMPLEMENTATION.
       OR character = cl_abap_char_utilities=>horizontal_tab
       OR character = cl_abap_char_utilities=>newline
       OR character = cl_abap_char_utilities=>cr_lf(1) ).
+  ENDMETHOD.
+ENDCLASS.
+
+CLASS lcl_sql_source_scanner IMPLEMENTATION.
+  METHOD scan.
+    DATA index TYPE i.
+    DATA next_index TYPE i.
+    DATA query_length TYPE i.
+    DATA character TYPE c LENGTH 1.
+    DATA next_character TYPE c LENGTH 1.
+    DATA token TYPE string.
+    DATA expect_source TYPE abap_bool.
+    DATA source_parenthesized TYPE abap_bool.
+    DATA first_token TYPE abap_bool VALUE abap_true.
+    DATA in_single_quote TYPE abap_bool.
+    DATA in_backtick TYPE abap_bool.
+    DATA in_template TYPE abap_bool.
+    DATA in_comment TYPE abap_bool.
+
+    CLEAR sources.
+    CLEAR invalid.
+    query_length = strlen( query ).
+
+    WHILE index < query_length.
+      character = query+index(1).
+
+      IF in_comment = abap_true.
+        IF character = cl_abap_char_utilities=>newline.
+          CLEAR in_comment.
+        ENDIF.
+        index = index + 1.
+        CONTINUE.
+      ENDIF.
+
+      IF in_single_quote = abap_true.
+        IF character = ''''.
+          next_index = index + 1.
+          IF next_index < query_length.
+            next_character = query+next_index(1).
+            IF next_character = ''''.
+              index = index + 2.
+              CONTINUE.
+            ENDIF.
+          ENDIF.
+          CLEAR in_single_quote.
+        ENDIF.
+        index = index + 1.
+        CONTINUE.
+      ENDIF.
+
+      IF in_backtick = abap_true.
+        IF character = '`'.
+          next_index = index + 1.
+          IF next_index < query_length.
+            next_character = query+next_index(1).
+            IF next_character = '`'.
+              index = index + 2.
+              CONTINUE.
+            ENDIF.
+          ENDIF.
+          CLEAR in_backtick.
+        ENDIF.
+        index = index + 1.
+        CONTINUE.
+      ENDIF.
+
+      IF in_template = abap_true.
+        IF character = '|'.
+          CLEAR in_template.
+        ENDIF.
+        index = index + 1.
+        CONTINUE.
+      ENDIF.
+
+      IF character CO 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789_/@+'.
+        CONCATENATE token character INTO token IN CHARACTER MODE.
+        index = index + 1.
+        CONTINUE.
+      ENDIF.
+
+      process_token(
+        EXPORTING token = token
+        CHANGING sources = sources
+                 invalid = invalid
+                 expect_source = expect_source
+                 source_parenthesized = source_parenthesized
+                 first_token = first_token ).
+      CLEAR token.
+      IF invalid = abap_true.
+        RETURN.
+      ENDIF.
+
+      CASE character.
+        WHEN ''''.
+          in_single_quote = abap_true.
+        WHEN '`'.
+          in_backtick = abap_true.
+        WHEN '|'.
+          in_template = abap_true.
+        WHEN '"'.
+          in_comment = abap_true.
+        WHEN '('.
+          IF expect_source = abap_true.
+            source_parenthesized = abap_true.
+          ENDIF.
+        WHEN ')' OR ','.
+          IF expect_source = abap_true.
+            invalid = abap_true.
+            RETURN.
+          ENDIF.
+      ENDCASE.
+
+      index = index + 1.
+    ENDWHILE.
+
+    process_token(
+      EXPORTING token = token
+      CHANGING sources = sources
+               invalid = invalid
+               expect_source = expect_source
+               source_parenthesized = source_parenthesized
+               first_token = first_token ).
+    IF expect_source = abap_true.
+      invalid = abap_true.
+    ENDIF.
+  ENDMETHOD.
+
+  METHOD process_token.
+    DATA upper_token TYPE string.
+    DATA table_name TYPE tabname.
+
+    IF token IS INITIAL OR invalid = abap_true.
+      RETURN.
+    ENDIF.
+
+    upper_token = token.
+    TRANSLATE upper_token TO UPPER CASE.
+
+    IF first_token = abap_true.
+      CLEAR first_token.
+      IF upper_token = 'WITH'.
+        invalid = abap_true.
+        RETURN.
+      ENDIF.
+    ENDIF.
+
+    IF expect_source = abap_true.
+      IF source_parenthesized = abap_true.
+        IF upper_token = 'SELECT'.
+          CLEAR expect_source.
+          CLEAR source_parenthesized.
+          RETURN.
+        ENDIF.
+        invalid = abap_true.
+        RETURN.
+      ENDIF.
+
+      IF upper_token(1) = '@'
+      OR upper_token(1) = '+'
+      OR strlen( upper_token ) > 30.
+        invalid = abap_true.
+        RETURN.
+      ENDIF.
+
+      table_name = upper_token.
+      INSERT table_name INTO TABLE sources.
+      CLEAR expect_source.
+      RETURN.
+    ENDIF.
+
+    IF upper_token = 'FROM' OR upper_token = 'JOIN'.
+      expect_source = abap_true.
+    ENDIF.
   ENDMETHOD.
 ENDCLASS.
 
@@ -2183,9 +2380,9 @@ FORM query_parse  USING    fw_query TYPE string
          lw_length      TYPE i,
          lw_query       TYPE string,
          lo_regex       TYPE REF TO cl_abap_regex,
-         lt_split       TYPE TABLE OF string,
+         lt_sources     TYPE ty_table_names,
          lw_string      TYPE string,
-         lw_tabix       TYPE i,
+         lw_invalid     TYPE abap_bool,
          lw_table       TYPE tabname.
 
   CLEAR : fw_select,
@@ -2194,7 +2391,8 @@ FORM query_parse  USING    fw_query TYPE string
           fw_rows,
           fw_union,
           fw_noauth,
-          fw_newsyntax.
+          fw_newsyntax,
+          fw_error.
 
   lw_query = fw_query.
 
@@ -2303,18 +2501,21 @@ FORM query_parse  USING    fw_query TYPE string
     fw_where = lw_query+lw_offset.
   ENDIF.
 
-* Authority-check on used select tables
-  IF s_customize-auth_object NE space OR s_customize-auth_select NE '*'.
-    CONCATENATE 'JOIN' fw_from INTO lw_string SEPARATED BY space.
-    TRANSLATE lw_string TO UPPER CASE.
-    SPLIT lw_string AT space INTO TABLE lt_split.
-    LOOP AT lt_split INTO lw_string.
-      lw_tabix = sy-tabix + 1.
-      CHECK lw_string = 'JOIN'.
-* Read next line (table name)
-      READ TABLE lt_split INTO lw_table INDEX lw_tabix.
-      CHECK sy-subrc = 0.
+* Collect every physical source, including nested subqueries.
+  lcl_sql_source_scanner=>scan(
+    EXPORTING query = lw_query
+    IMPORTING sources = lt_sources
+              invalid = lw_invalid ).
+  IF lw_invalid = abap_true OR lt_sources IS INITIAL.
+    CLEAR fw_from.
+    fw_error = abap_true.
+    RETURN.
+  ENDIF.
 
+* Authority-check on every used select table
+  IF s_customize-auth_object NE space OR s_customize-auth_select NE '*'.
+    LOOP AT lt_sources INTO lw_table.
+      CLEAR sy-subrc.
       IF s_customize-auth_object NE space.
         AUTHORITY-CHECK OBJECT s_customize-auth_object
                  ID 'TABLE' FIELD lw_table
@@ -5532,6 +5733,7 @@ CLASS ltc_query_parser DEFINITION FINAL
     METHODS rejects_two_level_subquery FOR TESTING.
     METHODS ignores_literal_source_keyword FOR TESTING.
     METHODS accepts_authorized_join FOR TESTING.
+    METHODS rejects_unauthorized_union FOR TESTING.
     METHODS rejects_dynamic_source FOR TESTING.
     METHODS rejects_unsupported_cte FOR TESTING.
 
@@ -5927,6 +6129,34 @@ CLASS ltc_query_parser IMPLEMENTATION.
                 parse_error = parse_error ).
 
     cl_abap_unit_assert=>assert_initial( act = no_authority ).
+    cl_abap_unit_assert=>assert_initial( act = parse_error ).
+  ENDMETHOD.
+
+  METHOD rejects_unauthorized_union.
+    DATA union_part TYPE string.
+    DATA no_authority TYPE abap_bool.
+    DATA parse_error TYPE abap_bool.
+
+    s_customize-auth_select = 'SCARR'.
+
+    parse_select(
+      EXPORTING
+        query = `SELECT carrid FROM scarr UNION SELECT carrid FROM sflight`
+      IMPORTING union_part = union_part
+                no_authority = no_authority
+                parse_error = parse_error ).
+
+    cl_abap_unit_assert=>assert_initial( act = no_authority ).
+    cl_abap_unit_assert=>assert_initial( act = parse_error ).
+
+    parse_select(
+      EXPORTING query = union_part
+      IMPORTING no_authority = no_authority
+                parse_error = parse_error ).
+
+    cl_abap_unit_assert=>assert_true(
+      act = no_authority
+      msg = 'A later UNION branch must use the same source policy' ).
     cl_abap_unit_assert=>assert_initial( act = parse_error ).
   ENDMETHOD.
 
