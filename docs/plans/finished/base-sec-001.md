@@ -10,7 +10,7 @@ Prevent parser output from escaping the intended SQL statement and becoming addi
 
 - Vulnerable path: editor input → procedural parser fragments → `QUERY_GENERATE` / `QUERY_GENERATE_NOSELECT` → `SYNTAX-CHECK FOR` → `GENERATE SUBROUTINE POOL` → later execution.
 - Attacker prerequisite: a crafted fragment reaching either generator. The current editor usually strips a top-level period, so exact end-to-end UI reachability is reduced but not accepted as the generator's security boundary.
-- Invariant: every emitted user-derived fragment remains inside one intended ABAP SQL statement; source terminators/comments/host references and unsupported literal forms fail before generation.
+- Invariant: every emitted user-derived fragment remains inside one intended ABAP SQL statement before and after 255-character source wrapping; source terminators/comments/host references, unsafe line splits, and unsupported literal forms fail before generation.
 - Preserved behavior: covered SELECT/DML syntax, SQL identifiers/functions/operators, single-quoted and decimal/negative literals, parser-stripped `INTO`, SAP_BASIS 750 syntax, and existing authorization decisions. ABAP type namespaces fail closed until they can be recognized in a grammar-aware CAST position.
 - Out of scope: native SQL retirement (`BASE-SEC-002`), nested-source authorization (`BASE-SEC-003`), complete SQL grammar/parser redesign, and adding a new per-column authorization model.
 
@@ -20,7 +20,7 @@ Prevent parser output from escaping the intended SQL statement and becoming addi
 2. Add harmless generator regressions proving that old SELECT and UPDATE code accepts a valid statement-injection payload. Generate but never execute the pool; deploy the test-only source to A4H and record red.
 3. Review the plan for include-list completeness, false positives, literal/decimal handling, 7.50 compatibility, Clean ABAP/Clean Core, and independence from SEC-002/SEC-003.
 4. Add a pure local input validator at the last shared pre-generation boundary. Use a positive character include list plus explicit single-quote, decimal-period, numeric-minus, and whitespace rules.
-5. Guard both generators, clear the output program on rejection, return safely from the non-SELECT caller, and add focused validator unit tests for valid and invalid boundaries.
+5. Guard both generators, preserve quote/comment semantics across generated-line wrapping, clear the output program on rejection, return safely from the non-SELECT caller, and add focused validator/unit tests for valid and invalid boundaries.
 6. Run `npm ci`, `npm test`, `npm run lint:quality`, `git diff --check`, exploit reversion review, and a complete diff/security review.
 7. Deploy the exact candidate to A4H through ARC-1, explicitly activate, and run active syntax, all ABAP Unit tests with coverage, active/inactive comparison, inactive-child inventory, and both recorded ATC variants.
 8. Start a fresh A4H transaction with no SQL execution and verify the ST22 delta; retain missing `STATUS010` as `BASE-BUG-007`.
@@ -34,6 +34,7 @@ Prevent parser output from escaping the intended SQL statement and becoming addi
 - A positive character policy is easier to audit than an ABAP-keyword deny list. Explicit decimal/minus rules preserve common numeric predicates without allowing a general statement terminator or `sy-uname` form; an adversarial `ABAP.<word>` lookalike remains rejected rather than creating a context-free period exception.
 - Guarding both generators avoids a SELECT-only fix while leaving native SQL wholly owned by SEC-002.
 - The local class is cohesive and pure; replacing the generic pool architecture remains a later structural change.
+- Generated-line wrapping is part of the sink contract. A safe character set is insufficient if a 255-character split can separate an escape pair or move `*` into source column one; unrepresentable long tokens now fail closed.
 
 ## Evidence log
 
@@ -57,7 +58,7 @@ Prevent parser output from escaping the intended SQL statement and becoming addi
 - Reviewed local diagnostics and ATC deltas. A follow-up declaration cleanup removed the two new legacy prefixes and two chained-declaration contributions; the diagnostic profile remains non-gating because its naming rules conflict. The two new production Cloud-readiness findings are classic `MESSAGE` statements used for safe user feedback, not unreleased APIs in the validator.
 - Reviewed CI configuration and first-run output. It checked out the PR head, installed pinned dependencies, and ran the repository ABAP/contract gates successfully; no workflow change was warranted.
 - Process improvement: `docs/development.md` and `docs/test-strategy.md` now require an explicit representation invariant plus a valid/adversarial pair for every allow-list exception. This directly addresses the overly broad `ABAP.<word>` exception caught during final review.
-- Integration note: this PR is independently based on `master` and overlaps the report/test register with P0 PRs #18 and #19. Merge one P0 PR at a time and rebase/revalidate the next; do not resolve the large ABAP overlap by accepting one side wholesale.
+- Integration note: merge P0 PR #18 first, this PR #20 second, and PR #19 last. Rebase/revalidate after each predecessor and do not resolve the large ABAP overlap by accepting one side wholesale.
 - Final CI: post-audit head `573dab6f1d687067db6ff9023096ddad2ac157fe` passed GitHub Actions Quality run `31108341355` plus the configured external abaplint check; the observations check remained informational as designed.
 
 ## Maintainer-requested follow-up process audit
@@ -67,3 +68,11 @@ Prevent parser output from escaping the intended SQL statement and becoming addi
 - Shared direct-deployment targets now have a required restore-and-verify handoff. Concurrent report PRs now require sequential merge, deliberate rebase, aggregate evidence recomputation, and affected live revalidation.
 - Final CI run links belong in the PR description/comment after success so recording evidence cannot create an infinite evidence-only CI loop.
 - The sanitized retrospective is stored in `docs/research/2026-08-06-p0-development-process-retrospective.md`. The follow-up head acceptance is recorded in PR #20 rather than by another post-green evidence commit.
+
+## External-review follow-up
+
+- A test-only A4H replay confirmed the 255-character question was real: a balanced SQL literal with its doubled quote split across the old hard-cut boundary passed validation and still produced a subroutine pool. No generated pool was executed and no SQL ran.
+- `LCL_GENERATED_LINE_SPLITTER` replaces the procedural splitter and splits only at whitespace outside literals, rejects a line with no safe split, and rejects a continuation that would place `*` in ABAP source column one. Both generator sinks stop before `GENERATE SUBROUTINE POOL` when the layout cannot be preserved.
+- The DML sink now handles a failed `SYNTAX-CHECK` symmetrically with SELECT: user-visible error styling, cleared program handle, and explicit return. The red test previously ended with classic exception `E001(00)`; it now returns normally with no pool.
+- Long unbroken tokens and long literals without an outside-literal split point are deliberately rejected. This is preferable to silently changing their ABAP-source representation.
+- Final exact candidate: source SHA-256 `9d44d07b14fd26eae8ae6899529bd5a0a8535a36734ea177c495c1c099e97be7` and server-normalized active SHA-256 `1b2ad196292ab5f761dde3ff1d15e9b08fa77dc7cf15de3cc5d75fc808571b84`. A4H syntax has zero errors and three warnings, active/inactive source matches, and all 39 tests pass with 21.59% statement, 19.28% branch, and 14.63% procedure coverage. `ABAP_CLOUD_READINESS` reports 676 findings (467 P1, 209 P2); `S4HANA_READINESS_2023` returns no rows but remains incomplete. Local configured abaplint stays at zero, while the diagnostic inventory is 1,986 findings across 59 non-gating rules.

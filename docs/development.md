@@ -188,6 +188,7 @@ For every relevant change, verify:
 - external table and column names cannot bypass intended restrictions;
 - values are bound or safely quoted instead of concatenated where possible;
 - comments, aliases, nested expressions, subqueries, and unions cannot hide additional statements;
+- generated lines split only at a grammar-safe boundary; a hard length cut, a split inside a literal, or a continuation that moves `*` into ABAP source column one must fail closed;
 - row limits remain enforced unless the user explicitly requests the documented override;
 - Native SQL remains unconditionally rejected and forbidden sinks such as `C_DB_EXECUTE` do not return;
 - error/generated-code displays do not leak credentials or confidential values.

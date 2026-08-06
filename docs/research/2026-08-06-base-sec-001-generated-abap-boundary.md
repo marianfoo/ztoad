@@ -19,6 +19,7 @@ The existing parser removes a caller-provided `INTO` target before generation an
 - A period is accepted only inside a single-quoted literal or between two digits in a decimal literal. A minus sign is accepted only for a numeric literal, not as an unescaped ABAP host-component selector such as `sy-uname`.
 - ABAP SQL type namespaces such as `abap.dec` currently fail closed. Safely preserving them requires grammar-aware recognition of a CAST type position; accepting any apparent `ABAP.<word>` sequence would weaken the statement-terminator invariant.
 - Single-quoted literals must be balanced and doubled quotes remain valid.
+- Generated source wrapping must preserve that character-level interpretation. Lines may split only at whitespace outside a literal; a required hard cut, a split inside a literal, or a continuation that would move `*` into ABAP source column one fails before generation.
 - SELECT and generated INSERT/UPDATE/DELETE use the same validator at the last pre-generation boundary. Native SQL is outside this generated-program path and remains the independent `BASE-SEC-002` finding.
 - Table-source authorization completeness remains the independent `BASE-SEC-003` finding. The validator prevents transition from SQL text into ABAP source; it does not invent a field-level authorization policy that ZTOAD does not have.
 
@@ -40,17 +41,25 @@ Deferred. It would reduce the generic-programming risk but requires a larger par
 
 Selected. A pure local validator recognizes the small set of characters required by the supported SQL surface, handles single-quoted literals and decimals explicitly, and rejects source-language boundary characters before either generator emits a line. This is an include-list approach at the ABAP-source boundary, not a claim to implement the complete ABAP SQL grammar.
 
+### Preserve semantics across generated-line wrapping
+
+Selected after external review. The procedural line splitter previously preferred any whitespace and otherwise cut at exactly 255 characters without tracking literal state. A live test placed the two quotes of one SQL `''` escape on opposite sides of that cut. The fragment validator accepted the balanced literal and the generated source passed `SYNTAX-CHECK`, producing a subroutine pool. No pool or SQL was executed, so this proves a representation change and executable output, not a demonstrated end-to-end data exploit.
+
+`LCL_GENERATED_LINE_SPLITTER` now accepts only whitespace outside a single-quoted literal. If no such boundary exists inside 255 characters, generation fails closed instead of cutting the token. It also rejects a split that would move `*` into source column one, where ABAP would interpret it as a full-line comment. `*` remains allowed for SQL wildcards, `COUNT( * )`, and multiplication when its generated position is stable. Very long unbroken tokens or literals that cannot be represented without an unsafe split are an intentional fail-closed limitation.
+
 ## Test design
 
 - Red: prove the original SELECT and UPDATE generators both create a subroutine pool from a payload that closes the SQL statement and appends `WRITE sy-uname`; do not execute either generated pool.
 - Green: reject statement terminators, comments, host escapes, unbalanced quotes, backtick/template literals, chained-statement punctuation, and `sy-...` host-component syntax.
 - Adversarial: reject an `AS ABAP.WRITE ...` lookalike so a namespace-shaped token cannot reintroduce a general period exception.
+- Representation boundary: place a doubled quote exactly across the old 255-character hard cut and require no pool; reject unbroken overlength lines and any split that would move `*` into column one while preserving ordinary safe whitespace wrapping.
+- Error contract: invalid but allow-listed DML syntax must clear the pool handle and return like the SELECT sink instead of relying on a dialog `E` message to abort control flow.
 - Preserve: simple SELECT, joins, aggregates, comparisons, decimal and negative numeric literals, namespace names, doubled single quotes, SQL wildcard/multiplication, and parser-stripped caller `INTO` syntax.
 - Regression: run the complete local and A4H suite; no malicious SQL or generated pool is executed.
 
 ## Compatibility and Clean Core
 
-The validator uses a pure local class, classic string offsets, and `CL_ABAP_CHAR_UTILITIES` constants available at the SAP_BASIS 750 floor. It adds no database or frontend dependency. The generic subroutine-pool architecture remains classic/unclean-core debt, but the input-to-source transition now has an explicit fail-closed contract.
+The validator and quote-aware splitter use classic string offsets and `CL_ABAP_CHAR_UTILITIES` constants available at the SAP_BASIS 750 floor. They add no database or frontend dependency. The generic subroutine-pool architecture remains classic/unclean-core debt, but the input-to-source transition now has an explicit fail-closed contract before and after line representation.
 
 ## SAP sources
 

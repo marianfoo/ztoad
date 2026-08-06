@@ -431,6 +431,32 @@ CLASS lcl_query_input_validator DEFINITION FINAL.
 ENDCLASS.
 
 *----------------------------------------------------------------------*
+*       CLASS lcl_generated_line_splitter DEFINITION
+*----------------------------------------------------------------------*
+*       Preserve source semantics while enforcing the 255-char limit
+*----------------------------------------------------------------------*
+CLASS lcl_generated_line_splitter DEFINITION FINAL.
+  PUBLIC SECTION.
+    CLASS-METHODS append
+      IMPORTING line TYPE string
+      CHANGING lines TYPE string_table
+               safe TYPE abap_bool.
+
+  PRIVATE SECTION.
+    CLASS-METHODS find_split_offset
+      IMPORTING line TYPE string
+                offset TYPE i
+      RETURNING VALUE(split_offset) TYPE i.
+    CLASS-METHODS starts_column_one_comment
+      IMPORTING line TYPE string
+                split_offset TYPE i
+      RETURNING VALUE(result) TYPE abap_bool.
+    CLASS-METHODS is_whitespace
+      IMPORTING character TYPE c
+      RETURNING VALUE(result) TYPE abap_bool.
+ENDCLASS.
+
+*----------------------------------------------------------------------*
 *       CLASS lcl_editor DEFINITION
 *----------------------------------------------------------------------*
 *       Common API for the desktop source editor and WebGUI text editor
@@ -643,6 +669,101 @@ CLASS lcl_query_input_validator IMPLEMENTATION.
 
   METHOD is_digit.
     result = xsdbool( character CO '0123456789' ).
+  ENDMETHOD.
+
+  METHOD is_whitespace.
+    result = xsdbool(
+      character = space
+      OR character = cl_abap_char_utilities=>horizontal_tab
+      OR character = cl_abap_char_utilities=>newline
+      OR character = cl_abap_char_utilities=>cr_lf(1) ).
+  ENDMETHOD.
+ENDCLASS.
+
+CLASS lcl_generated_line_splitter IMPLEMENTATION.
+  METHOD append.
+    DATA remaining TYPE i.
+    DATA offset TYPE i.
+    DATA split_offset TYPE i.
+    DATA segment_length TYPE i.
+
+    IF safe = abap_false.
+      RETURN.
+    ENDIF.
+
+    remaining = strlen( line ).
+    WHILE remaining > c_line_max.
+      split_offset = find_split_offset( line = line offset = offset ).
+      IF split_offset < offset
+      OR starts_column_one_comment(
+           line = line split_offset = split_offset ) = abap_true.
+        safe = abap_false.
+        RETURN.
+      ENDIF.
+
+      segment_length = split_offset - offset.
+      APPEND line+offset(segment_length) TO lines.
+      remaining = remaining + offset - split_offset - 1.
+      offset = split_offset + 1.
+    ENDWHILE.
+
+    APPEND line+offset(remaining) TO lines.
+  ENDMETHOD.
+
+  METHOD find_split_offset.
+    DATA scan_index TYPE i.
+    DATA scan_limit TYPE i.
+    DATA next_index TYPE i.
+    DATA full_length TYPE i.
+    DATA character TYPE c LENGTH 1.
+    DATA next_character TYPE c LENGTH 1.
+    DATA in_literal TYPE abap_bool.
+
+    split_offset = -1.
+    scan_index = offset.
+    scan_limit = offset + c_line_max.
+    full_length = strlen( line ).
+
+    WHILE scan_index < scan_limit.
+      character = line+scan_index(1).
+      IF character = ''''.
+        next_index = scan_index + 1.
+        IF in_literal = abap_true AND next_index < full_length.
+          next_character = line+next_index(1).
+          IF next_character = ''''.
+            scan_index = scan_index + 2.
+            CONTINUE.
+          ENDIF.
+        ENDIF.
+        IF in_literal = abap_true.
+          CLEAR in_literal.
+        ELSE.
+          in_literal = abap_true.
+        ENDIF.
+      ELSEIF in_literal = abap_false
+         AND is_whitespace( character ) = abap_true.
+        split_offset = scan_index.
+      ENDIF.
+      scan_index = scan_index + 1.
+    ENDWHILE.
+  ENDMETHOD.
+
+  METHOD starts_column_one_comment.
+    DATA index TYPE i.
+    DATA full_length TYPE i.
+    DATA character TYPE c LENGTH 1.
+
+    index = split_offset + 1.
+    full_length = strlen( line ).
+    WHILE index < full_length.
+      character = line+index(1).
+      IF is_whitespace( character ) = abap_false.
+        EXIT.
+      ENDIF.
+      index = index + 1.
+    ENDWHILE.
+
+    result = xsdbool( index < full_length AND character = '*' ).
   ENDMETHOD.
 
   METHOD is_whitespace.
@@ -2216,46 +2337,6 @@ FORM query_parse  USING    fw_query TYPE string
 ENDFORM.                    " QUERY_PARSE
 
 *&---------------------------------------------------------------------*
-*&      Form  add_line_to_table
-*&---------------------------------------------------------------------*
-*       Add a string line in a table
-*       Break line at 255 char, respecting words if possible
-*----------------------------------------------------------------------*
-*      -->FW_LINE    Line to add in table
-*      <--FT_TABLE   Table to append
-*----------------------------------------------------------------------*
-FORM add_line_to_table USING fw_line TYPE string
-                       CHANGING ft_table TYPE table.
-  DATA : lw_length TYPE i,
-         lw_offset TYPE i,
-         ls_find   TYPE match_result.
-
-  lw_length = strlen( fw_line ).
-  lw_offset = 0.
-  DO.
-    IF lw_length LE c_line_max.
-      APPEND fw_line+lw_offset(lw_length) TO ft_table.
-      EXIT. "exit do
-    ELSE.
-      FIND ALL OCCURRENCES OF REGEX '\s' "search space
-           IN SECTION OFFSET lw_offset LENGTH c_line_max
-           OF fw_line RESULTS ls_find.
-      IF sy-subrc NE 0.
-        APPEND fw_line+lw_offset(c_line_max) TO ft_table.
-        lw_length = lw_length - c_line_max.
-        lw_offset = lw_offset + c_line_max.
-      ELSE.
-        ls_find-length = ls_find-offset - lw_offset.
-        APPEND fw_line+lw_offset(ls_find-length) TO ft_table.
-        lw_length = lw_length + lw_offset - ls_find-offset - 1.
-        lw_offset = ls_find-offset + 1.
-      ENDIF.
-    ENDIF.
-  ENDDO.
-
-ENDFORM.                    "add_line_to_table
-
-*&---------------------------------------------------------------------*
 *&      Form  QUERY_GENERATE
 *&---------------------------------------------------------------------*
 *       Create SELECT SQL query in a new generated temp program
@@ -2311,6 +2392,7 @@ FORM query_generate  USING    fw_select TYPE string
          lw_strlen_string    TYPE string,
          lw_explicit         TYPE string.
   DATA security_input TYPE string.
+  DATA line_layout_safe TYPE abap_bool.
 
   CLEAR fw_program.
   CONCATENATE 'SELECT' fw_select 'FROM' fw_from fw_where
@@ -2321,10 +2403,13 @@ FORM query_generate  USING    fw_select TYPE string
     RETURN.
   ENDIF.
 
+  line_layout_safe = abap_true.
+
   DEFINE c.
     lw_strlen_string = &1.
-    perform add_line_to_table using lw_strlen_string
-                              changing lt_code_string.
+    lcl_generated_line_splitter=>append(
+      EXPORTING line = lw_strlen_string
+      CHANGING lines = lt_code_string safe = line_layout_safe ).
   END-OF-DEFINITION.
 
   CLEAR : lw_select_distinct,
@@ -2737,6 +2822,12 @@ FORM query_generate  USING    fw_select TYPE string
   c 'endloop.'.                                             "#EC NOTEXT
   c 'GET REFERENCE OF t_result INTO fo_result.'.            "#EC NOTEXT
   c 'ENDFORM.'.                                             "#EC NOTEXT
+  IF line_layout_safe = abap_false.
+    MESSAGE 'Cannot parse the query'(m07)
+            TYPE c_msg_success DISPLAY LIKE c_msg_error.
+    CLEAR fw_program.
+    RETURN.
+  ENDIF.
   CLEAR : lw_line,
           lw_word,
           lw_mess.
@@ -3886,6 +3977,7 @@ FORM query_generate_noselect  USING    fw_command TYPE string
          lw_started(1)       TYPE c,
          lw_started_field(1) TYPE c.
   DATA security_input TYPE string.
+  DATA line_layout_safe TYPE abap_bool.
 
   CLEAR fw_program.
   CONCATENATE fw_command fw_table fw_param
@@ -3896,10 +3988,13 @@ FORM query_generate_noselect  USING    fw_command TYPE string
     RETURN.
   ENDIF.
 
+  line_layout_safe = abap_true.
+
   DEFINE c.
     lw_strlen_string = &1.
-    perform add_line_to_table using lw_strlen_string
-                              changing lt_code_string.
+    lcl_generated_line_splitter=>append(
+      EXPORTING line = lw_strlen_string
+      CHANGING lines = lt_code_string safe = line_layout_safe ).
   END-OF-DEFINITION.
 
 * Write Header
@@ -4083,13 +4178,22 @@ FORM query_generate_noselect  USING    fw_command TYPE string
   c 'fw_time = w_timeend - w_timestart.'.                   "#EC NOTEXT
   c 'ENDFORM.'.                                             "#EC NOTEXT
 
+  IF line_layout_safe = abap_false.
+    MESSAGE 'Cannot parse the query'(m07)
+            TYPE c_msg_success DISPLAY LIKE c_msg_error.
+    CLEAR fw_program.
+    RETURN.
+  ENDIF.
+
   CLEAR : lw_line,
           lw_word,
           lw_mess.
   SYNTAX-CHECK FOR lt_code_string PROGRAM sy-repid
                MESSAGE lw_mess LINE lw_line WORD lw_word.
   IF sy-subrc NE 0 AND fw_display = space.
-    MESSAGE lw_mess TYPE c_msg_error.
+    MESSAGE lw_mess TYPE c_msg_success DISPLAY LIKE c_msg_error.
+    CLEAR fw_program.
+    RETURN.
   ENDIF.
 
   IF fw_display = space.
@@ -5854,6 +5958,7 @@ CLASS ltc_query_generator DEFINITION FINAL
     METHODS keeps_escaped_count_valid FOR TESTING.
     METHODS keeps_legacy_select_valid FOR TESTING.
     METHODS rejects_statement_injection FOR TESTING.
+    METHODS rejects_wrapped_quote_boundary FOR TESTING.
 
     METHODS generate_query
       IMPORTING query TYPE string
@@ -5996,6 +6101,35 @@ CLASS ltc_query_generator IMPLEMENTATION.
       act = generated_program
       msg = 'User input must not terminate SELECT and append ABAP' ).
   ENDMETHOD.
+
+  METHOD rejects_wrapped_quote_boundary.
+    DATA generated_program TYPE sy-repid.
+    DATA new_syntax TYPE abap_bool.
+    DATA count_query TYPE abap_bool.
+    DATA query TYPE string.
+    DATA literal TYPE string.
+
+    literal = ''''.
+    DO c_line_max - 2 TIMES.
+      literal = literal && 'A'.
+    ENDDO.
+    literal = literal && `''B'`.
+    query = `SELECT COUNT( * ) FROM SCARR WHERE CARRID = ` && literal.
+
+    cl_abap_unit_assert=>assert_true(
+      act = lcl_query_input_validator=>is_safe( query )
+      msg = 'Balanced doubled quotes must pass fragment validation' ).
+
+    generate_query(
+      EXPORTING query = query
+      IMPORTING generated_program = generated_program
+                new_syntax = new_syntax
+                count_query = count_query ).
+
+    cl_abap_unit_assert=>assert_initial(
+      act = generated_program
+      msg = 'A wrapped doubled quote must not produce executable source' ).
+  ENDMETHOD.
 ENDCLASS.
 
 
@@ -6007,33 +6141,43 @@ CLASS ltc_line_splitter DEFINITION FINAL
     METHODS keeps_short_line FOR TESTING.
     METHODS keeps_255_char_boundary FOR TESTING.
     METHODS splits_long_line FOR TESTING.
+    METHODS rejects_unsafe_hard_split FOR TESTING.
+    METHODS rejects_literal_space_split FOR TESTING.
+    METHODS rejects_column_one_comment FOR TESTING.
 ENDCLASS.
 
 CLASS ltc_line_splitter IMPLEMENTATION.
   METHOD keeps_short_line.
     DATA line TYPE string.
     DATA lines TYPE STANDARD TABLE OF string.
+    DATA safe TYPE abap_bool VALUE abap_true.
 
     line = 'SELECT carrid FROM scarr'.
 
-    PERFORM add_line_to_table USING line CHANGING lines.
+    lcl_generated_line_splitter=>append(
+      EXPORTING line = line
+      CHANGING lines = lines safe = safe ).
 
     cl_abap_unit_assert=>assert_equals(
       act = lines
       exp = VALUE string_table( ( `SELECT carrid FROM scarr` ) )
       msg = 'A short generated-code line must remain unchanged' ).
+    cl_abap_unit_assert=>assert_true( act = safe ).
   ENDMETHOD.
 
   METHOD keeps_255_char_boundary.
     DATA line TYPE string.
     DATA lines TYPE STANDARD TABLE OF string.
     DATA index TYPE i.
+    DATA safe TYPE abap_bool VALUE abap_true.
 
     DO c_line_max TIMES.
       line = line && 'A'.
     ENDDO.
 
-    PERFORM add_line_to_table USING line CHANGING lines.
+    lcl_generated_line_splitter=>append(
+      EXPORTING line = line
+      CHANGING lines = lines safe = safe ).
 
     cl_abap_unit_assert=>assert_equals(
       act = lines( lines )
@@ -6045,6 +6189,7 @@ CLASS ltc_line_splitter IMPLEMENTATION.
       act = index
       exp = c_line_max
       msg = 'Boundary line length must be preserved' ).
+    cl_abap_unit_assert=>assert_true( act = safe ).
   ENDMETHOD.
 
   METHOD splits_long_line.
@@ -6053,13 +6198,16 @@ CLASS ltc_line_splitter IMPLEMENTATION.
     DATA first_line TYPE string.
     DATA second_line TYPE string.
     DATA index TYPE i.
+    DATA safe TYPE abap_bool VALUE abap_true.
 
-    DO 260 TIMES.
+    DO 250 TIMES.
       line = line && 'A'.
     ENDDO.
-    line = line && ' BBB'.
+    line = line && ' BBBBBBBBBB'.
 
-    PERFORM add_line_to_table USING line CHANGING lines.
+    lcl_generated_line_splitter=>append(
+      EXPORTING line = line
+      CHANGING lines = lines safe = safe ).
 
     cl_abap_unit_assert=>assert_equals(
       act = lines( lines )
@@ -6070,12 +6218,72 @@ CLASS ltc_line_splitter IMPLEMENTATION.
     index = strlen( first_line ).
     cl_abap_unit_assert=>assert_equals(
       act = index
-      exp = c_line_max
-      msg = 'First segment must use the safe maximum' ).
+      exp = 250
+      msg = 'First segment must end at safe whitespace' ).
     cl_abap_unit_assert=>assert_equals(
       act = second_line
-      exp = 'AAAAA BBB'
+      exp = 'BBBBBBBBBB'
       msg = 'Remaining text must be preserved exactly' ).
+    cl_abap_unit_assert=>assert_true( act = safe ).
+  ENDMETHOD.
+
+  METHOD rejects_unsafe_hard_split.
+    DATA line TYPE string.
+    DATA lines TYPE STANDARD TABLE OF string.
+    DATA safe TYPE abap_bool VALUE abap_true.
+
+    DO c_line_max + 1 TIMES.
+      line = line && 'A'.
+    ENDDO.
+
+    lcl_generated_line_splitter=>append(
+      EXPORTING line = line
+      CHANGING lines = lines safe = safe ).
+
+    cl_abap_unit_assert=>assert_false(
+      act = safe
+      msg = 'An unbroken token must not be cut into generated source' ).
+    cl_abap_unit_assert=>assert_initial( act = lines ).
+  ENDMETHOD.
+
+  METHOD rejects_column_one_comment.
+    DATA line TYPE string.
+    DATA lines TYPE STANDARD TABLE OF string.
+    DATA safe TYPE abap_bool VALUE abap_true.
+
+    DO 250 TIMES.
+      line = line && 'A'.
+    ENDDO.
+    line = line && ' *REMAINDER'.
+
+    lcl_generated_line_splitter=>append(
+      EXPORTING line = line
+      CHANGING lines = lines safe = safe ).
+
+    cl_abap_unit_assert=>assert_false(
+      act = safe
+      msg = 'Wrapping must not move an asterisk into source column one' ).
+  ENDMETHOD.
+
+  METHOD rejects_literal_space_split.
+    DATA line TYPE string.
+    DATA literal_part TYPE string.
+    DATA lines TYPE STANDARD TABLE OF string.
+    DATA safe TYPE abap_bool VALUE abap_true.
+
+    DO 130 TIMES.
+      literal_part = literal_part && 'A'.
+    ENDDO.
+    line = `WHERE TEXT = '` && literal_part && space
+        && literal_part && `'`.
+
+    lcl_generated_line_splitter=>append(
+      EXPORTING line = line
+      CHANGING lines = lines safe = safe ).
+
+    cl_abap_unit_assert=>assert_false(
+      act = safe
+      msg = 'Whitespace inside a literal is not a safe source split' ).
   ENDMETHOD.
 ENDCLASS.
 
@@ -6094,6 +6302,7 @@ CLASS ltc_command_parser DEFINITION FINAL
     METHODS rejects_native_sql_by_default FOR TESTING.
     METHODS cannot_reenable_native_sql FOR TESTING.
     METHODS rejects_dml_injection FOR TESTING.
+    METHODS rejects_invalid_dml_syntax FOR TESTING.
     METHODS keeps_valid_dml_generation FOR TESTING.
 ENDCLASS.
 
@@ -6200,6 +6409,21 @@ CLASS ltc_command_parser IMPLEMENTATION.
     cl_abap_unit_assert=>assert_initial(
       act = generated_program
       msg = 'User DML must not append a generated ABAP statement' ).
+  ENDMETHOD.
+
+  METHOD rejects_invalid_dml_syntax.
+    DATA generated_program TYPE sy-repid.
+
+    PERFORM query_generate_noselect
+      USING 'UPDATE'
+            'SCARR'
+            `WHERE CARRID = 'LH'`
+            space
+      CHANGING generated_program.
+
+    cl_abap_unit_assert=>assert_initial(
+      act = generated_program
+      msg = 'Invalid DML syntax must return no generated program' ).
   ENDMETHOD.
 
   METHOD keeps_valid_dml_generation.

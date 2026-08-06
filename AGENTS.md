@@ -56,6 +56,7 @@ NPL currently lacks ZTOAD's transparent table. SAP_BASIS 750 has no ADT transpar
 - Extract testable logic behind small local classes instead of adding more behavior to large `FORM` routines.
 - Use dependency injection for external collaborators. Use test seams only as a temporary legacy-code bridge.
 - Test both the success path and invalid/untrusted input. ZTOAD executes dynamic SQL, so authorization boundaries, dynamic table/column input, escaping, DML, and native SQL are security-sensitive.
+- For generated source, test the actual emitted line representation: split only at whitespace outside literals, reject unsafe hard cuts, and never move `*` into ABAP source column one.
 - ABAP Unit tests must not change customizing or persistent business data. Any integration test that writes must use an explicitly disposable Z table and be cleaned up.
 - Local abaplint is a fast compatibility/static gate, not a substitute for SAP syntax, activation, ABAP Unit, or ATC.
 - ABAP Unit and syntax cannot prove that a Control Framework class is supported by a particular frontend. GUI-control changes require a new browser session against the exact active candidate plus a post-run dump check.

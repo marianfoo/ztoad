@@ -56,6 +56,7 @@ Each parser/generator change should select relevant cases from this matrix:
 | DML | INSERT values/set, UPDATE, DELETE, conversion errors, authorization denial; disposable Z table only |
 | Native SQL | rejected by default, cannot be re-enabled by legacy configuration, forbidden executor absent |
 | Error handling | parse rejection, compile rejection, runtime exception, sanitized message, no unexpected ST22 dump |
+| Generated lines | below/exactly/over 255 characters, safe whitespace outside literals, doubled-quote boundary, unbroken token rejection, no `*` moved into source column one |
 
 ## Live test protocol
 
