@@ -29,7 +29,7 @@ Priority meanings: **P0** blocks the requested test workflow or is an immediate 
 | BASE-SEC-001 | P0 | User text becomes dynamic Open SQL and generated ABAP (`GENERATE SUBROUTINE POOL`, lines 2310 and 3657). Parser-derived table/field/tail tokens are not validated through a strict include list. | Malicious/ambiguous table, column, `WHERE`, `HAVING`, subquery, comment, and quoted-keyword cases; verify rejection before generation. | Open |
 | BASE-SEC-002 | P0 | Native SQL uses unsupported kernel call `C_DB_EXECUTE` at line 3818. It is a high-impact arbitrary database-command path and produces a live compiler warning. | Authorization-negative test, default-disabled test, allow-list test against a disposable Z object, and no-kernel-call architecture test. | Open |
 | BASE-SEC-003 | P0 | SELECT authorization extraction tokenizes top-level `FROM`/`JOIN` text and can miss nested subqueries/CTEs or concealed data sources. | Multi-table joins, nested subqueries, aliases, comments, quoted identifiers, UNION branches, and unauthorized inner-table cases. | Open |
-| BASE-BUG-001 | P1 | [Issue #6](https://github.com/marianfoo/ztoad/issues/6): a reported `SELECT DISTINCT ... COUNT ... MAX ... GROUP BY ... HAVING` query produces “The INTO/APPENDING clause must be at the end of the SELECT.” | Sanitized `VBAK`/`VGBEL` reproduction; check exact generated ordering around `HAVING`, `ORDER BY`, `UP TO`, and `INTO TABLE`. | Open |
+| BASE-BUG-001 | P1 | [Issue #6](https://github.com/marianfoo/ztoad/issues/6): a reported `SELECT DISTINCT ... COUNT ... MAX ... GROUP BY ... HAVING` query produces “The INTO/APPENDING clause must be at the end of the SELECT.” | Sanitized `DD03L` reproduction; check exact generated ordering around `HAVING`, `ORDER BY`, `UP TO`, and `INTO TABLE`. | Fixed and 17/17 green on A4H; live 7.50 pending |
 | BASE-BUG-002 | P1 | [Issue #7](https://github.com/marianfoo/ztoad/issues/7): a reported `SUM( CASE ... END ) AS ...` over `EKBE` produces “No component exists with the name CASE.” The expression is split into false result components. | Sanitized aggregate with multi-line `CASE`, qualified fields, multiplication, alias, WHERE, and GROUP BY; assert one aggregate expression and the expected generated row type. | Open |
 | BASE-BUG-003 | P1 | [Issue #4](https://github.com/marianfoo/ztoad/issues/4): `SUBSTRING`/`CONCAT` produce “No component exists with the name SUBSTRING(”, exposing naïve select-list tokenization. | Nested function arguments, commas inside functions, aliases, literals containing spaces/commas, and function composition. | Open |
 | BASE-BUG-004 | P1 | Keyword detection uses string searches and space splitting rather than quote/parenthesis-aware lexical tokens. Keywords in literals, comments, functions, or subqueries can move clause boundaries. | Quoted `FROM`, `WHERE`, `UNION`, `UP TO`; escaped quotes; comments; nested parentheses; multiline queries. | Open |
@@ -92,9 +92,10 @@ This diagnostic profile is intentionally not the merge gate yet. New code must n
 
 ## Initial executable tests
 
-The program now ends with three harmless, short ABAP Unit classes:
+The program now ends with four harmless, short ABAP Unit classes:
 
 - `LTC_QUERY_PARSER`: 8 tests for simple SELECT, default/explicit/unlimited limits, tail clauses, UNION separation, comma syntax, caller `INTO` removal, and missing `FROM` rejection.
+- `LTC_QUERY_GENERATOR`: 3 tests for strict aggregate clause ordering plus escaped-count and legacy-select compatibility.
 - `LTC_LINE_SPLITTER`: 3 tests for short lines, the 255-character boundary, and long-line splitting.
 - `LTC_COMMAND_PARSER`: 3 tests for UPDATE, DELETE FROM, and NATIVE quote conversion.
 
