@@ -20,6 +20,7 @@
 - [ ] Authorization and SQL-injection implications were reviewed.
 - [ ] New or changed logic has ABAP Unit coverage where technically feasible.
 - [ ] Documentation and changelog impact were considered.
+- [ ] The accepted PR will use squash merge and a Conventional Commit PR title.
 
 ## Test evidence / exceptions
 
