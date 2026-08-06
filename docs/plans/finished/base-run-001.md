@@ -1,10 +1,10 @@
 # BASE-RUN-001 implementation and validation plan
 
-_Status: implemented and validated; pull request pending · branch: `codex/fix-base-run-001`_
+_Status: completed in PR [#16](https://github.com/marianfoo/ztoad/pull/16) · branch: `codex/fix-base-run-001` · first CI run green_
 
 ## Goal and root cause
 
-Make ZTOAD reach a usable query editor in A4H WebGUI without creating a new ST22 dump. The original failure is the default `ABAP` source type passed implicitly to `CL_GUI_ABAPEDIT`; its constructor publishes lexer data through `DP_PUBLISH_URL`, which raises an uncaught `DATA_SOURCE_ERROR`. A live spike additionally proved that the underlying source-editor control has no valid WebGUI frontend handle even when lexer publication is skipped. Full evidence is in [the root-cause report](../research/2026-08-06-base-run-001-webgui-editor-root-cause.md).
+Make ZTOAD reach a usable query editor in A4H WebGUI without creating a new ST22 dump. The original failure is the default `ABAP` source type passed implicitly to `CL_GUI_ABAPEDIT`; its constructor publishes lexer data through `DP_PUBLISH_URL`, which raises an uncaught `DATA_SOURCE_ERROR`. A live spike additionally proved that the underlying source-editor control has no valid WebGUI frontend handle even when lexer publication is skipped. Full evidence is in [the root-cause report](../../research/2026-08-06-base-run-001-webgui-editor-root-cause.md).
 
 ## Test-first change
 
@@ -74,3 +74,20 @@ Restore the original report source from `master` through ARC-1 and reactivate. N
 ## Final review and PR
 
 After all available gates, review the complete diff and evidence, update `BASE-RUN-001`, commit with a Conventional Commit subject, push, open a PR, and wait for required CI. After its first green run, audit the workflow and CI, apply useful documentation/process improvements in the same PR, move this plan to `docs/plans/finished/`, push, and wait for green again. Do not merge without maintainer direction, especially while the 7.50 ZTOAD gate is blocked.
+
+## Post-green process and CI audit
+
+PR #16's first Quality run, [31091738961](https://github.com/marianfoo/ztoad/actions/runs/31091738961), completed successfully. The pinned checkout/setup actions, Node.js 24, `npm ci`, and `npm test` all completed without warnings or dependency failures. The GitHub token is read-only and the job finished in eight seconds. The external abaplint check passed; its observations check completed neutral as expected.
+
+No CI workflow change is justified in this PR. The current configured compatibility/XML gate is green and appropriate. The raw full-quality inventory is intentionally not promoted because it still contains legacy debt and mutually contradictory default naming configurations; the active zero-findings plan now requires a coherent Clean ABAP strict profile before CI promotion.
+
+The audit produced these repository-process improvements:
+
+- Environment-dependent green candidates remain spikes until a live integration test accepts them. This prevented the SQL-source-type workaround from being shipped after it merely moved the dump.
+- ARC-1 write success and an `activate=true` option are not activation evidence. The workflow now requires explicit activation followed by active/inactive object-state equality.
+- GUI-control changes require a fresh browser session against the exact active source and a post-run ST22 delta; Unit and syntax checks alone are insufficient.
+- UI smoke now verifies serialized dynpro/GUI-status prerequisites before attributing a failure to product source. Missing `STATUS010` remains a separate `BASE-BUG-007` finding while keeping full query execution blocked.
+- When ARC-1's pre-write lint profile is wrong, only that local lint request may be bypassed after repository abaplint passes; live preflight, activation, syntax, Unit, ATC, and object-state checks remain mandatory.
+- NPL remains an ADT/ARC-1-only target. Its unavailable transparent-table creation prerequisite is recorded as blocked rather than replaced by an invalid DDIC substitute.
+
+These changes were added to `AGENTS.md`, the development playbook, the test strategy, and the abaplint zero-findings plan in the same PR.

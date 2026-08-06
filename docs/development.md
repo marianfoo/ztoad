@@ -65,19 +65,21 @@ Do not manually install only the report source. That omits the dynpros, table, a
 `master` remains the only long-lived integration/release line and the normal branch of each shared native-abapGit link. Development uses a short-lived pull-request branch so CI and review can evaluate the candidate without placing an unreviewed state on `master`.
 
 1. Synchronize local `master`, create `codex/<finding-id>`, select one finding, and confirm the target systems have no unrelated differences.
-2. Research and reproduce the problem on the oldest available affected system. Check fixture availability before making a spike permanent.
+2. Research and reproduce the problem on the oldest available affected system. Check fixture and serialized UI-metadata availability before making a spike permanent.
 3. Add the smallest test, replay the original production code, and record the intended red failure.
 4. Write and review a plan under `docs/plans/` covering implementation, ABAP 7.50, Clean ABAP/Clean Core, local/live tests, rollback, browser smoke, and ST22.
-5. Edit source locally and make the smallest production change that turns the test green. Keep serializer XML unchanged for a source-only fix.
+5. Edit source locally and make the smallest production change that turns the test green. For a frontend or other environment-dependent assumption, keep the candidate classified as a spike until live integration evidence accepts it. Keep serializer XML unchanged for a source-only fix.
 6. Run `npm ci`, `npm test`, `git diff --check`, and the final local/security review.
-7. Deploy the exact candidate source to SAP_BASIS 750 first through ARC-1/ADT when its real dependencies exist; record any missing ADT prerequisite as blocked. Keep the A4H native-abapGit link on `master` and record an unmerged candidate as a direct deployment.
-8. On NPL, activate only the intended object and run active syntax, all ABAP Unit tests, and complete ATC variants through ARC-1. On A4H/SAP_BASIS 758, repeat those checks and additionally run safe browser smoke and ST22 delta.
+7. Deploy the exact candidate source to SAP_BASIS 750 first through ARC-1/ADT when its real dependencies exist; record any missing ADT prerequisite as blocked. Keep the A4H native-abapGit link on `master` and record an unmerged candidate as a direct deployment. Follow every write with an explicit activation call and active/inactive object-state comparison; a write response or activation option alone is not proof that the active version changed.
+8. On NPL, activate only the intended object and run active syntax, all ABAP Unit tests, and complete ATC variants through ARC-1. On A4H/SAP_BASIS 758, repeat those checks and additionally start a fresh browser session for safe smoke and ST22 delta. Verify required dynpros/GUI statuses before attributing an end-to-end failure to the source candidate.
 9. If a correction must be made in SAP, export it through native abapGit or reproduce it locally, then review every serialized/source difference. Never leave an unexported system-only fix.
 10. Perform a final review, update evidence, commit/push the short-lived branch, open the PR, and wait for CI. After the first green run, audit the process/CI, update guidance in the same PR, move the plan to `docs/plans/finished/`, push, and wait again.
 
 Always test 7.50 first when the destination and the candidate's real dependencies are available. A change that uses newer syntax may appear correct on 2023 yet be impossible to activate on the compatibility floor. The `arc-1-750` profile and ADT lifecycle are configured and proven; exact ZTOAD validation remains blocked while transparent table `ZTOAD` is absent because SAP_BASIS 750 cannot create transparent tables over ADT. See [the NPL dossier](research/2026-08-06-npl-adt-only-validation.md).
 
 Native abapGit branch switching changes real system objects, and abapGit Flow remains beta. Do not use either casually in the shared package. Structural-object PRs may require a dedicated package/system or an explicitly coordinated temporary branch procedure.
+
+If ARC-1's pre-write linter reports an incorrect ABAP release, do not weaken all write checks. After the pinned repository abaplint gate passes, disable only the mis-profiled local lint request, retain server preflight, activate explicitly, and run SAP syntax/Unit/ATC/object-state checks. Track the tool mismatch separately from the product change.
 
 ## 5. Structural object changes
 

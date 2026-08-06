@@ -71,12 +71,12 @@ Run this sequence after deployment:
 
 1. Confirm native abapGit points at `master` and its check is clean.
 2. Confirm no unrelated inactive divergence and record the exact candidate commit/source hash being tested.
-3. Deploy and activate only the intended changed objects. Do not describe an unmerged directly deployed source as a native-abapGit `master` pull.
-4. Run SAP syntax.
+3. Deploy and explicitly activate only the intended changed objects. Do not describe an unmerged directly deployed source as a native-abapGit `master` pull, and do not rely on a write request's activation option.
+4. Confirm active and inactive source are identical, then run active SAP syntax.
 5. Run all ABAP Unit tests; require zero failures.
 6. Run the recorded ATC variants and inspect prerequisite/check errors. A result with missing prerequisites is incomplete even when no finding rows are displayed.
 7. Record the latest ST22 dump timestamp before UI execution.
-8. Launch ZTOAD and run only a read-only sanitized smoke query, initially `SELECT SINGLE mandt FROM t000`.
+8. Verify the installed dynpro and GUI status required by the scenario, then launch ZTOAD in a fresh browser session and run only a read-only sanitized smoke query, initially `SELECT SINGLE mandt FROM t000`.
 9. Verify expected UI/result state and confirm ST22 has no new dump.
 10. Do not repeat the browser portion on NPL; repeat only the ADT activation/syntax/Unit/ATC gates there.
 
@@ -84,7 +84,7 @@ If FLP cannot open WebGUI because the automation browser blocks a popup, record 
 
 For `BASE-RUN-001`, editor startup/render/input and the ST22 delta are green on A4H. Query dispatch remains blocked because installed GUI status `STATUS010` is missing (`BASE-BUG-007`), despite being present in repository XML.
 
-`BASE-RUN-001` currently blocks steps 8–9 in WebGUI because `CL_GUI_ABAPEDIT` dumps. Until fixed, unit/syntax/ATC checks remain valid, but browser end-to-end status is failed rather than skipped.
+For GUI-control changes, a green policy Unit test proves only the selection decision. The chosen control remains a spike until a fresh live session renders it, the intended interaction works, and ST22 stays unchanged. If a spike merely moves the dump to another constructor or event path, reject it and update the root-cause model before implementation continues.
 
 ## Database-writing integration tests
 
