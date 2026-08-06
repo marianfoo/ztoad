@@ -5905,7 +5905,8 @@ CLASS ltc_command_parser DEFINITION FINAL
     METHODS teardown.
     METHODS parses_update FOR TESTING.
     METHODS accepts_delete_from FOR TESTING.
-    METHODS prepares_native_sql FOR TESTING.
+    METHODS rejects_native_sql_by_default FOR TESTING.
+    METHODS cannot_reenable_native_sql FOR TESTING.
 ENDCLASS.
 
 CLASS ltc_command_parser IMPLEMENTATION.
@@ -5915,7 +5916,7 @@ CLASS ltc_command_parser IMPLEMENTATION.
     s_customize-auth_insert = '*'.
     s_customize-auth_update = '*'.
     s_customize-auth_delete = '*'.
-    s_customize-auth_native = abap_true.
+    CLEAR s_customize-auth_native.
   ENDMETHOD.
 
   METHOD teardown.
@@ -5958,7 +5959,7 @@ CLASS ltc_command_parser IMPLEMENTATION.
     cl_abap_unit_assert=>assert_initial( act = no_authority ).
   ENDMETHOD.
 
-  METHOD prepares_native_sql.
+  METHOD rejects_native_sql_by_default.
     DATA no_authority TYPE abap_bool.
     DATA command TYPE string.
     DATA table TYPE string.
@@ -5971,10 +5972,30 @@ CLASS ltc_command_parser IMPLEMENTATION.
     cl_abap_unit_assert=>assert_equals(
       act = command
       exp = c_native_command ).
+    cl_abap_unit_assert=>assert_initial( act = parameters ).
+    cl_abap_unit_assert=>assert_true(
+      act = no_authority
+      msg = 'Native SQL must be rejected by default' ).
+  ENDMETHOD.
+
+  METHOD cannot_reenable_native_sql.
+    DATA no_authority TYPE abap_bool.
+    DATA command TYPE string.
+    DATA table TYPE string.
+    DATA parameters TYPE string.
+
+    s_customize-auth_native = abap_true.
+
+    PERFORM query_parse_noselect
+      USING `NATIVE DROP INDEX 'ZTEST_INDEX'`
+      CHANGING no_authority command table parameters.
+
     cl_abap_unit_assert=>assert_equals(
-      act = parameters
-      exp = 'DROP INDEX "ZTEST_INDEX"'
-      msg = 'Native SQL quotes must be converted for the kernel call' ).
-    cl_abap_unit_assert=>assert_initial( act = no_authority ).
+      act = command
+      exp = c_native_command ).
+    cl_abap_unit_assert=>assert_initial( act = parameters ).
+    cl_abap_unit_assert=>assert_true(
+      act = no_authority
+      msg = 'Legacy configuration must not re-enable Native SQL' ).
   ENDMETHOD.
 ENDCLASS.

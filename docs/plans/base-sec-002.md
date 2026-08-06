@@ -41,7 +41,8 @@ Remove the externally controlled Native SQL execution boundary and unsupported `
 
 - Baseline: `npm ci` reports 0 vulnerabilities; `npm test` passes with 0 configured abaplint issues; full diagnostic lint reports 1,878 findings across 58 rules.
 - Red repository contract: `npm test` reached the new focused assertion and failed because `src/ztoad.prog.abap` still contains `C_DB_EXECUTE` (`AssertionError: Unsupported native SQL kernel call C_DB_EXECUTE must not exist`). Configured abaplint remained green with 0 findings before the contract ran.
-- ABAP Unit red/green: pending.
+- ABAP Unit red: the test-only candidate activated on A4H with the four known warnings. Of 20 tests, 19 passed and only `LTC_COMMAND_PARSER=>CANNOT_REENABLE_NATIVE_SQL` failed (`ASSERT_INITIAL`) because setting the deprecated fallback flag still copied Native SQL into the executable parameter. `REJECTS_NATIVE_SQL_BY_DEFAULT`, UPDATE, and DELETE remained green. Coverage was 15.40% statements, 13.32% branches, and 6.58% procedures.
+- ABAP Unit green: pending.
 - Local final checks: pending.
 - A4H: pending.
 - NPL ADT-only: pending.
