@@ -39,6 +39,8 @@ npm test
 
 `@abaplint/cli` is pinned exactly because the project does not claim semantic-version compatibility. The config uses abaplint's canonical release `v762`, which maps to on-premise SAP_BASIS 750. The initial rule set deliberately concentrates on parsing, syntax, type resolution, includes, method consistency, line endings, and abapGit XML consistency. It creates a zero-warning baseline for this legacy report. Add stricter rules only with the refactoring that resolves their existing findings.
 
+`npm test` also checks the complete native-abapGit installation closure: the source/object files, four dynpros, and three GUI statuses. For a live composite-object gate, capture `SAPRead(type="INACTIVE_OBJECTS")` as JSON and run `node scripts/installation-contract.mjs --inactive-objects <file>`. Unrelated inactive objects are ignored; any ZTOAD source, CUA, screen, or text part makes the gate fail.
+
 ## 3. Native abapGit setup on the complete-object test system
 
 Use native abapGit on A4H for complete object round trips. The repository already declares `/src/` as its starting folder and `PREFIX` folder logic, so the root package name may differ per system. NPL is deliberately ARC-1/ADT-only: do not use its FLP, WebGUI, SAP GUI, or browser automation.
@@ -51,8 +53,9 @@ Setup procedure:
 2. Create an online repository for `https://github.com/marianfoo/ztoad`.
 3. Select `master` for the initial installation and bind it to the chosen empty package. Keep this shared repository on `master` during normal source-only PR testing.
 4. Pull and activate all objects.
-5. Confirm that the repository status is clean.
-6. Run ZTOAD once with the read-only smoke query below.
+5. Query inactive objects and require the ZTOAD installation-closure command above to pass. Main-source equality is insufficient for a composite program.
+6. Confirm that the repository status is clean.
+7. Run ZTOAD once with the read-only smoke query below.
 
 On A4H, the Fiori-shell URL for the transaction is:
 

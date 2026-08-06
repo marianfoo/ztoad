@@ -21,6 +21,7 @@ For every bug or feature:
 | Layer | Purpose | Runs where | Required for |
 |---|---|---|---|
 | Local abaplint | Fast syntax floor, dependency/XML consistency, regression against configured rules | Developer machine and GitHub Actions | Every change |
+| Installation closure | Required native-abapGit files/GUI metadata locally; no inactive ZTOAD composite parts in supplied ADT evidence | Local/CI for serialization; each structural SAP target for live inventory | Every structural/deployment change |
 | ABAP Unit | Pure parser/generator/policy behavior with no GUI or persistent data | SAP_BASIS 750 and 758 | Every production logic change |
 | SAP syntax + activation | Authoritative compiler and repository consistency | Both SAP targets | Every `src/` change |
 | ATC | Security, performance, released API, and migration checks | Both SAP targets | Every `src/` change |
