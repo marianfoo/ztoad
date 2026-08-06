@@ -7,7 +7,7 @@ Open SQL Editor
    Program : ZTOAD  
    Author  : S. Hermann  
    Date    : 31.12.2017  
-   Version : 4.0.4 <!-- x-release-please-version -->
+   Version : 5.0.0 <!-- x-release-please-version -->
 
 This is just a clone of the original [ZTOAD](http://quelquepart.biz/article7/ztoad-requeteur-open-sql), an Open SQL editor.
 
