@@ -949,8 +949,8 @@ CLASS lcl_sql_source_scanner IMPLEMENTATION.
 
       IF upper_token(1) = '@'
       OR upper_token(1) = '+'
-      OR upper_token(1) = '\'
-      OR upper_token CP 'HIERARCHY*'
+      OR upper_token CS '\'
+      OR upper_token = 'HIERARCHY'
       OR strlen( upper_token ) > 30.
         invalid = abap_true.
         RETURN.
@@ -5730,9 +5730,13 @@ CLASS ltc_query_parser DEFINITION FINAL
     METHODS ignores_literal_source_keyword FOR TESTING.
     METHODS rejects_source_comment FOR TESTING.
     METHODS rejects_path_source FOR TESTING.
+    METHODS rejects_attached_path_source FOR TESTING.
     METHODS rejects_hierarchy_source FOR TESTING.
+    METHODS accepts_hierarchy_named_table FOR TESTING.
+    METHODS rejects_parenthesized_join FOR TESTING.
     METHODS accepts_authorized_join FOR TESTING.
     METHODS rejects_unauthorized_union FOR TESTING.
+    METHODS rejects_unauthorized_union_all FOR TESTING.
     METHODS rejects_dynamic_source FOR TESTING.
     METHODS rejects_unsupported_cte FOR TESTING.
 
@@ -6147,6 +6151,20 @@ CLASS ltc_query_parser IMPLEMENTATION.
       msg = 'Path-expression sources cannot be mapped to a physical object' ).
   ENDMETHOD.
 
+  METHOD rejects_attached_path_source.
+    DATA parse_error TYPE abap_bool.
+
+    s_customize-auth_select = '*'.
+
+    parse_select(
+      EXPORTING query = `SELECT COUNT( * ) FROM zi_view\_association`
+      IMPORTING parse_error = parse_error ).
+
+    cl_abap_unit_assert=>assert_true(
+      act = parse_error
+      msg = 'Attached path sources cannot be mapped to one physical object' ).
+  ENDMETHOD.
+
   METHOD rejects_hierarchy_source.
     DATA parse_error TYPE abap_bool.
 
@@ -6159,6 +6177,39 @@ CLASS ltc_query_parser IMPLEMENTATION.
     cl_abap_unit_assert=>assert_true(
       act = parse_error
       msg = 'Hierarchy sources must fail until their grammar is modeled' ).
+  ENDMETHOD.
+
+  METHOD accepts_hierarchy_named_table.
+    DATA no_authority TYPE abap_bool.
+    DATA parse_error TYPE abap_bool.
+
+    s_customize-auth_select = 'HIERARCHY_*'.
+
+    parse_select(
+      EXPORTING query = `SELECT * FROM hierarchy_table`
+      IMPORTING no_authority = no_authority
+                parse_error = parse_error ).
+
+    cl_abap_unit_assert=>assert_initial(
+      act = no_authority
+      msg = 'A table whose name starts with HIERARCHY must remain usable' ).
+    cl_abap_unit_assert=>assert_initial( act = parse_error ).
+  ENDMETHOD.
+
+  METHOD rejects_parenthesized_join.
+    DATA parse_error TYPE abap_bool.
+
+    s_customize-auth_select = '*'.
+
+    parse_select(
+      EXPORTING
+        query = `SELECT a~carrid FROM ( scarr AS a INNER JOIN sflight AS b`
+             && ` ON b~carrid = a~carrid )`
+      IMPORTING parse_error = parse_error ).
+
+    cl_abap_unit_assert=>assert_true(
+      act = parse_error
+      msg = 'Parenthesized joins must fail until their grammar is modeled' ).
   ENDMETHOD.
 
   METHOD accepts_authorized_join.
@@ -6202,6 +6253,24 @@ CLASS ltc_query_parser IMPLEMENTATION.
     cl_abap_unit_assert=>assert_true(
       act = no_authority
       msg = 'A later UNION branch must use the same source policy' ).
+    cl_abap_unit_assert=>assert_initial( act = parse_error ).
+  ENDMETHOD.
+
+  METHOD rejects_unauthorized_union_all.
+    DATA no_authority TYPE abap_bool.
+    DATA parse_error TYPE abap_bool.
+
+    s_customize-auth_select = 'SCARR'.
+
+    parse_select(
+      EXPORTING
+        query = `SELECT carrid FROM scarr UNION ALL SELECT carrid FROM sflight`
+      IMPORTING no_authority = no_authority
+                parse_error = parse_error ).
+
+    cl_abap_unit_assert=>assert_true(
+      act = no_authority
+      msg = 'UNION ALL must not hide an unauthorized later source' ).
     cl_abap_unit_assert=>assert_initial( act = parse_error ).
   ENDMETHOD.
 
