@@ -49,7 +49,7 @@ Each parser/generator change should select relevant cases from this matrix:
 |---|---|
 | Lexing | upper/lower case, tabs/multiple spaces, multiline input, comments, escaped quotes, quoted dots/keywords |
 | Select list | simple fields, qualified fields, aliases, `*`, aggregate, nested function, nested `CASE`, comma and old syntax |
-| Sources | one table, alias, multiple joins, subquery, nested subquery, UNION branch, unauthorized inner table |
+| Sources | one table, namespace and keyword-shaped names, alias, multiple joins, parenthesized-join policy, subquery, nested subquery, UNION branch, unauthorized inner table, attached/detached path expressions, hierarchy constructor |
 | Clauses | WHERE, GROUP BY, HAVING, ORDER BY, UP TO, INTO/APPENDING, strict-syntax ordering |
 | Set operations | UNION, UNION ALL, branch layout mismatch, limits/order in branches |
 | Limits | default, explicit positive, zero/unlimited, invalid/overflow, policy maximum |
