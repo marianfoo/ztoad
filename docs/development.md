@@ -183,7 +183,7 @@ For every relevant change, verify:
 - values are bound or safely quoted instead of concatenated where possible;
 - comments, aliases, nested expressions, subqueries, and unions cannot hide additional statements;
 - row limits remain enforced unless the user explicitly requests the documented override;
-- native SQL remains disabled by default;
+- Native SQL remains unconditionally rejected and forbidden sinks such as `C_DB_EXECUTE` do not return;
 - error/generated-code displays do not leak credentials or confidential values.
 
 Run ATC security checks on the live systems. Local abaplint cannot prove runtime authorization or dynamic-SQL safety.

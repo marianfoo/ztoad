@@ -42,9 +42,9 @@ Remove the externally controlled Native SQL execution boundary and unsupported `
 - Baseline: `npm ci` reports 0 vulnerabilities; `npm test` passes with 0 configured abaplint issues; full diagnostic lint reports 1,878 findings across 58 rules.
 - Red repository contract: `npm test` reached the new focused assertion and failed because `src/ztoad.prog.abap` still contains `C_DB_EXECUTE` (`AssertionError: Unsupported native SQL kernel call C_DB_EXECUTE must not exist`). Configured abaplint remained green with 0 findings before the contract ran.
 - ABAP Unit red: the test-only candidate activated on A4H with the four known warnings. Of 20 tests, 19 passed and only `LTC_COMMAND_PARSER=>CANNOT_REENABLE_NATIVE_SQL` failed (`ASSERT_INITIAL`) because setting the deprecated fallback flag still copied Native SQL into the executable parameter. `REJECTS_NATIVE_SQL_BY_DEFAULT`, UPDATE, and DELETE remained green. Coverage was 15.40% statements, 13.32% branches, and 6.58% procedures.
-- ABAP Unit green: pending.
-- Local final checks: pending.
-- A4H: pending.
-- NPL ADT-only: pending.
+- ABAP Unit green: the implemented candidate passed all 20 tests on A4H. Coverage was 15.31% statements, 12.90% branches, and 6.67% procedures; the lower totals reflect deletion of the executor form.
+- Local final checks: `npm ci` found 0 vulnerabilities; configured abaplint and the repository contract passed; `git diff --check` passed. The full diagnostic inventory fell from 1,878 to 1,841 findings across the same 58 rules. Source searches found no executor form, dispatch, or `C_DB_EXECUTE`; only historical/research references remain.
+- A4H: the exact local report source was written through ARC-1 with only its mis-profiled pre-write lint disabled, server preflight retained, and explicit activation. Active syntax has 0 errors and only the 3 known POSIX warnings. Active/inactive main source has no difference. The 7 known inactive child parts remain attributable to `BASE-BUG-007`. `ABAP_CLOUD_READINESS` fell from 768 (463 P1/305 P2) to 759 (457 P1/302 P2). `S4HANA_READINESS_2023` again returned 0 rows but remains non-authoritative because 7 prerequisite checks are unavailable. A fresh FLP/WebGUI transaction start rendered the editor, reproduced only missing `STATUS010`, executed no SQL, and created no ST22 dump after the 09:30:59Z marker.
+- NPL ADT-only: the configured ARC-1 1.0.2 profile reached SAP_BASIS 750, but both `PROG ZTOAD` and required `TABL ZTOAD` are absent. Exact activation/syntax/Unit/ATC therefore remains prerequisite-blocked; no GUI fallback or substitute object was used.
 - First PR CI: pending.
 - Post-green audit/final CI: pending.

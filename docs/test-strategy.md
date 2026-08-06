@@ -54,7 +54,7 @@ Each parser/generator change should select relevant cases from this matrix:
 | Set operations | UNION, UNION ALL, branch layout mismatch, limits/order in branches |
 | Limits | default, explicit positive, zero/unlimited, invalid/overflow, policy maximum |
 | DML | INSERT values/set, UPDATE, DELETE, conversion errors, authorization denial; disposable Z table only |
-| Native SQL | disabled default, authorization denial, strict allow list, unsupported operation rejection; never business data |
+| Native SQL | rejected by default, cannot be re-enabled by legacy configuration, forbidden executor absent |
 | Error handling | parse rejection, compile rejection, runtime exception, sanitized message, no unexpected ST22 dump |
 
 ## Live test protocol
@@ -89,7 +89,7 @@ For GUI-control changes, a green policy Unit test proves only the selection deci
 
 ## Database-writing integration tests
 
-No normal smoke or unit test may modify SAP or business tables. A test of INSERT/UPDATE/DELETE/native behavior requires all of the following:
+No normal smoke or unit test may modify SAP or business tables. A test of INSERT/UPDATE/DELETE behavior requires all of the following:
 
 - an explicitly disposable Z table in the test package;
 - a dedicated test user/role with no broad wildcard access;
@@ -99,7 +99,7 @@ No normal smoke or unit test may modify SAP or business tables. A test of INSERT
 - a pre-test and post-test row-count assertion;
 - a recovery procedure if cleanup fails.
 
-Native SQL remains disabled unless the test specifically targets its replacement/security policy and has explicit maintainer approval.
+Native SQL is retired and must remain rejected before generation or execution.
 
 ## Release acceptance
 

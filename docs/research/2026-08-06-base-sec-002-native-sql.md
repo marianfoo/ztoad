@@ -56,3 +56,11 @@ Selected. The feature is already disabled by default, its implementation is unsu
 - [SQL Injections in Generated Programs](https://help.sap.com/doc/abapdocu_latest_index_htm/latest/en-US/ABENSQL_INJ_GEN_PROG_SCRTY.html)
 - [SQL Injections in Dynamic Tokens](https://help.sap.com/doc/abapdocu_latest_index_htm/latest/en-US/ABENSQL_INJ_DYN_TOKENS_SCRTY.html)
 - [ABAP Database Connectivity](https://help.sap.com/doc/abapdocu_latest_index_htm/latest/en-US/ABENADBC.html)
+
+## Validation result
+
+The focused repository assertion and live ABAP Unit test both failed against the old implementation before production code changed. The final implementation removes the dispatch and executor form, rejects `NATIVE` in `QUERY_PARSE_NOSELECT`, and retains the legacy configuration fields only as ignored layout members.
+
+On A4H/SAP_BASIS 758, explicit activation and active syntax completed with zero errors and three known POSIX warnings; the prior `C_DB_EXECUTE` warning disappeared. All 20 ABAP Unit tests passed. `ABAP_CLOUD_READINESS` improved from 768 findings (463 P1, 305 P2) to 759 (457 P1, 302 P2). Active and inactive main report source had no difference; the seven existing inactive screen/status/text child parts remain `BASE-BUG-007`. A fresh FLP transaction start rendered the editor, reported only missing `STATUS010`, and produced no ST22 delta. No SQL was executed.
+
+The ARC-1 1.0.2 ADT-only probe reached NPL/SAP_BASIS 750 and confirmed that both `PROG ZTOAD` and required `TABL ZTOAD` are absent. Exact 7.50 validation therefore remains prerequisite-blocked without using a GUI or an unfaithful substitute.

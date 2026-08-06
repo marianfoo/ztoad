@@ -60,7 +60,7 @@ ddic tree
 Tips : You can search a table in the tree using header clic
 
 Managed queries  
-SELECT, INSERT, UPDATE, DELETE, Any native SQL command
+SELECT, INSERT, UPDATE, DELETE
 
 About New SQL Query Syntax
 You could use new syntax (if your SAP system manage it)
@@ -95,11 +95,7 @@ In this SQL editor, you have 2 ways to do an INSERT :
 - By passing value of used fields only  
 `INSERT SEOCLASSTX SET CLSNAME = 'ZZMACLASS' DESCRIPT = 'TeSt class'`
 
-Native SQL special syntax
-To execute a native SQL command, please add the prefix NATIVE
-before your query
-`NATIVE CREATE INDEX 'TESTINDEX' ON T001 (MANDT, WAERS, BUKRS)`
-`NATIVE DROP INDEX 'TESTINDEX'`
+Native SQL is intentionally rejected. Database-specific statements belong in audited database-administration tooling, not in ZTOAD.
 
 ## Sample queries
 
@@ -125,14 +121,13 @@ before your query
 You could define your authorization object to restrict function usage by user.  
 If you dont define auth object, all users will have same access as defined bellow.  
 The auth object have 2 fields TABLE and ACTVT  
-ACTVT can take 5 values that you could define here.  
+ACTVT can take 4 values that you could define here.
 By default :
 
 - 01 for INSERT command
 - 02 for UPDATE command
 - 03 for SELECT command
 - 06 for DELETE command
-- 16 for EXECUTE NATIVE SQL command
 - TABLE contain allowed table name pattern
 
 The Authorization object name ist `ZTOAD_AUTH`.
@@ -162,7 +157,7 @@ No you define globally the authorizations:
          auth_update     TYPE string VALUE space, "'*',
 * Allow DELETE query on SAP table (restricted by given pattern)
          auth_delete     TYPE string VALUE space, "'*',
-* Allow any native sql command (set value to space to disable)
+* Deprecated and ignored; Native SQL cannot be enabled
          auth_native(1)  TYPE c VALUE space, "abap_true,
 ```
 

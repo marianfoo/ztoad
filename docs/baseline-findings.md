@@ -1,6 +1,6 @@
 # ZTOAD baseline findings
 
-_Snapshot: 2026-08-06 · branch `codex/fix-base-bug-006` · live system A4H client 001, SAP_BASIS 758 SP02 · secondary target NPL client 001, SAP_BASIS 750 SP02_
+_Snapshot: 2026-08-06 · branch `codex/fix-base-sec-002` · live system A4H client 001, SAP_BASIS 758 SP02 · secondary target NPL client 001, SAP_BASIS 750 SP02_
 
 This is the ordered work list for incremental TDD. It records observed defects separately from broad style debt so a new failure cannot disappear inside the legacy backlog. A finding is closed only after its regression test is green locally where possible, green on A4H, and green on the SAP_BASIS 750 target.
 
@@ -9,17 +9,17 @@ This is the ordered work list for incremental TDD. It records observed defects s
 | Gate | Result | Interpretation |
 |---|---|---|
 | Repository `npm test` | Passed, 0 configured abaplint findings | Fast compatibility/XML gate is green |
-| Pinned abaplint default profile | 1,878 findings across 58 rules; `master` baseline 1,857 across 57 | Existing debt plus 19 adapter naming and 2 legacy exception-contract findings; reproducible locally, not an immediate all-or-nothing gate |
-| A4H SAP syntax | 0 errors, 4 warnings | Program compiles on SAP_BASIS 758 |
-| A4H ABAP Unit | 19 passed, 0 failed | Parser, generator, command, line-splitting, and editor-policy tests are green |
+| Pinned abaplint default profile | 1,841 findings across 58 rules; pre-fix branch baseline 1,878 | Removing the Native SQL executor reduced diagnostic debt by 37; remaining debt is reproducible locally, not an immediate all-or-nothing gate |
+| A4H SAP syntax | 0 errors, 3 warnings | Program compiles on SAP_BASIS 758; the unsupported kernel-call warning is gone |
+| A4H ABAP Unit | 20 passed, 0 failed | Parser, generator, command, line-splitting, and editor-policy tests are green |
 | A4H ATC `S4HANA_READINESS_2023` | Initial run displayed 0 finding rows | Later evidence shows missing prerequisites; this is not an authoritative zero gate |
-| A4H ATC `ABAP_CLOUD_READINESS` | 768 findings: 463 priority 1, 305 priority 2 | Current classic report is not ABAP Cloud compatible |
+| A4H ATC `ABAP_CLOUD_READINESS` | 759 findings: 457 priority 1, 302 priority 2 | Nine findings removed with the Native SQL sink; current classic report remains non-Cloud-compatible |
 | A4H WebGUI smoke | Editor startup/input passed; query dispatch blocked | Final editor renders and accepts text without a new dump; installed GUI status `STATUS010` is missing (`BASE-BUG-007`) |
 | ABAP 7.50 live gate | ARC-1 lifecycle passed; ZTOAD blocked | `arc-1-750` can create/activate/syntax/unit/delete, but ZTOAD's transparent table is absent and SAP_BASIS 750 cannot create it over ADT |
 
-The four normal syntax warnings on the BASE-RUN-001 candidate are POSIX-regex deprecation at lines 1965, 1988, and 2114, plus the unsupported `C_DB_EXECUTE` call at line 4118.
+The BASE-RUN-001 candidate had four normal syntax warnings: three POSIX-regex deprecations plus unsupported `C_DB_EXECUTE`. The BASE-SEC-002 candidate removes the kernel call, leaving only the three known regex warnings.
 
-The BASE-BUG-001 parser/generator baseline remains green inside the current 19-test suite. The current `ABAP_CLOUD_READINESS` result is 768 findings (463 P1, 305 P2). The latest `S4HANA_READINESS_2023` run returned no rows but is incomplete because seven prerequisite checks are unavailable. See the [finished BASE-BUG-001 plan](plans/finished/base-bug-001.md) and the [BASE-RUN-001 research](research/2026-08-06-base-run-001-webgui-editor-root-cause.md) for exact evidence.
+The BASE-BUG-001 parser/generator baseline remains green inside the current 20-test suite. The current `ABAP_CLOUD_READINESS` result is 759 findings (457 P1, 302 P2). The latest `S4HANA_READINESS_2023` run returned no rows but is incomplete because seven prerequisite checks are unavailable. See the [finished BASE-BUG-001 plan](plans/finished/base-bug-001.md) and the [BASE-SEC-002 research](research/2026-08-06-base-sec-002-native-sql.md) for exact evidence.
 
 ## Ordered findings register
 
@@ -29,7 +29,7 @@ Priority meanings: **P0** blocks the requested test workflow or is an immediate 
 |---|---:|---|---|---|
 | BASE-RUN-001 | P0 | ZTOAD originally dumped in WebGUI through `DP_PUBLISH_URL`; a rejected SQL-mode spike then dumped in `CL_GUI_SOURCEEDIT`. The final adapter uses `CL_GUI_TEXTEDIT` in WebGUI and keeps `CL_GUI_ABAPEDIT` elsewhere. | Two editor-policy Unit tests plus fresh WebGUI launch/input and post-run ST22 delta. | Fixed candidate: 19/19 green, editor renders and accepts input, no new dump; full query dispatch waits on `BASE-BUG-007` |
 | BASE-SEC-001 | P0 | User text becomes dynamic Open SQL and generated ABAP (`GENERATE SUBROUTINE POOL`, lines 2310 and 3657). Parser-derived table/field/tail tokens are not validated through a strict include list. | Malicious/ambiguous table, column, `WHERE`, `HAVING`, subquery, comment, and quoted-keyword cases; verify rejection before generation. | Open |
-| BASE-SEC-002 | P0 | Native SQL uses unsupported kernel call `C_DB_EXECUTE` at line 3818. It is a high-impact arbitrary database-command path and produces a live compiler warning. | Authorization-negative test, default-disabled test, allow-list test against a disposable Z object, and no-kernel-call architecture test. | Open |
+| BASE-SEC-002 | P0 | Native SQL used unsupported kernel call `C_DB_EXECUTE`. It was a high-impact arbitrary database-command path and produced a live compiler warning. | Default rejection, rejection despite the deprecated enable flag, preserved UPDATE/DELETE parsing, and a no-kernel-call repository contract. | Fixed candidate: local gates green, A4H 20/20 green and warning removed, read-only startup produced no dump; exact NPL gate prerequisite-blocked because PROG/TABL ZTOAD are absent |
 | BASE-SEC-003 | P0 | SELECT authorization extraction tokenizes top-level `FROM`/`JOIN` text and can miss nested subqueries/CTEs or concealed data sources. | Multi-table joins, nested subqueries, aliases, comments, quoted identifiers, UNION branches, and unauthorized inner-table cases. | Open |
 | BASE-BUG-001 | P1 | [Issue #6](https://github.com/marianfoo/ztoad/issues/6): a reported `SELECT DISTINCT ... COUNT ... MAX ... GROUP BY ... HAVING` query produces “The INTO/APPENDING clause must be at the end of the SELECT.” | Sanitized `DD03L` reproduction; check exact generated ordering around `HAVING`, `ORDER BY`, `UP TO`, and `INTO TABLE`. | Fixed and 17/17 green on A4H; live 7.50 pending |
 | BASE-BUG-002 | P1 | [Issue #7](https://github.com/marianfoo/ztoad/issues/7): a reported `SUM( CASE ... END ) AS ...` over `EKBE` produces “No component exists with the name CASE.” The expression is split into false result components. | Sanitized aggregate with multi-line `CASE`, qualified fields, multiplication, alias, WHERE, and GROUP BY; assert one aggregate expression and the expected generated row type. | Open |
@@ -64,7 +64,7 @@ The program now ends with five harmless, short ABAP Unit classes:
 - `LTC_QUERY_PARSER`: 8 tests for simple SELECT, default/explicit/unlimited limits, tail clauses, UNION separation, comma syntax, caller `INTO` removal, and missing `FROM` rejection.
 - `LTC_QUERY_GENERATOR`: 3 tests for strict aggregate clause ordering plus escaped-count and legacy-select compatibility.
 - `LTC_LINE_SPLITTER`: 3 tests for short lines, the 255-character boundary, and long-line splitting.
-- `LTC_COMMAND_PARSER`: 3 tests for UPDATE, DELETE FROM, and NATIVE quote conversion.
+- `LTC_COMMAND_PARSER`: 4 tests for UPDATE, DELETE FROM, default Native SQL rejection, and rejection despite the deprecated enable flag.
 - `LTCL_EDITOR_CONFIGURATION`: 2 tests selecting the supported WebGUI text editor while retaining the desktop ABAP editor.
 
 These are characterization tests: they make current behavior explicit without claiming that every behavior is correct. For each open bug, add the smallest failing regression test first, then implement the fix, then refactor while all earlier tests remain green.

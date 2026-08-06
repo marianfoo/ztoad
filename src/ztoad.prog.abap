@@ -41,7 +41,7 @@
 *& Tips : You can search a table in the tree using header clic
 *&
 *3 Managed queries
-*& SELECT, INSERT, UPDATE, DELETE, Any native SQL command
+*& SELECT, INSERT, UPDATE, DELETE
 *&
 *3 About New SQL Query Syntax
 *& You could use new syntax (if your SAP system manage it)
@@ -74,11 +74,9 @@
 *& - By passing value of used fields only
 *E INSERT SEOCLASSTX SET CLSNAME = 'ZZMACLASS' DESCRIPT = 'TeSt class'
 *&
-*3 Native SQL special syntax
-*& To execute a native SQL command, please add the prefix NATIVE
-*& before your query
-*& NATIVE CREATE INDEX 'TESTINDEX' ON T001 (MANDT, WAERS, BUKRS)
-*& NATIVE DROP INDEX 'TESTINDEX'
+*3 Native SQL
+*& Native SQL is intentionally rejected. Use audited database
+*& administration tooling for database-specific statements.
 *&
 *3 Sample of query :
 *&
@@ -218,12 +216,11 @@ DATA : BEGIN OF s_customize,                                "#EC NEEDED
 * If you dont define auth object, all users will have same access as
 * defined bellow
 * The auth object have 2 fields TABLE and ACTVT
-* ACTVT can take 5 values that you could define here. By default :
+* ACTVT can take 4 values that you could define here. By default :
 * 01 for INSERT command
 * 02 for UPDATE command
 * 03 for SELECT command
 * 06 for DELETE command
-* 16 for EXECUTE NATIVE SQL command
 * TABLE contain allowed table name pattern
 * '*' to allow all table, 'Z*' to allow all specific tables...
          auth_object(20) TYPE c VALUE 'ZTOAD_AUTH',
@@ -231,6 +228,7 @@ DATA : BEGIN OF s_customize,                                "#EC NEEDED
          actvt_insert    TYPE tactt-actvt VALUE '01',
          actvt_update    TYPE tactt-actvt VALUE '02',
          actvt_delete    TYPE tactt-actvt VALUE '06',
+* Deprecated and ignored; retained to avoid changing the legacy layout
          actvt_native    TYPE tactt-actvt VALUE '16',
 
 * Bellow is default AUTH used if no auth_object is defined
@@ -242,7 +240,7 @@ DATA : BEGIN OF s_customize,                                "#EC NEEDED
          auth_update     TYPE string VALUE space, "'*',
 * Allow DELETE query on SAP table (restricted by given pattern)
          auth_delete     TYPE string VALUE space, "'*',
-* Allow any native sql command (set value to space to disable)
+* Deprecated and ignored; Native SQL cannot be enabled
          auth_native(1)  TYPE c VALUE space, "abap_true,
 
        END OF s_customize.
@@ -1591,13 +1589,6 @@ FORM query_process USING fw_display TYPE c
                                           lw_where.
     IF lw_noauth NE space.
       PERFORM ddic_set_tree USING lw_from.
-      RETURN.
-    ENDIF.
-
-* For native sql command, execute it directly
-    IF lw_command = c_native_command.
-      PERFORM ddic_set_tree USING lw_from.
-      PERFORM query_process_native USING lw_where.
       RETURN.
     ENDIF.
 
@@ -3701,22 +3692,11 @@ FORM query_parse_noselect  USING    fw_query TYPE string
       ENDIF.
 
     WHEN c_native_command.
-      IF s_customize-auth_object NE space.
-        AUTHORITY-CHECK OBJECT s_customize-auth_object
-                 ID 'ACTVT' FIELD s_customize-actvt_native.
-      ELSEIF s_customize-auth_native NE abap_true.
-        sy-subrc = 4.
-      ENDIF.
-      IF sy-subrc NE 0.
-        CONCATENATE 'SQL command not allowed :'(m25) fw_command
-                    INTO lw_query.
-        MESSAGE lw_query TYPE c_msg_success DISPLAY LIKE c_msg_error.
-        fw_noauth = abap_true.
-        RETURN.
-      ENDIF.
-* For native command, replace ' by "
-      TRANSLATE lw_query USING '''"'.
-      fw_param = lw_query.
+      CONCATENATE 'SQL command not allowed :'(m25) fw_command
+                  INTO lw_query.
+      MESSAGE lw_query TYPE c_msg_success DISPLAY LIKE c_msg_error.
+      fw_noauth = abap_true.
+      RETURN.
 
     WHEN OTHERS.
       CONCATENATE 'SQL command not allowed :'(m25) fw_command
@@ -4074,71 +4054,6 @@ FORM editor_paste  USING fw_text TYPE string
 ENDFORM.                    " EDITOR_PASTE
 
 *&---------------------------------------------------------------------*
-*&      Form  QUERY_PROCESS_NATIVE
-*&---------------------------------------------------------------------*
-*       Execute a given native sql command
-*----------------------------------------------------------------------*
-*      -->FW_COMMAND Native SQL Command to execute
-*----------------------------------------------------------------------*
-FORM query_process_native USING fw_command TYPE string.
-  DATA : lw_lines        TYPE i,
-         lw_sql_code     TYPE i,
-         lw_sql_msg(255) TYPE c,
-         lw_row_num      TYPE i,
-         lw_command(255) TYPE c,
-         lw_msg          TYPE string,
-         lw_timestart    TYPE timestampl,
-         lw_timeend      TYPE timestampl,
-         lw_time         TYPE p LENGTH 8 DECIMALS 2,
-         lw_charnumb(12) TYPE c,
-         lw_answer(1)    TYPE c.
-
-* Have a user confirmation before execute Native SQL Command
-  CONCATENATE 'Are you sure you want to do a'(m31) fw_command
-              '?'(m33)
-              INTO lw_msg SEPARATED BY space.
-  CALL FUNCTION 'POPUP_TO_CONFIRM'
-    EXPORTING
-      titlebar              = 'Warning : critical operation'(t04)
-      text_question         = lw_msg
-      default_button        = '2'
-      display_cancel_button = space
-    IMPORTING
-      answer                = lw_answer
-    EXCEPTIONS
-      text_not_found        = 1
-      OTHERS                = 2.
-  IF sy-subrc NE 0 OR lw_answer NE '1'.
-    RETURN.
-  ENDIF.
-
-  lw_command = fw_command.
-  lw_lines = strlen( lw_command ).
-  GET TIME STAMP FIELD lw_timestart.
-  CALL 'C_DB_EXECUTE'
-       ID 'STATLEN' FIELD lw_lines
-       ID 'STATTXT' FIELD lw_command
-       ID 'SQLERR'  FIELD lw_sql_code
-       ID 'ERRTXT'  FIELD lw_sql_msg
-       ID 'ROWNUM'  FIELD lw_row_num.
-  IF sy-subrc NE 0.
-    MESSAGE lw_sql_msg TYPE c_msg_success DISPLAY LIKE c_msg_error.
-    RETURN.
-  ELSE.
-    GET TIME STAMP FIELD lw_timeend.
-    lw_time = cl_abap_tstmp=>subtract(
-                tstmp1 = lw_timeend
-                tstmp2 = lw_timestart
-              ).
-    lw_charnumb = lw_time.
-    CONCATENATE 'Query executed in'(m09) lw_charnumb 'seconds.'(m10)
-                INTO lw_msg SEPARATED BY space.
-    CONDENSE lw_msg.
-    MESSAGE lw_msg TYPE c_msg_success.
-  ENDIF.
-ENDFORM.                    " QUERY_PROCESS_NATIVE
-
-*&---------------------------------------------------------------------*
 *&      Form  ddic_add_tree_zspro
 *&---------------------------------------------------------------------*
 *       Add nodes from table ZSPRO
@@ -4449,7 +4364,7 @@ FORM ddic_refresh_tree.
     PERFORM query_parse_noselect USING lw_query
                                  CHANGING lw_noauth lw_select
                                           lw_from lw_where.
-    IF lw_noauth NE space OR lw_select = c_native_command.
+    IF lw_noauth NE space.
       RETURN.
     ENDIF.
   ENDIF.
