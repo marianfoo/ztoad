@@ -17,7 +17,7 @@ This is the ordered work list for incremental TDD. It records observed defects s
 | A4H WebGUI smoke | Exact combined result pending post-rebase validation | Startup will be repeated without SQL execution; missing `STATUS010` remains `BASE-BUG-007` |
 | ABAP 7.50 live gate | ARC-1 lifecycle passed; ZTOAD blocked | `arc-1-750` can create/activate/syntax/unit/delete, but ZTOAD's transparent table is absent and SAP_BASIS 750 cannot create it over ADT |
 
-BASE-SEC-002 is merged and its Native SQL sink is absent from this candidate. Exact syntax, Unit, ATC, source-hash, and smoke evidence for the combined BASE-SEC-001 candidate must be recomputed before merge. See the [BASE-SEC-001 plan](plans/base-sec-001.md), [BASE-SEC-002 research](research/2026-08-06-base-sec-002-native-sql.md), and [BASE-BUG-001 plan](plans/finished/base-bug-001.md).
+BASE-SEC-002 is merged and its Native SQL sink is absent from this candidate. Exact syntax, Unit, ATC, source-hash, and smoke evidence for the combined BASE-SEC-001 candidate must be recomputed before merge. See the [finished BASE-SEC-001 plan](plans/finished/base-sec-001.md), [BASE-SEC-002 research](research/2026-08-06-base-sec-002-native-sql.md), and [BASE-BUG-001 plan](plans/finished/base-bug-001.md).
 
 ## Ordered findings register
 

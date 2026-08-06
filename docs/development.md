@@ -68,7 +68,7 @@ Do not manually install only the report source. That omits the dynpros, table, a
 2. Research and reproduce the problem on the oldest available affected system. Check fixture and serialized UI-metadata availability before making a spike permanent.
 3. Add the smallest test, replay the original production code, and record the intended red failure.
 4. Write and review a plan under `docs/plans/` covering implementation, ABAP 7.50, Clean ABAP/Clean Core, local/live tests, rollback, browser smoke, and ST22.
-5. Edit source locally and make the smallest production change that turns the test green. For a frontend or other environment-dependent assumption, keep the candidate classified as a spike until live integration evidence accepts it. Keep serializer XML unchanged for a source-only fix.
+5. Edit source locally and make the smallest production change that turns the test green. For a frontend or other environment-dependent assumption, keep the candidate classified as a spike until live integration evidence accepts it. Keep serializer XML unchanged for a source-only fix. At any external-text-to-code boundary, state the representation invariant explicitly. Treat every allow-list exception as grammar: prove its context, add an adversarial lookalike regression, and fail closed when the parser cannot distinguish data from source syntax.
 6. Run `npm ci`, `npm test`, `git diff --check`, and the final local/security review.
 7. Deploy the exact candidate source to SAP_BASIS 750 first through ARC-1/ADT when its real dependencies exist; record any missing ADT prerequisite as blocked. Keep the A4H native-abapGit link on `master` and record an unmerged candidate as a direct deployment. Follow every write with an explicit activation call, active/inactive main-object comparison, and an inactive-child-part query for affected composite objects; a write response, activation option, or equal main-source hash alone does not prove that screens, statuses, texts, and includes are active.
 8. On NPL, activate only the intended object and run active syntax, all ABAP Unit tests, and complete ATC variants through ARC-1. On A4H/SAP_BASIS 758, repeat those checks and additionally start a fresh browser session for safe smoke and ST22 delta. Verify required dynpros/GUI statuses before attributing an end-to-end failure to the source candidate.
@@ -123,7 +123,7 @@ CLASS ltc_query_parser DEFINITION
 ENDCLASS.
 ```
 
-The baseline now contains 19 live-passing tests across `LTC_QUERY_PARSER`, `LTC_QUERY_GENERATOR`, `LTC_LINE_SPLITTER`, `LTC_COMMAND_PARSER`, and `LTCL_EDITOR_CONFIGURATION`. The next regression corpus should cover the existing open parser reports:
+The BASE-SEC-001 candidate contains 34 live-passing tests across `LTC_QUERY_PARSER`, `LTC_QUERY_INPUT_VALIDATOR`, `LTC_QUERY_GENERATOR`, `LTC_LINE_SPLITTER`, `LTC_COMMAND_PARSER`, and `LTCL_EDITOR_CONFIGURATION`. The next regression corpus should cover the existing open parser reports:
 
 - aggregate functions around `CASE` (issue #7)
 - SQL string functions such as `SUBSTRING` and `CONCAT` (issue #4)

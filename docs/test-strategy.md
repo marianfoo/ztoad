@@ -101,6 +101,8 @@ No normal smoke or unit test may modify SAP or business tables. A test of INSERT
 
 Native SQL is retired and must remain rejected before generation or execution.
 
+For a parser, generator, dynamic token, or other text-to-code boundary, tests must cover both preserved data and rejected source syntax. Exercise literal/quote state, statement terminators, comments, host-language escapes, and malformed input. Each narrow allow-list exception needs a valid example and a namespace-/keyword-shaped near miss proving that a context-free lookalike is rejected. Assert rejection before generation or execution, clear any executable output handle, and never execute the exploit proof.
+
 ## Release acceptance
 
 A release candidate is accepted only when:
