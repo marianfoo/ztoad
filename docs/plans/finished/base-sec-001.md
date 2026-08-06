@@ -59,3 +59,11 @@ Prevent parser output from escaping the intended SQL statement and becoming addi
 - Process improvement: `docs/development.md` and `docs/test-strategy.md` now require an explicit representation invariant plus a valid/adversarial pair for every allow-list exception. This directly addresses the overly broad `ABAP.<word>` exception caught during final review.
 - Integration note: this PR is independently based on `master` and overlaps the report/test register with P0 PRs #18 and #19. Merge one P0 PR at a time and rebase/revalidate the next; do not resolve the large ABAP overlap by accepting one side wholesale.
 - Final CI: post-audit head `573dab6f1d687067db6ff9023096ddad2ac157fe` passed GitHub Actions Quality run `31108341355` plus the configured external abaplint check; the observations check remained informational as designed.
+
+## Maintainer-requested follow-up process audit
+
+- The shared primary test target had retained this unmerged source after validation. It was restored through ADT to the branch-point `master` source SHA-256 `f30e88b6e0a52fd15d6fdaf09e383b22629bb069c55317a7d9a2e9c565cf8694`; activation succeeded, syntax retained the four known warnings, 19/19 baseline tests passed, and active/inactive state matched.
+- The workflow now freezes a source/object commit before expensive live evidence and explicitly invalidates that evidence after any production or serialized-object change.
+- Shared direct-deployment targets now have a required restore-and-verify handoff. Concurrent report PRs now require sequential merge, deliberate rebase, aggregate evidence recomputation, and affected live revalidation.
+- Final CI run links belong in the PR description/comment after success so recording evidence cannot create an infinite evidence-only CI loop.
+- The sanitized retrospective is stored in `docs/research/2026-08-06-p0-development-process-retrospective.md`. The follow-up head acceptance is recorded in PR #20 rather than by another post-green evidence commit.
