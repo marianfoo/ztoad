@@ -146,7 +146,7 @@ Run these checks for the complete ZTOAD object set on both systems:
 2. All imported objects activate.
 3. SAP syntax check passes for program `ZTOAD`.
 4. ABAP Unit passes with no skipped relevant tests.
-5. ATC completes with the recorded project variants and has no new unapproved finding. The latest A4H `S4HANA_READINESS_2023` run returned no finding rows but was incomplete because seven prerequisite checks are unavailable. The latest `ABAP_CLOUD_READINESS` run reported 768 architectural findings (463 P1, 305 P2); it is an information/burn-down signal, not a zero gate.
+5. ATC completes with the recorded project variants and has no new unapproved finding. A `S4HANA_READINESS_2023` run with unavailable prerequisite checks is incomplete even when it returns no finding rows. Treat `ABAP_CLOUD_READINESS` as an architectural information/burn-down signal, not a zero gate; record exact dated totals in the [baseline findings register](baseline-findings.md), not this long-lived playbook.
 6. Manual read-only browser smoke tests pass on A4H; NPL UI smoke is not applicable by maintainer direction.
 7. Authorization-negative tests confirm that unauthorized tables/activities remain blocked.
 8. ST22 and, when relevant, Gateway/system logs contain no new errors from the test.
@@ -176,7 +176,7 @@ Then exercise the parser feature being changed with a sanitized query and verify
 
 `BASE-RUN-001` is fixed at the editor boundary: a fresh A4H WebGUI launch renders the fallback editor, accepts the sanitized query, and creates no new ST22 dump. Full query execution is still not green because the current A4H installation lacks GUI status `STATUS010` (`BASE-BUG-007`). Keep product behavior failures separate from incomplete system metadata, and never run this browser protocol on NPL.
 
-Use `npm run lint:quality` to reproduce the non-blocking full default-rule inventory. `master` has 1,857 findings; the BASE-RUN-001 candidate has 1,878, with 19 adapter-API naming diagnostics plus 2 classic-exception diagnostics needed to preserve the legacy Control Framework `sy-subrc` contract. The raw defaults contain conflicting prefix/no-prefix naming rules, so the strict profile must resolve that configuration conflict explicitly while the raw inventory remains visible. Continue the [active zero-findings plan](plans/abaplint-zero-findings.md); only promote the resolved strict command to required CI after it is green.
+Use `npm run lint:quality` to reproduce the non-blocking full default-rule inventory. Record exact dated totals and intentional deltas in the [baseline findings register](baseline-findings.md); do not copy volatile counts into this long-lived playbook. The raw defaults contain conflicting prefix/no-prefix naming rules, so the strict profile must resolve that configuration conflict explicitly while the raw inventory remains visible. Continue the [active zero-findings plan](plans/abaplint-zero-findings.md); only promote the resolved strict command to required CI after it is green.
 
 ## 8. Security review for every parser/execution change
 
