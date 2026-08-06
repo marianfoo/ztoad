@@ -194,7 +194,7 @@ Release Please runs on pushes to `master` and reads Conventional Commit messages
 - the annotated version in `README.md`
 - the annotated version comment in `src/ztoad.prog.abap`
 
-When a `fix:` or `feat:` change reaches `master`, Release Please opens or updates one release PR. Review its version and changelog, let Quality pass, and merge it to create the unprefixed SemVer tag and GitHub Release. The action intentionally uses the repository `GITHUB_TOKEN` by default; see [setup-evaluation.md](setup-evaluation.md) before switching to a PAT or GitHub App token.
+When a `fix:` or `feat:` change reaches `master`, Release Please opens or updates one release PR. Review its version and changelog, let Quality pass, and merge it to create the unprefixed SemVer tag and GitHub Release. The action intentionally uses the repository `GITHUB_TOKEN` by default. GitHub places the resulting pull-request Quality workflow in an approval-required state; a maintainer must approve that run and wait for green CI. See [setup-evaluation.md](setup-evaluation.md) before switching to a GitHub App or fine-grained PAT for unattended triggering.
 
 ## 10. Primary references
 
@@ -210,3 +210,4 @@ When a `fix:` or `feat:` change reaches `master`, Release Please opens or update
 - [abaplint local setup](https://github.com/abaplint/abaplint/blob/main/docs/getting_started.md)
 - [Release Please Action](https://github.com/googleapis/release-please-action)
 - [Release Please manifest configuration](https://github.com/googleapis/release-please/blob/main/docs/manifest-releaser.md)
+- [GitHub `GITHUB_TOKEN` workflow-trigger behavior](https://docs.github.com/en/actions/concepts/security/github_token#when-github_token-triggers-workflow-runs)

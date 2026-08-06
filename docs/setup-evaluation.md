@@ -39,9 +39,9 @@ Trade-off: live CI improves repeatability but creates credential, network, syste
 
 ### 4. Release Please authentication
 
-Implemented default: repository `GITHUB_TOKEN`, with explicit action permissions.
+Implemented default: repository `GITHUB_TOKEN`, with explicit action permissions. Release Please successfully created PR #10 for version 4.1.0. Its repository Quality run entered GitHub's approval-required state; after manual approval it passed and the PR became cleanly mergeable. This is the expected least-privilege operating mode, not a CI failure.
 
-Potential change: a fine-grained PAT or GitHub App token if release-PR creation must trigger other workflows automatically. GitHub suppresses some workflow cascades created by `GITHUB_TOKEN`; a stronger token adds secret lifecycle and privilege-management work.
+Potential change: a dedicated GitHub App installation token or fine-grained PAT if release-PR workflows must run without manual approval. Prefer an App for scoped, short-lived credentials. Either option adds credential lifecycle and privilege-management work, so it is not introduced by a source bug PR. See GitHub's [`GITHUB_TOKEN` trigger behavior](https://docs.github.com/en/actions/concepts/security/github_token#when-github_token-triggers-workflow-runs).
 
 ### 5. Branch concurrency inside SAP
 
@@ -63,7 +63,7 @@ Alternative: a full OO rewrite could improve design faster but greatly expands r
 
 ### 8. Historical `4.0.4` tag
 
-Current code and documentation identify version `4.0.4`, but Git contains only the `4.0.3` tag. The Release Please manifest therefore starts at the declared code version `4.0.4` and correctly proposes `4.0.5` for the next fix, but its first generated compare link assumes that a `4.0.4` tag exists.
+Current code and documentation identify version `4.0.4`, but Git contains only the `4.0.3` tag. The Release Please manifest starts at the declared code version `4.0.4`; current PR #10 correctly proposes `4.1.0` because the accumulated conventional commits include a feature. Its first generated compare link still assumes that a `4.0.4` tag exists.
 
 Recommendation: after the current `master` state has passed both live-system gates, create a one-time `4.0.4` tag and GitHub Release at the exact verified commit. Do not backfill it before live verification, and do not move the tag later.
 

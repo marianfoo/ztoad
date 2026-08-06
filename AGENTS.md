@@ -64,4 +64,4 @@ If ARC-1 authentication or a live system is unavailable, local checks may contin
 - Preserve lower-case abapGit filenames and LF line endings.
 - Do not reformat the legacy report as part of an unrelated fix.
 - Release Please owns `CHANGELOG.md`, `version.txt`, and the annotated version lines in `README.md` and `src/ztoad.prog.abap` after bootstrap.
-- Do not manually tag ordinary releases. Merge the Release Please PR after its checks and version diff are reviewed.
+- Do not manually tag ordinary releases. Merge the Release Please PR after its checks and version diff are reviewed. With the default `GITHUB_TOKEN`, approve its queued Quality workflow in GitHub before waiting for green CI.
