@@ -448,6 +448,23 @@ CLASS lcl_query_input_validator DEFINITION FINAL.
 ENDCLASS.
 
 *----------------------------------------------------------------------*
+*       CLASS lcl_select_expression_analyzer DEFINITION
+*----------------------------------------------------------------------*
+*       Resolve safe type references for supported SQL expressions
+*----------------------------------------------------------------------*
+CLASS lcl_select_expression_analyzer DEFINITION FINAL.
+  PUBLIC SECTION.
+    CLASS-METHODS find_case_result_reference
+      IMPORTING expression TYPE string
+      RETURNING VALUE(reference) TYPE string.
+
+  PRIVATE SECTION.
+    CLASS-METHODS is_column_reference
+      IMPORTING token TYPE string
+      RETURNING VALUE(result) TYPE abap_bool.
+ENDCLASS.
+
+*----------------------------------------------------------------------*
 *       CLASS lcl_generated_line_splitter DEFINITION
 *----------------------------------------------------------------------*
 *       Preserve source semantics while enforcing the 255-char limit
@@ -734,6 +751,63 @@ CLASS lcl_query_input_validator IMPLEMENTATION.
       OR character = cl_abap_char_utilities=>horizontal_tab
       OR character = cl_abap_char_utilities=>newline
       OR character = cl_abap_char_utilities=>cr_lf(1) ).
+  ENDMETHOD.
+ENDCLASS.
+
+CLASS lcl_select_expression_analyzer IMPLEMENTATION.
+  METHOD find_case_result_reference.
+    DATA tokens TYPE string_table.
+    DATA token TYPE string.
+    DATA candidate TYPE string.
+    DATA case_seen TYPE abap_bool.
+
+    DATA(normalized_expression) = expression.
+    TRANSLATE normalized_expression TO UPPER CASE.
+    SPLIT normalized_expression AT space INTO TABLE tokens.
+
+    LOOP AT tokens INTO token.
+      IF token = 'CASE'.
+        case_seen = abap_true.
+        CONTINUE.
+      ENDIF.
+      IF case_seen = abap_false OR token <> 'THEN'.
+        CONTINUE.
+      ENDIF.
+
+      DATA(next_index) = sy-tabix + 1.
+      READ TABLE tokens INTO candidate INDEX next_index.
+      IF sy-subrc = 0
+      AND is_column_reference( candidate ) = abap_true.
+        reference = candidate.
+      ENDIF.
+      RETURN.
+    ENDLOOP.
+  ENDMETHOD.
+
+  METHOD is_column_reference.
+    DATA source_name TYPE string.
+    DATA field_name TYPE string.
+
+    result = abap_false.
+    IF token IS INITIAL
+    OR token CN 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_/~'.
+      RETURN.
+    ENDIF.
+
+    DATA(first_character) = token(1).
+    IF first_character CO '0123456789~'.
+      RETURN.
+    ENDIF.
+
+    IF token CS '~'.
+      SPLIT token AT '~' INTO source_name field_name.
+      IF source_name IS INITIAL OR field_name IS INITIAL
+      OR source_name CS '~' OR field_name CS '~'.
+        RETURN.
+      ENDIF.
+    ENDIF.
+
+    result = abap_true.
   ENDMETHOD.
 ENDCLASS.
 
@@ -2693,7 +2767,10 @@ FORM query_generate  USING    fw_select TYPE string
          lw_word(30),
          ls_fieldlist        TYPE ty_fieldlist,
          lw_strlen_string    TYPE string,
-         lw_explicit         TYPE string.
+         lw_explicit         TYPE string,
+         lw_case_reference   TYPE string,
+         lw_case_alias       TYPE string,
+         lw_case_aggregate   TYPE abap_bool.
   DATA security_input TYPE string.
   DATA line_layout_safe TYPE abap_bool.
 
@@ -2814,6 +2891,9 @@ FORM query_generate  USING    fw_select TYPE string
     lw_current_length = strlen( lw_string ).
 
     CLEAR ls_fieldlist.
+    CLEAR : lw_case_reference,
+            lw_case_alias,
+            lw_case_aggregate.
     ls_fieldlist-ref_field = lw_string.
 
 * Manage new syntax "Case"
@@ -2955,6 +3035,23 @@ FORM query_generate  USING    fw_select TYPE string
           DELETE lt_split INDEX lw_index.
         ENDIF.
       ENDDO.
+      IF lw_char_10 = 'SUM('.
+        lw_case_reference =
+          lcl_select_expression_analyzer=>find_case_result_reference(
+            ls_fieldlist-ref_field ).
+        IF lw_case_reference IS NOT INITIAL.
+          lw_string2 = lw_case_reference.
+          lw_case_aggregate = abap_true.
+          lw_index = lw_current_line + 1.
+          READ TABLE lt_split INTO lw_case_alias INDEX lw_index.
+          IF sy-subrc = 0 AND lw_case_alias = 'AS'.
+            lw_index = lw_index + 1.
+            READ TABLE lt_split INTO lw_case_alias INDEX lw_index.
+          ELSE.
+            CLEAR lw_case_alias.
+          ENDIF.
+        ENDIF.
+      ENDIF.
       lw_string = lw_string2.
     ENDIF.
 
@@ -3023,7 +3120,16 @@ FORM query_generate  USING    fw_select TYPE string
 
     ELSE. "Simple field
       CONCATENATE 'F' lw_field_number INTO ls_fieldlist-field.
-      ls_fieldlist-ref_field = lw_select_field.
+      IF lw_case_aggregate = abap_true.
+        CLEAR ls_fieldlist-ref_table.
+        IF lw_case_alias IS INITIAL.
+          ls_fieldlist-ref_field = 'SUM'.                  "#EC NOTEXT
+        ELSE.
+          ls_fieldlist-ref_field = lw_case_alias.
+        ENDIF.
+      ELSE.
+        ls_fieldlist-ref_field = lw_select_field.
+      ENDIF.
       APPEND ls_fieldlist TO ft_fieldlist.
 
       CONCATENATE ',' ls_fieldlist-field INTO lw_struct_line.
@@ -6615,6 +6721,55 @@ CLASS ltc_query_input_validator IMPLEMENTATION.
 ENDCLASS.
 
 
+CLASS ltcl_select_expr_analyzer DEFINITION FINAL
+  FOR TESTING
+  DURATION SHORT
+  RISK LEVEL HARMLESS.
+  PRIVATE SECTION.
+    METHODS finds_simple_case_result FOR TESTING.
+    METHODS finds_searched_case_result FOR TESTING.
+    METHODS finds_unqualified_case_result FOR TESTING.
+    METHODS ignores_quoted_then FOR TESTING.
+    METHODS rejects_literal_result FOR TESTING.
+ENDCLASS.
+
+CLASS ltcl_select_expr_analyzer IMPLEMENTATION.
+  METHOD finds_simple_case_result.
+    cl_abap_unit_assert=>assert_equals(
+      act = lcl_select_expression_analyzer=>find_case_result_reference(
+        `SUM( CASE SFLIGHT~CARRID WHEN 'LH' THEN SFLIGHT~PRICE ELSE SFLIGHT~PRICE END )` )
+      exp = 'SFLIGHT~PRICE' ).
+  ENDMETHOD.
+
+  METHOD finds_searched_case_result.
+    cl_abap_unit_assert=>assert_equals(
+      act = lcl_select_expression_analyzer=>find_case_result_reference(
+        `SUM( CASE WHEN SFLIGHT~PRICE > 0 THEN SFLIGHT~PRICE ELSE SFLIGHT~PRICE END )` )
+      exp = 'SFLIGHT~PRICE' ).
+  ENDMETHOD.
+
+  METHOD finds_unqualified_case_result.
+    cl_abap_unit_assert=>assert_equals(
+      act = lcl_select_expression_analyzer=>find_case_result_reference(
+        `SUM( CASE CARRID WHEN 'LH' THEN PRICE ELSE PRICE END )` )
+      exp = 'PRICE' ).
+  ENDMETHOD.
+
+  METHOD ignores_quoted_then.
+    cl_abap_unit_assert=>assert_equals(
+      act = lcl_select_expression_analyzer=>find_case_result_reference(
+        `SUM( CASE SFLIGHT~CARRID WHEN 'THEN' THEN SFLIGHT~PRICE ELSE SFLIGHT~PRICE END )` )
+      exp = 'SFLIGHT~PRICE' ).
+  ENDMETHOD.
+
+  METHOD rejects_literal_result.
+    cl_abap_unit_assert=>assert_initial(
+      act = lcl_select_expression_analyzer=>find_case_result_reference(
+        `SUM( CASE SFLIGHT~CARRID WHEN 'LH' THEN 1 ELSE 0 END )` ) ).
+  ENDMETHOD.
+ENDCLASS.
+
+
 CLASS ltc_query_generator DEFINITION FINAL
   FOR TESTING
   DURATION SHORT
@@ -6627,6 +6782,8 @@ CLASS ltc_query_generator DEFINITION FINAL
     METHODS setup.
     METHODS teardown.
     METHODS generates_case_sum_expression FOR TESTING.
+    METHODS generates_searched_case_sum FOR TESTING.
+    METHODS rejects_unproven_case_sum_type FOR TESTING.
     METHODS generates_strict_aggregate FOR TESTING.
     METHODS keeps_escaped_count_valid FOR TESTING.
     METHODS keeps_legacy_select_valid FOR TESTING.
@@ -6637,7 +6794,8 @@ CLASS ltc_query_generator DEFINITION FINAL
       IMPORTING query TYPE string
       EXPORTING generated_program TYPE sy-repid
                 new_syntax TYPE abap_bool
-                count_query TYPE abap_bool.
+                count_query TYPE abap_bool
+                field_list TYPE ty_fieldlist_table.
 ENDCLASS.
 
 CLASS ltc_query_generator IMPLEMENTATION.
@@ -6660,8 +6818,6 @@ CLASS ltc_query_generator IMPLEMENTATION.
     DATA rows TYPE ty_rows.
     DATA no_authority TYPE abap_bool.
     DATA parse_error TYPE abap_bool.
-    DATA field_list TYPE ty_fieldlist_table.
-
     PERFORM query_parse USING query
                         CHANGING select_part
                                  from_part
@@ -6716,9 +6872,11 @@ CLASS ltc_query_generator IMPLEMENTATION.
   ENDMETHOD.
 
   METHOD generates_case_sum_expression.
-    DATA generated_program TYPE sy-repid.
+    DATA generated_program TYPE c LENGTH 40.
     DATA new_syntax TYPE abap_bool.
     DATA count_query TYPE abap_bool.
+    DATA field_list TYPE ty_fieldlist_table.
+    DATA first_field TYPE ty_fieldlist.
 
     generate_query(
       EXPORTING
@@ -6728,7 +6886,8 @@ CLASS ltc_query_generator IMPLEMENTATION.
       IMPORTING
         generated_program = generated_program
         new_syntax = new_syntax
-        count_query = count_query ).
+        count_query = count_query
+        field_list = field_list ).
 
     cl_abap_unit_assert=>assert_equals(
       act = new_syntax
@@ -6740,6 +6899,47 @@ CLASS ltc_query_generator IMPLEMENTATION.
     cl_abap_unit_assert=>assert_not_initial(
       act = generated_program
       msg = 'SUM CASE expression must produce a valid subroutine pool' ).
+    READ TABLE field_list INTO first_field INDEX 1.
+    cl_abap_unit_assert=>assert_equals(
+      act = sy-subrc
+      exp = 0
+      msg = 'Generated CASE field metadata must be present' ).
+    cl_abap_unit_assert=>assert_initial(
+      act = first_field-ref_table
+      msg = 'Computed CASE result must not claim direct DDIC metadata' ).
+    cl_abap_unit_assert=>assert_equals(
+      act = first_field-ref_field
+      exp = 'NET_PRICE'
+      msg = 'Computed CASE result must preserve its SQL alias' ).
+  ENDMETHOD.
+
+  METHOD generates_searched_case_sum.
+    DATA generated_program TYPE c LENGTH 40.
+
+    generate_query(
+      EXPORTING
+        query = `SELECT SUM( CASE WHEN SFLIGHT~PRICE > 0 THEN SFLIGHT~PRICE`
+             && ` ELSE SFLIGHT~PRICE * -1 END ) AS NET_PRICE, SFLIGHT~CARRID`
+             && ` FROM SFLIGHT GROUP BY SFLIGHT~CARRID`
+      IMPORTING generated_program = generated_program ).
+
+    cl_abap_unit_assert=>assert_not_initial(
+      act = generated_program
+      msg = 'Searched CASE sum must produce a valid subroutine pool' ).
+  ENDMETHOD.
+
+  METHOD rejects_unproven_case_sum_type.
+    DATA generated_program TYPE c LENGTH 40.
+
+    generate_query(
+      EXPORTING
+        query = `SELECT SUM( CASE SFLIGHT~CARRID WHEN 'LH' THEN 1 ELSE 0 END ) AS MATCH_COUNT,`
+             && ` SFLIGHT~CARRID FROM SFLIGHT GROUP BY SFLIGHT~CARRID`
+      IMPORTING generated_program = generated_program ).
+
+    cl_abap_unit_assert=>assert_initial(
+      act = generated_program
+      msg = 'Unproven CASE result types must fail closed' ).
   ENDMETHOD.
 
   METHOD keeps_escaped_count_valid.
