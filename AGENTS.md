@@ -8,6 +8,7 @@ These rules apply to every change in this repository. Read [docs/development.md]
 - Native abapGit is the source of truth for round-tripping complete SAP repository objects, including metadata XML, screens, text elements, authorization objects, tables, and transactions.
 - The ABAP 7.50 and S/4HANA 2023 systems are validation targets. Never treat an unexported system change as complete.
 - ARC-1 is the preferred interface for system context, focused object reads, syntax checks, ABAP Unit, and ATC. A source-only ARC-1 mirror is useful for inspection but is not a complete abapGit deployment.
+- NPL/SAP_BASIS 750 is an ARC-1/ADT-only target. Do not use FLP, WebGUI, SAP GUI, or browser automation there. UI/browser smoke belongs to A4H/SAP_BASIS 758.
 
 ## Compatibility contract
 
@@ -26,7 +27,7 @@ For changes that affect `src/` or live behavior:
 4. Write an implementation/test/rollback plan in `docs/plans/`, including ABAP 7.50 compatibility, Clean ABAP/Clean Core, abaplint, ABAP Unit, live activation/syntax/ATC, safe browser smoke, and ST22 delta. Review the plan before production changes.
 5. Implement the smallest change that turns the test green. Refactor only while the complete suite remains green. Edit source locally for source-only changes; create structural SAP objects in a development system and export them with native abapGit instead of inventing serializer XML.
 6. Run `npm ci`, `npm test`, `git diff --check`, a complete diff review, and the relevant security/authorization review. Deploy the exact candidate to each available SAP target without pretending that the shared abapGit `master` link represents an unmerged branch.
-7. On SAP_BASIS 750 first when available, then S/4HANA 2023, require controlled activation, active syntax, all ABAP Unit tests, complete ATC runs or explicit prerequisite failures, safe smoke, and ST22 delta. A failed/unavailable gate is never a pass.
+7. On SAP_BASIS 750 first when available, then S/4HANA 2023, require controlled activation, active syntax, all ABAP Unit tests, and complete ATC runs or explicit prerequisite failures. Run safe browser smoke and ST22 delta on A4H only. A failed/unavailable gate is never a pass.
 8. Perform a final implementation review, update finding evidence, commit with a Conventional Commit subject, push the branch, open a pull request, and wait for required CI to become green.
 9. After the first green PR run, audit the plan, implementation, test evidence, CI output, and development process. Apply useful process/documentation improvements to the same PR, move its plan to `docs/plans/finished/`, push, and wait for CI again.
 10. Merge only after the maintainer accepts any recorded live-system limitations. Pull the resulting `master`, verify Release Please behavior, and do not manually tag an ordinary release.
@@ -34,6 +35,8 @@ For changes that affect `src/` or live behavior:
 For a source-only candidate, a controlled direct source deployment is preferable to switching the shared native-abapGit repository away from `master`. Record the candidate commit/hash and activate only the intended object. Structural changes still require a real native-abapGit round trip and may need a dedicated package/system to avoid changing shared objects underneath other work.
 
 If ARC-1 authentication or a live system is unavailable, local checks may continue, but do not claim live validation. Record the missing gate in the PR and complete it before merge unless the maintainer explicitly accepts the risk.
+
+NPL currently lacks ZTOAD's transparent table. SAP_BASIS 750 has no ADT transparent-table create endpoint, so ARC-1 cannot provision it safely. Never substitute a DDIC structure. Until the real table is provisioned outside the ADT-only workflow, record NPL ZTOAD activation/syntax/Unit/ATC as blocked even though the ARC-1 object lifecycle itself is proven usable.
 
 ## Testing rules
 

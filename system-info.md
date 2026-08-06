@@ -1,6 +1,6 @@
 # System Info: A4H / ZTOAD test matrix
 
-_Generated: 2026-08-06T05:54:28Z_ · _Source: live ARC-1 discovery, native abapGit, SAP syntax/Unit/ATC runs, and WebGUI smoke testing_
+_Updated: 2026-08-06_ · _Source: live ARC-1 discovery on A4H and NPL, native abapGit, SAP syntax/Unit/ATC runs, and A4H WebGUI smoke testing_
 
 ## Identity
 
@@ -48,7 +48,7 @@ The first request created during setup, `A4HK906377`, is an empty local request 
 - **ARC-1 rule inventory**: 158 enabled, 25 disabled
 - **Repository gate**: pinned `@abaplint/cli` with the compatibility-focused rules in `abaplint.json`
 - **Compatibility floor**: SAP_BASIS 750; the separate 7.50 system is still required for the authoritative downport gate
-- **Baseline full-rule audit**: 1,086 findings (992 errors, 94 warnings) across 35 rules; tracked in `docs/baseline-findings.md`
+- **Baseline full-rule audit**: 1,857 findings across 57 rules on `master`; BASE-RUN-001 candidate 1,878 with 21 explained adapter diagnostics
 
 ## RAP Constraints Snapshot
 
@@ -69,10 +69,11 @@ The first request created during setup, `A4HK906377`, is an empty local request 
 | Repository objects | PROG `ZTOAD`, TABL `ZTOAD`, SUSO `ZTOAD_AUTH` |
 | Active/inactive source | Identical; no inactive divergence |
 | SAP syntax | 0 errors; 4 warnings |
-| ABAP Unit | 14 passed, 0 failed |
-| ATC `S4HANA_READINESS_2023` | 0 findings |
-| ATC `ABAP_CLOUD_READINESS` | 758 findings; classic Dynpro/GUI design is not ABAP Cloud compatible |
-| WebGUI smoke | Failed with `RAISE_EXCEPTION` / `DATA_SOURCE_ERROR` in `DP_PUBLISH_URL` from `CL_GUI_ABAPEDIT=>CONSTRUCTOR` |
+| ABAP Unit | 19 passed, 0 failed |
+| ATC `S4HANA_READINESS_2023` | 0 rows returned; non-authoritative because known prerequisites are unavailable |
+| ATC `ABAP_CLOUD_READINESS` | 768 findings (463 P1, 305 P2); classic Dynpro/GUI design is not ABAP Cloud compatible |
+| WebGUI smoke | Fresh final launch renders the plain text editor and accepts `SELECT SINGLE mandt FROM t000`; no new ST22 dump |
+| Remaining UI prerequisite | A4H installation lacks GUI status `STATUS010`, so query dispatch is blocked by `BASE-BUG-007` |
 
 ## Coding Guidance
 
@@ -82,18 +83,24 @@ The first request created during setup, `A4HK906377`, is an empty local request 
 - Never infer browser compatibility from activation. The current `CL_GUI_ABAPEDIT` path is proven to dump in WebGUI and needs a tested fallback or replacement.
 - Keep native SQL disabled by default. Any parser/executor change needs explicit authorization, injection, row-limit, and error-leakage tests.
 - Use native abapGit for complete object round trips. ARC-1 remains preferred for reads, targeted source writes, activation, syntax, ABAP Unit, ATC, object state, and ST22 diagnostics.
+- ARC-1 source writes must be followed by explicit activation and an object-state comparison. `activate=true` on the write request did not activate this candidate; the separate activation call did.
 
-## Secondary Target: ABAP 7.50
+## Secondary Target: NPL / ABAP 7.50
 
 | Field | Value |
 |---|---|
-| SID / URL / client | Not configured in this workspace yet |
-| Required release | SAP_BASIS 750 |
-| Purpose | Minimum-release deserialization, activation, syntax, ABAP Unit, ATC, and runtime gate |
-| ARC-1 | Configure as a separate server/profile such as `arc-1-750`; do not replace the A4H destination |
-| Completion status | Pending; no change may claim full two-system compatibility until this gate passes |
+| SID / client | NPL / 001 |
+| Release | SAP_BASIS 750 SP02; SAP_ABA, SAP_UI, and SAP_GWFND 750 SP02 |
+| Purpose | ADT-only minimum-release activation, syntax, ABAP Unit, and ATC gate |
+| ARC-1 | Separate `arc-1-750` profile, pinned to ARC-1 1.0.2; write/activate/syntax/Unit/cleanup lifecycle proven |
+| UI boundary | No FLP, WebGUI, SAP GUI, or browser automation; A4H owns UI smoke |
+| ZTOAD state | Program and transparent table are absent |
+| Blocking prerequisite | SAP_BASIS 750 exposes no ADT transparent-table create endpoint, so table `ZTOAD` cannot be safely provisioned through ARC-1 |
+| Completion status | Connection usable; exact ZTOAD activation/syntax/Unit/ATC blocked until the real table exists |
 
-## Verified Access Paths
+See [the NPL ADT-only validation dossier](docs/research/2026-08-06-npl-adt-only-validation.md). A disposable report was created, activated, syntax-checked, unit-tested successfully, deleted, and confirmed absent. No stub DDIC structure may be used to claim compatibility.
+
+## Verified A4H Access Paths
 
 - FLP transaction intent: `https://a4h.marianzeis.de/sap/bc/ui2/flp?sap-client=001#Shell-startGUI?sap-ui2-tcode=<TCODE>`
 - Standalone WebGUI: `https://a4h.marianzeis.de/sap/bc/gui/sap/its/webgui?sap-client=001&~transaction=<TCODE>`

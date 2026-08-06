@@ -255,6 +255,7 @@ DATA : BEGIN OF s_customize,                                "#EC NEEDED
 *######################################################################*
 * Objects
 CLASS lcl_application DEFINITION DEFERRED.
+CLASS lcl_editor DEFINITION DEFERRED.
 
 * Screen objects
 DATA : o_handle_event         TYPE REF TO lcl_application,
@@ -272,7 +273,7 @@ DATA : o_handle_event         TYPE REF TO lcl_application,
 
 * Tabs objects (editor, ddic, alv)
        BEGIN OF s_tab_active,
-         o_textedit             TYPE REF TO cl_gui_abapedit,
+         o_textedit             TYPE REF TO lcl_editor,
          o_tree_ddic            TYPE REF TO cl_gui_column_tree,
          t_node_ddic            TYPE treev_ntab,
          t_item_ddic            TYPE TABLE OF mtreeitm,
@@ -400,6 +401,69 @@ CLASS lcl_drag_object DEFINITION FINAL.
 ENDCLASS."lcl_drag_object DEFINITION
 
 *----------------------------------------------------------------------*
+*       CLASS lcl_editor_configuration DEFINITION
+*----------------------------------------------------------------------*
+*       Select editor behavior without depending on a live frontend
+*----------------------------------------------------------------------*
+CLASS lcl_editor_configuration DEFINITION FINAL.
+  PUBLIC SECTION.
+    CLASS-METHODS get_editor_type
+      IMPORTING i_webgui             TYPE abap_bool
+      RETURNING VALUE(r_editor_type) TYPE string.
+ENDCLASS.
+
+*----------------------------------------------------------------------*
+*       CLASS lcl_editor DEFINITION
+*----------------------------------------------------------------------*
+*       Common API for the desktop source editor and WebGUI text editor
+*----------------------------------------------------------------------*
+CLASS lcl_editor DEFINITION FINAL.
+  PUBLIC SECTION.
+    METHODS constructor
+      IMPORTING i_parent TYPE REF TO cl_gui_container
+                i_webgui TYPE abap_bool.
+    METHODS is_ready
+      RETURNING VALUE(r_ready) TYPE abap_bool.
+    METHODS get_abap_editor
+      RETURNING VALUE(r_editor) TYPE REF TO cl_gui_abapedit.
+    METHODS get_selection_pos
+      EXPORTING e_from_line TYPE i
+                e_from_pos  TYPE i
+                e_to_line   TYPE i
+                e_to_pos    TYPE i
+      EXCEPTIONS operation_failed.
+    METHODS get_selected_text_as_table
+      EXPORTING e_table TYPE STANDARD TABLE.
+    METHODS get_text
+      EXPORTING e_table TYPE STANDARD TABLE
+      EXCEPTIONS operation_failed.
+    METHODS delete_text
+      IMPORTING i_from_line TYPE i
+                i_from_pos  TYPE i
+                i_to_line   TYPE i
+                i_to_pos    TYPE i.
+    METHODS set_text
+      IMPORTING i_table TYPE STANDARD TABLE.
+    METHODS set_visible
+      IMPORTING i_visible TYPE abap_bool.
+    METHODS set_textmodified_status.
+    METHODS get_textmodified_status
+      RETURNING VALUE(r_status) TYPE i.
+    METHODS insert_block_at_position
+      IMPORTING i_line     TYPE i
+                i_pos      TYPE i
+                i_text_tab TYPE STANDARD TABLE.
+    METHODS set_selection_pos_in_line
+      IMPORTING i_line TYPE i
+                i_pos  TYPE i.
+    METHODS set_focus.
+
+  PRIVATE SECTION.
+    DATA abap_editor TYPE REF TO cl_gui_abapedit.
+    DATA text_editor TYPE REF TO cl_gui_textedit.
+ENDCLASS.
+
+*----------------------------------------------------------------------*
 *       CLASS lcl_application DEFINITION
 *----------------------------------------------------------------------*
 *       Class to handle application events
@@ -449,6 +513,235 @@ CLASS lcl_application DEFINITION FINAL.
                     FOR EVENT function_selected OF cl_gui_toolbar
         IMPORTING fcode.
 ENDCLASS.                    "lcl_application DEFINITION
+
+CLASS lcl_editor_configuration IMPLEMENTATION.
+  METHOD get_editor_type.
+    IF i_webgui = abap_true.
+      r_editor_type = 'TEXT'.
+    ELSE.
+      r_editor_type = 'ABAP'.
+    ENDIF.
+  ENDMETHOD.
+ENDCLASS.
+
+CLASS lcl_editor IMPLEMENTATION.
+  METHOD constructor.
+    IF lcl_editor_configuration=>get_editor_type( i_webgui ) = 'TEXT'.
+      CREATE OBJECT text_editor
+        EXPORTING
+          parent                   = i_parent
+        EXCEPTIONS
+          error_cntl_create      = 1
+          error_cntl_init        = 2
+          error_cntl_link        = 3
+          error_dp_create        = 4
+          gui_type_not_supported = 5
+          OTHERS                 = 6.
+    ELSE.
+      abap_editor = NEW cl_gui_abapedit( parent = i_parent ).
+    ENDIF.
+  ENDMETHOD.
+
+  METHOD is_ready.
+    r_ready = xsdbool( text_editor IS BOUND OR abap_editor IS BOUND ).
+  ENDMETHOD.
+
+  METHOD get_abap_editor.
+    r_editor = abap_editor.
+  ENDMETHOD.
+
+  METHOD get_selection_pos.
+    IF text_editor IS BOUND.
+      text_editor->get_selection_pos(
+        IMPORTING
+          from_line = e_from_line
+          from_pos  = e_from_pos
+          to_line   = e_to_line
+          to_pos    = e_to_pos
+        EXCEPTIONS
+          OTHERS    = 1 ).
+    ELSE.
+      abap_editor->get_selection_pos(
+        IMPORTING
+          from_line = e_from_line
+          from_pos  = e_from_pos
+          to_line   = e_to_line
+          to_pos    = e_to_pos
+        EXCEPTIONS
+          OTHERS    = 1 ).
+    ENDIF.
+
+    IF sy-subrc <> 0.
+      RAISE operation_failed.
+    ENDIF.
+  ENDMETHOD.
+
+  METHOD get_selected_text_as_table.
+    IF text_editor IS BOUND.
+      text_editor->get_selected_text_as_r3table(
+        IMPORTING
+          table  = e_table
+        EXCEPTIONS
+          OTHERS = 0 ).
+    ELSE.
+      abap_editor->get_selected_text_as_table(
+        IMPORTING
+          table  = e_table
+        EXCEPTIONS
+          OTHERS = 0 ).
+    ENDIF.
+  ENDMETHOD.
+
+  METHOD get_text.
+    IF text_editor IS BOUND.
+      text_editor->get_text_as_r3table(
+        IMPORTING
+          table  = e_table
+        EXCEPTIONS
+          OTHERS = 1 ).
+    ELSE.
+      abap_editor->get_text(
+        IMPORTING
+          table  = e_table
+        EXCEPTIONS
+          OTHERS = 1 ).
+    ENDIF.
+
+    IF sy-subrc <> 0.
+      RAISE operation_failed.
+    ENDIF.
+  ENDMETHOD.
+
+  METHOD delete_text.
+    DATA empty_text TYPE soli_tab.
+
+    IF text_editor IS BOUND.
+      text_editor->set_selection_pos(
+        EXPORTING
+          from_line = i_from_line
+          from_pos  = i_from_pos
+          to_line   = i_to_line
+          to_pos    = i_to_pos
+        EXCEPTIONS
+          OTHERS    = 0 ).
+      text_editor->set_selected_text_as_r3table(
+        EXPORTING
+          table  = empty_text
+        EXCEPTIONS
+          OTHERS = 0 ).
+    ELSE.
+      abap_editor->delete_text(
+        from_line = i_from_line
+        from_pos  = i_from_pos
+        to_line   = i_to_line
+        to_pos    = i_to_pos ).
+    ENDIF.
+  ENDMETHOD.
+
+  METHOD set_text.
+    IF text_editor IS BOUND.
+      text_editor->set_text_as_r3table(
+        EXPORTING
+          table  = i_table
+        EXCEPTIONS
+          OTHERS = 0 ).
+    ELSE.
+      abap_editor->set_text(
+        EXPORTING
+          table  = i_table
+        EXCEPTIONS
+          OTHERS = 0 ).
+    ENDIF.
+  ENDMETHOD.
+
+  METHOD set_visible.
+    IF text_editor IS BOUND.
+      text_editor->set_visible( visible = i_visible ).
+    ELSE.
+      abap_editor->set_visible( visible = i_visible ).
+    ENDIF.
+  ENDMETHOD.
+
+  METHOD set_textmodified_status.
+    IF text_editor IS BOUND.
+      text_editor->set_textmodified_status( ).
+    ELSE.
+      abap_editor->set_textmodified_status( ).
+    ENDIF.
+  ENDMETHOD.
+
+  METHOD get_textmodified_status.
+    IF text_editor IS BOUND.
+      text_editor->get_textmodified_status(
+        IMPORTING
+          status = r_status
+        EXCEPTIONS
+          OTHERS = 0 ).
+    ELSE.
+      abap_editor->get_textmodified_status(
+        IMPORTING
+          status = r_status
+        EXCEPTIONS
+          OTHERS = 0 ).
+    ENDIF.
+  ENDMETHOD.
+
+  METHOD insert_block_at_position.
+    IF text_editor IS BOUND.
+      text_editor->set_selection_pos(
+        EXPORTING
+          from_line = i_line
+          from_pos  = i_pos
+          to_line   = i_line
+          to_pos    = i_pos
+        EXCEPTIONS
+          OTHERS    = 0 ).
+      text_editor->set_selected_text_as_stream(
+        EXPORTING
+          selected_text = i_text_tab
+        EXCEPTIONS
+          OTHERS        = 0 ).
+    ELSE.
+      abap_editor->insert_block_at_position(
+        EXPORTING
+          line     = i_line
+          pos      = i_pos
+          text_tab = i_text_tab
+        EXCEPTIONS
+          OTHERS   = 0 ).
+    ENDIF.
+  ENDMETHOD.
+
+  METHOD set_selection_pos_in_line.
+    IF text_editor IS BOUND.
+      text_editor->set_selection_pos_in_line(
+        EXPORTING
+          line   = i_line
+          pos    = i_pos
+        EXCEPTIONS
+          OTHERS = 0 ).
+    ELSE.
+      abap_editor->set_selection_pos_in_line(
+        EXPORTING
+          line   = i_line
+          pos    = i_pos
+        EXCEPTIONS
+          OTHERS = 0 ).
+    ENDIF.
+  ENDMETHOD.
+
+  METHOD set_focus.
+    IF text_editor IS BOUND.
+      cl_gui_control=>set_focus(
+        EXPORTING control = text_editor
+        EXCEPTIONS OTHERS = 0 ).
+    ELSE.
+      cl_gui_control=>set_focus(
+        EXPORTING control = abap_editor
+        EXCEPTIONS OTHERS = 0 ).
+    ENDIF.
+  ENDMETHOD.
+ENDCLASS.
 
 *----------------------------------------------------------------------*
 *       CLASS LCL_APPLICATION IMPLEMENTATION
@@ -560,10 +853,10 @@ CLASS lcl_application IMPLEMENTATION.
 * Find active query
     CALL METHOD s_tab_active-o_textedit->get_selection_pos
       IMPORTING
-        from_line = lw_cursor_line_from
-        from_pos  = lw_cursor_pos_from
-        to_line   = lw_cursor_line_to
-        to_pos    = lw_cursor_pos_to.
+        e_from_line = lw_cursor_line_from
+        e_from_pos  = lw_cursor_pos_from
+        e_to_line   = lw_cursor_line_to
+        e_to_pos    = lw_cursor_pos_to.
 
 * If nothing selected, no help to display
     IF lw_cursor_line_from = lw_cursor_line_to
@@ -574,7 +867,7 @@ CLASS lcl_application IMPLEMENTATION.
 * Get content of abap edit box
     CALL METHOD s_tab_active-o_textedit->get_text
       IMPORTING
-        table  = lt_query[]
+        e_table = lt_query[]
       EXCEPTIONS
         OTHERS = 1.
 
@@ -621,10 +914,10 @@ CLASS lcl_application IMPLEMENTATION.
 * Get current cursor position/selection in editor
     CALL METHOD s_tab_active-o_textedit->get_selection_pos
       IMPORTING
-        from_line = lw_line_start
-        from_pos  = lw_pos_start
-        to_line   = lw_line_end
-        to_pos    = lw_pos_end
+        e_from_line = lw_line_start
+        e_from_pos  = lw_pos_start
+        e_to_line   = lw_line_end
+        e_to_pos    = lw_pos_end
       EXCEPTIONS
         OTHERS    = 4.
     IF sy-subrc NE 0.
@@ -636,10 +929,10 @@ CLASS lcl_application IMPLEMENTATION.
     OR lw_pos_start NE lw_pos_end.
       CALL METHOD s_tab_active-o_textedit->delete_text
         EXPORTING
-          from_line = lw_line_start
-          from_pos  = lw_pos_start
-          to_line   = lw_line_end
-          to_pos    = lw_pos_end.
+          i_from_line = lw_line_start
+          i_from_pos  = lw_pos_start
+          i_to_line   = lw_line_end
+          i_to_pos    = lw_pos_end.
     ENDIF.
 
     PERFORM editor_paste USING lw_data lw_line_start lw_pos_start.
@@ -661,7 +954,7 @@ CLASS lcl_application IMPLEMENTATION.
 
       CALL METHOD s_tab_active-o_textedit->set_text
         EXPORTING
-          table  = lt_query
+          i_table = lt_query
         EXCEPTIONS
           OTHERS = 0.
 
@@ -885,7 +1178,7 @@ MODULE user_command_0010 INPUT.
 * Display editor / ddic / alv
         CALL METHOD s_tab_active-o_textedit->set_visible
           EXPORTING
-            visible = abap_true.
+            i_visible = abap_true.
         CALL METHOD s_tab_active-o_tree_ddic->set_visible
           EXPORTING
             visible = abap_true.
@@ -1131,7 +1424,9 @@ FORM editor_init.
          ls_event      TYPE cntl_simple_event,
          lt_default    TYPE TABLE OF string,
          lw_queryid    TYPE ztoad-queryid,
-         lo_dragrop    TYPE REF TO cl_dragdrop,
+         dragdrop      TYPE REF TO cl_dragdrop,
+         abap_editor   TYPE REF TO cl_gui_abapedit,
+         completer     TYPE REF TO cl_abap_parser,
          lw_dummy_date TYPE timestamp.                      "#EC NEEDED
 
 * For first tab, Get last query used
@@ -1165,71 +1460,73 @@ FORM editor_init.
 
   CREATE OBJECT s_tab_active-o_textedit
     EXPORTING
-      parent = o_container_query.
-
-* Register events
-  SET HANDLER o_handle_event->hnd_editor_f1 FOR s_tab_active-o_textedit.
-  SET HANDLER o_handle_event->hnd_editor_drop FOR s_tab_active-o_textedit.
-
-  ls_event-eventid = cl_gui_textedit=>event_f1.
-  APPEND ls_event TO lt_events.
-
-  CALL METHOD s_tab_active-o_textedit->set_registered_events
-    EXPORTING
-      events                    = lt_events
-    EXCEPTIONS
-      cntl_error                = 1
-      cntl_system_error         = 2
-      illegal_event_combination = 3.
-  IF sy-subrc <> 0.
-    IF sy-msgno IS NOT INITIAL.
-      MESSAGE ID sy-msgid TYPE sy-msgty NUMBER sy-msgno
-              DISPLAY LIKE c_msg_error
-              WITH sy-msgv1 sy-msgv2 sy-msgv3 sy-msgv4 .
-    ENDIF.
+      i_parent = o_container_query
+      i_webgui = xsdbool( cl_gui_control=>www_active IS NOT INITIAL ).
+  IF s_tab_active-o_textedit->is_ready( ) = abap_false.
+    MESSAGE 'The query editor cannot be created' TYPE c_msg_error.
+    RETURN.
   ENDIF.
+
+  abap_editor = s_tab_active-o_textedit->get_abap_editor( ).
+
+* The ABAP source editor and its completer are not supported by WebGUI.
+  IF abap_editor IS BOUND.
+* Register events
+    SET HANDLER o_handle_event->hnd_editor_f1 FOR abap_editor.
+    SET HANDLER o_handle_event->hnd_editor_drop FOR abap_editor.
+
+    ls_event-eventid = cl_gui_textedit=>event_f1.
+    APPEND ls_event TO lt_events.
+
+    abap_editor->set_registered_events(
+      EXPORTING
+        events                    = lt_events
+      EXCEPTIONS
+        cntl_error                = 1
+        cntl_system_error         = 2
+        illegal_event_combination = 3 ).
+    IF sy-subrc <> 0.
+      IF sy-msgno IS NOT INITIAL.
+        MESSAGE ID sy-msgid TYPE sy-msgty NUMBER sy-msgno
+                DISPLAY LIKE c_msg_error
+                WITH sy-msgv1 sy-msgv2 sy-msgv3 sy-msgv4.
+      ENDIF.
+    ENDIF.
 
 * Activate Code Completion and Quickinfo
 * Comment the paragraph if CL_ABAP_PARSER doesnt exists on your system
 * BEGIN OF ABAP PARSER
-  DATA lo_completer TYPE REF TO cl_abap_parser.
-  CALL METHOD s_tab_active-o_textedit->('INIT_COMPLETER').
-  CALL METHOD s_tab_active-o_textedit->('GET_COMPLETER')
-    RECEIVING
-      m_parser = lo_completer.
-  SET HANDLER lo_completer->handle_completion_request FOR s_tab_active-o_textedit.
-  SET HANDLER lo_completer->handle_insertion_request FOR s_tab_active-o_textedit.
-  SET HANDLER lo_completer->handle_quickinfo_request FOR s_tab_active-o_textedit.
-  s_tab_active-o_textedit->register_event_completion( ).
-  s_tab_active-o_textedit->register_event_quick_info( ).
-  s_tab_active-o_textedit->register_event_insert_pattern( ).
+    CALL METHOD abap_editor->('INIT_COMPLETER').
+    CALL METHOD abap_editor->('GET_COMPLETER')
+      RECEIVING
+        m_parser = completer.
+    SET HANDLER completer->handle_completion_request FOR abap_editor.
+    SET HANDLER completer->handle_insertion_request FOR abap_editor.
+    SET HANDLER completer->handle_quickinfo_request FOR abap_editor.
+    abap_editor->register_event_completion( ).
+    abap_editor->register_event_quick_info( ).
+    abap_editor->register_event_insert_pattern( ).
 * END OF ABAP PARSER
 
 * Manage Drop on SQL editor
-  CREATE OBJECT lo_dragrop.
-  CALL METHOD lo_dragrop->add
-    EXPORTING
+    dragdrop = NEW cl_dragdrop( ).
+    dragdrop->add(
       flavor     = 'EDIT_INSERT'
       dragsrc    = space
       droptarget = abap_true
-      effect     = cl_dragdrop=>copy.
-  CALL METHOD s_tab_active-o_textedit->set_dragdrop
-    EXPORTING
-      dragdrop = lo_dragrop.
+      effect     = cl_dragdrop=>copy ).
+    abap_editor->set_dragdrop( dragdrop = dragdrop ).
+  ENDIF.
 
 * Set Default template
   CALL METHOD s_tab_active-o_textedit->set_text
     EXPORTING
-      table  = lt_default
+      i_table = lt_default
     EXCEPTIONS
       OTHERS = 0.
 
 * Set focus
-  CALL METHOD cl_gui_control=>set_focus
-    EXPORTING
-      control = s_tab_active-o_textedit
-    EXCEPTIONS
-      OTHERS  = 0.
+  s_tab_active-o_textedit->set_focus( ).
 
   PERFORM ddic_refresh_tree.
 ENDFORM.                    " EDITOR_INIT
@@ -1474,13 +1771,13 @@ FORM editor_get_query USING fw_force_last TYPE c
 * Get selected content
   CALL METHOD s_tab_active-o_textedit->get_selected_text_as_table
     IMPORTING
-      table = lt_query[].
+      e_table = lt_query[].
 
 * if no selected content, get complete content of abap edit box
   IF lt_query[] IS INITIAL.
     CALL METHOD s_tab_active-o_textedit->get_text
       IMPORTING
-        table  = lt_query[]
+        e_table = lt_query[]
       EXCEPTIONS
         OTHERS = 1.
   ENDIF.
@@ -1523,8 +1820,8 @@ FORM editor_get_query USING fw_force_last TYPE c
 * Find active query
   CALL METHOD s_tab_active-o_textedit->get_selection_pos
     IMPORTING
-      from_line = lw_cursor_line
-      from_pos  = lw_cursor_pos.
+      e_from_line = lw_cursor_line
+      e_from_pos  = lw_cursor_pos.
   lw_cursor_offset = lw_cursor_pos - 1.
 
   FIND ALL OCCURRENCES OF '.' IN TABLE lt_query RESULTS lt_find.
@@ -2743,7 +3040,7 @@ FORM repo_save_query.
 * Get content of abap edit box
   CALL METHOD s_tab_active-o_textedit->get_text
     IMPORTING
-      table  = lt_query[]
+      e_table = lt_query[]
     EXCEPTIONS
       OTHERS = 1.
 
@@ -3013,7 +3310,7 @@ FORM repo_save_current_query.
 * Get content of abap edit box
   CALL METHOD s_tab_active-o_textedit->get_text
     IMPORTING
-      table  = lt_query[]
+      e_table = lt_query[]
     EXCEPTIONS
       OTHERS = 1.
 
@@ -3209,9 +3506,7 @@ FORM screen_exit.
   ENDIF.
 
 * Check if textedit is modified
-  CALL METHOD s_tab_active-o_textedit->get_textmodified_status
-    IMPORTING
-      status = lw_status.
+  lw_status = s_tab_active-o_textedit->get_textmodified_status( ).
   IF lw_status NE 0.
     CONCATENATE 'Current query is not saved. Do you want'(m22)
 'to exit without saving or save into history then exit ?'(m56)
@@ -3747,9 +4042,9 @@ FORM editor_paste  USING fw_text TYPE string
 
   CALL METHOD s_tab_active-o_textedit->insert_block_at_position
     EXPORTING
-      line     = fw_line
-      pos      = fw_pos
-      text_tab = lt_text
+      i_line     = fw_line
+      i_pos      = fw_pos
+      i_text_tab = lt_text
     EXCEPTIONS
       OTHERS   = 0.
 
@@ -3765,17 +4060,13 @@ FORM editor_paste  USING fw_text TYPE string
 
   CALL METHOD s_tab_active-o_textedit->set_selection_pos_in_line
     EXPORTING
-      line   = lw_line
-      pos    = lw_pos
+      i_line = lw_line
+      i_pos  = lw_pos
     EXCEPTIONS
       OTHERS = 0.
 
 * Focus on editor
-  CALL METHOD cl_gui_control=>set_focus
-    EXPORTING
-      control = s_tab_active-o_textedit
-    EXCEPTIONS
-      OTHERS  = 0.
+  s_tab_active-o_textedit->set_focus( ).
 
   CONCATENATE fw_text 'pasted to SQL Editor'(m27)
               INTO lw_message SEPARATED BY space.
@@ -4561,10 +4852,10 @@ FORM ddic_f4.
 * Get current cursor position/selection in editor
     CALL METHOD s_tab_active-o_textedit->get_selection_pos
       IMPORTING
-        from_line = lw_line_start
-        from_pos  = lw_pos_start
-        to_line   = lw_line_end
-        to_pos    = lw_pos_end
+        e_from_line = lw_line_start
+        e_from_pos  = lw_pos_start
+        e_to_line   = lw_line_end
+        e_to_pos    = lw_pos_end
       EXCEPTIONS
         OTHERS    = 4.
     IF sy-subrc NE 0.
@@ -4576,10 +4867,10 @@ FORM ddic_f4.
     OR lw_pos_start NE lw_pos_end.
       CALL METHOD s_tab_active-o_textedit->delete_text
         EXPORTING
-          from_line = lw_line_start
-          from_pos  = lw_pos_start
-          to_line   = lw_line_end
-          to_pos    = lw_pos_end.
+          i_from_line = lw_line_start
+          i_from_pos  = lw_pos_start
+          i_to_line   = lw_line_end
+          i_to_pos    = lw_pos_end.
     ENDIF.
 
     PERFORM editor_paste USING lw_val lw_line_start lw_pos_start.
@@ -4668,7 +4959,7 @@ FORM leave_current_tab.
 * Hide current editor / ddic / alv
   CALL METHOD s_tab_active-o_textedit->set_visible
     EXPORTING
-      visible = space.
+      i_visible = space.
 
   CALL METHOD s_tab_active-o_tree_ddic->set_visible
     EXPORTING
@@ -4721,7 +5012,7 @@ FORM tab_update_title USING fw_query TYPE string.
 * Basic read query to check if first line is a comment
   CALL METHOD s_tab_active-o_textedit->get_text
     IMPORTING
-      table  = lt_query[]
+      e_table = lt_query[]
     EXCEPTIONS
       OTHERS = 1.
   READ TABLE lt_query INTO ls_query INDEX 1.
@@ -5073,6 +5364,34 @@ CLASS ltc_query_parser DEFINITION FINAL
                 no_authority TYPE abap_bool
                 new_syntax TYPE abap_bool
                 parse_error TYPE abap_bool.
+ENDCLASS.
+
+
+CLASS ltcl_editor_configuration DEFINITION FINAL
+  FOR TESTING
+  DURATION SHORT
+  RISK LEVEL HARMLESS.
+  PRIVATE SECTION.
+    METHODS uses_text_editor_in_webgui FOR TESTING.
+    METHODS keeps_abap_mode_elsewhere FOR TESTING.
+ENDCLASS.
+
+CLASS ltcl_editor_configuration IMPLEMENTATION.
+  METHOD uses_text_editor_in_webgui.
+    cl_abap_unit_assert=>assert_equals(
+      act = lcl_editor_configuration=>get_editor_type(
+              i_webgui = abap_true )
+      exp = 'TEXT'
+      msg = 'WebGUI must use its supported plain text editor' ).
+  ENDMETHOD.
+
+  METHOD keeps_abap_mode_elsewhere.
+    cl_abap_unit_assert=>assert_equals(
+      act = lcl_editor_configuration=>get_editor_type(
+              i_webgui = abap_false )
+      exp = 'ABAP'
+      msg = 'Desktop GUI must retain ABAP editor behavior' ).
+  ENDMETHOD.
 ENDCLASS.
 
 CLASS ltc_query_parser IMPLEMENTATION.

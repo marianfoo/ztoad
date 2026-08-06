@@ -26,8 +26,8 @@ For every bug or feature:
 | ATC | Security, performance, released API, and migration checks | Both SAP targets | Every `src/` change |
 | Native-abapGit check | Complete object serialization and remote/local consistency | Both SAP targets | Every structural/deployment change |
 | Integration test | DB/auth/executor behavior against disposable objects | Dedicated test client only | Parser/execution/security changes |
-| WebGUI/FLP smoke | Startup, controls, basic read-only query, navigation | A4H and later 7.50 if supported | UI/startup changes and release candidates |
-| ST22/log check | Detect uncaught regressions even if the browser returns to SAP Easy Access | Both SAP targets | Every live smoke test |
+| WebGUI/FLP smoke | Startup, controls, basic read-only query, navigation | A4H only | UI/startup changes and release candidates |
+| ST22/log check | Detect uncaught regressions even if the browser returns to SAP Easy Access | A4H | Every live browser smoke test |
 
 ## Unit-test design rules
 
@@ -58,6 +58,8 @@ Each parser/generator change should select relevant cases from this matrix:
 
 ## Live test protocol
 
+NPL/SAP_BASIS 750 is ARC-1/ADT-only. Run activation, syntax, ABAP Unit, and ATC there; do not use FLP, WebGUI, SAP GUI, or browser automation. If a required object cannot be installed through the available ADT surface, record a blocked prerequisite rather than using an unfaithful substitute.
+
 For A4H, use only the HTTPS reverse proxy:
 
 - FLP: `https://a4h.marianzeis.de/sap/bc/ui2/flp?sap-client=001#Shell-startGUI?sap-ui2-tcode=<TCODE>`
@@ -76,9 +78,11 @@ Run this sequence after deployment:
 7. Record the latest ST22 dump timestamp before UI execution.
 8. Launch ZTOAD and run only a read-only sanitized smoke query, initially `SELECT SINGLE mandt FROM t000`.
 9. Verify expected UI/result state and confirm ST22 has no new dump.
-10. Repeat on the other SAP target.
+10. Do not repeat the browser portion on NPL; repeat only the ADT activation/syntax/Unit/ATC gates there.
 
-If FLP cannot open WebGUI because the automation browser blocks a popup, record that environmental failure and use the standalone HTTPS WebGUI URL as a secondary diagnostic path. A missing `TRAN` object, application dump, or new ST22 entry remains a product gate failure.
+If FLP cannot open WebGUI because the automation browser blocks a popup, record that environmental failure and use the standalone HTTPS WebGUI URL as a secondary diagnostic path. Before interpreting a runtime failure, verify that the installed report contains the serialized dynpros and GUI statuses required by the test. Classify missing installation metadata separately from a product-code regression, but keep the overall smoke gate blocked until both are green.
+
+For `BASE-RUN-001`, editor startup/render/input and the ST22 delta are green on A4H. Query dispatch remains blocked because installed GUI status `STATUS010` is missing (`BASE-BUG-007`), despite being present in repository XML.
 
 `BASE-RUN-001` currently blocks steps 8–9 in WebGUI because `CL_GUI_ABAPEDIT` dumps. Until fixed, unit/syntax/ATC checks remain valid, but browser end-to-end status is failed rather than skipped.
 
@@ -105,7 +109,7 @@ A release candidate is accepted only when:
 - SAP_BASIS 750 and A4H 758 activate and pass syntax;
 - all ABAP Unit tests pass on both systems;
 - the selected ATC variants have no new unapproved finding;
-- the read-only UI smoke suite passes with no new ST22 dump;
+- the A4H read-only UI smoke suite passes with no new ST22 dump;
 - the finding register and changelog/release metadata are updated.
 
 An unavailable live system is a missing gate, not a pass. Record it and complete it before release unless the maintainer explicitly accepts the risk.
