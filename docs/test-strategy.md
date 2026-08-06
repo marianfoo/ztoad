@@ -56,6 +56,7 @@ Each parser/generator change should select relevant cases from this matrix:
 | DML | INSERT values/set, UPDATE, DELETE, conversion errors, authorization denial; disposable Z table only |
 | Native SQL | rejected by default, cannot be re-enabled by legacy configuration, forbidden executor absent |
 | Error handling | parse rejection, compile rejection, runtime exception, sanitized message, no unexpected ST22 dump |
+| Generated lines | below/exactly/over 255 characters, safe whitespace outside literals, doubled-quote boundary, unbroken token rejection, no `*` moved into source column one |
 
 ## Live test protocol
 
@@ -71,7 +72,7 @@ Do not use ports 50000 or 50001. Credentials stay in the ignored `.env` file and
 Run this sequence after deployment:
 
 1. Confirm native abapGit points at the expected coordinated branch, refresh it, and review the complete system/Git diff. For normal source work this is `master`; a structural-object feature branch must be explicit in the evidence.
-2. Confirm no unrelated inactive divergence and record the exact candidate commit/source hash being tested. If unrelated drift exists, leave it unselected and list it; never use **Add All**.
+2. Confirm no unrelated inactive divergence and record the frozen candidate commit/source hash being tested. If unrelated drift exists, leave it unselected and list it; never use **Add All**. If source or serialized object content changes after this point, discard the affected evidence and restart deployment from this step.
 3. Deploy and explicitly activate only the intended changed objects. Do not describe an unmerged directly deployed source as a native-abapGit `master` pull, and do not rely on a write request's activation option.
 4. Confirm active and inactive main source are identical, query inactive child parts for changed composite objects, then run active SAP syntax. Screens, GUI statuses, text elements, and includes must be checked separately; main-source equality does not clear an inactive child part.
 5. Run all ABAP Unit tests; require zero failures.
@@ -80,6 +81,7 @@ Run this sequence after deployment:
 8. Verify the installed dynpro and GUI status required by the scenario, then launch ZTOAD in a fresh browser session and run only a read-only sanitized smoke query, initially `SELECT SINGLE mandt FROM t000`.
 9. Verify expected UI/result state and confirm ST22 has no new dump.
 10. Do not repeat the browser portion on NPL; repeat only the ADT activation/syntax/Unit/ATC gates there.
+11. On a shared target, restore and explicitly activate the intended `master` object after evidence collection, then verify the relevant baseline tests and active/inactive state. Record an exception only when the maintainer reserves the deployed candidate for immediate follow-up work.
 
 If FLP cannot open WebGUI because the automation browser blocks a popup, record that environmental failure and use the standalone HTTPS WebGUI URL as a secondary diagnostic path. Before interpreting a runtime failure, verify that the installed report contains the serialized dynpros and GUI statuses required by the test. Classify missing installation metadata separately from a product-code regression, but keep the overall smoke gate blocked until both are green.
 
@@ -100,6 +102,8 @@ No normal smoke or unit test may modify SAP or business tables. A test of INSERT
 - a recovery procedure if cleanup fails.
 
 Native SQL is retired and must remain rejected before generation or execution.
+
+For a parser, generator, dynamic token, or other text-to-code boundary, tests must cover both preserved data and rejected source syntax. Exercise literal/quote state, statement terminators, comments, host-language escapes, and malformed input. Each narrow allow-list exception needs a valid example and a namespace-/keyword-shaped near miss proving that a context-free lookalike is rejected. Assert rejection before generation or execution, clear any executable output handle, and never execute the exploit proof.
 
 ## Release acceptance
 

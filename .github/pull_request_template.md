@@ -9,6 +9,7 @@
 ## Validation
 
 - [ ] `npm ci` and `npm test` pass locally.
+- [ ] Live evidence names a frozen candidate commit/source hash; no later source/object change is covered by stale evidence.
 - [ ] Serialized files were produced or verified with native abapGit; XML was not hand-authored without a system round trip.
 - [ ] Native abapGit staging contained only intended objects; unrelated system/Git drift was documented and left unselected.
 - [ ] ABAP 7.50: pull, activation, syntax check, ABAP Unit, and ATC pass, or this is not applicable and is explained below.
@@ -16,8 +17,10 @@
 - [ ] Activation evidence covers affected child parts (screens, GUI statuses, text elements, and includes), not only main-source equality.
 - [ ] A safe manual ZTOAD smoke test passes on both systems, or the omitted system/check is explained below.
 - [ ] ST22 was checked before/after live smoke; known and new dumps are distinguished.
+- [ ] Directly deployed objects on shared systems were restored to `master`, or an explicit temporary reservation is documented.
 - [ ] ATC prerequisite/check errors were reviewed; an incomplete run is not reported as zero findings.
 - [ ] Authorization and SQL-injection implications were reviewed.
+- [ ] Security claims distinguish proven entry-point reachability from sink-level behavior and state actor prerequisites, or this is not applicable.
 - [ ] New or changed logic has ABAP Unit coverage where technically feasible.
 - [ ] Documentation and changelog impact were considered.
 - [ ] The accepted PR will use squash merge and a Conventional Commit PR title.
@@ -28,7 +31,7 @@
 
 ## Final review and process audit
 
-<!-- Summarize the final diff/security review, first green CI run, process improvements, and second green CI run. -->
+<!-- Summarize the final diff/security review, first green CI run, process improvements, and second green CI run. Record the final run here or in a comment instead of creating an evidence-only commit. For an overlapping PR, state the merge/rebase order and revalidation required after each predecessor merges. -->
 
 ## Release note
 
