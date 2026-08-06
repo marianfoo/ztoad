@@ -45,8 +45,10 @@ The plan is intentionally structural:
 ## Evidence log
 
 - Red baseline: `npm test` on 2026-08-06 passed configured abaplint with 0 issues, then failed in `scripts/repository-contract.mjs` with `Missing native-abapGit transaction object: src/ztoad.tran.xml`.
-- Local green: pending.
-- A4H ADT/live/native-abapGit: pending.
-- NPL ARC-1/ADT-only: pending.
+- Local green: native `src/ztoad.tran.xml` turns the repository contract green; `npm ci` reports 0 vulnerabilities, `npm test` reports 0 configured abaplint issues, and `npm run lint:quality` remains at the explained 1,878-finding/58-rule candidate baseline.
+- Native abapGit: serialized and pushed only `TRAN ZTOAD`; the file records a report transaction for program `ZTOAD`, screen `1000`, English text `ZTOAD SQL query tool`, WebGUI support, and Windows-GUI support. A follow-up stage shows that file clean. Unrelated A4H program/table drift was deliberately not staged.
+- A4H ADT/live: active syntax has 0 errors and the same 4 known warnings; 19/19 ABAP Unit tests pass; `ABAP_CLOUD_READINESS` remains 768 findings; `S4HANA_READINESS_2023` returned no rows but remains non-authoritative because prerequisites are unavailable. Standalone WebGUI and FLP intent launches both reach the ZTOAD editor. The ST22 list is unchanged. Missing `STATUS010` remains the independent `BASE-BUG-007` blocker.
+- A4H repository state: explicit program activation succeeded and active/inactive main-source hashes are identical. ARC-1 still lists program parts/screens/texts as inactive, so the process audit must address part-level activation evidence; no unrelated program metadata is included in this fix.
+- NPL ARC-1/ADT-only: connection and repository search succeed, but no ZTOAD objects exist. `PROG ZTOAD` and `TABL ZTOAD` return not found, exact search returns no objects, and the transaction reader returns only an empty placeholder. The structural install/activation gate is blocked because ADT cannot create the missing table or native-round-trip `TRAN`; no forbidden UI fallback was used.
 - First PR CI: pending.
 - Post-green process audit and final CI: pending.

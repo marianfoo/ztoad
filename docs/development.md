@@ -4,7 +4,7 @@ This is the normative workflow for future issues and features. Its goal is fast 
 
 ## 1. Architecture and trust boundaries
 
-ZTOAD is not only `src/ztoad.prog.abap`. The report also depends on its program metadata and dynpros (`ztoad.prog.xml`), persisted-query table (`ztoad.tabl.xml`), and authorization object (`ztoad_auth.suso.xml`). Future transaction codes or other repository objects will add more serialized files.
+ZTOAD is not only `src/ztoad.prog.abap`. The report also depends on its program metadata and dynpros (`ztoad.prog.xml`), persisted-query table (`ztoad.tabl.xml`), authorization object (`ztoad_auth.suso.xml`), and report transaction (`ztoad.tran.xml`).
 
 Use each tool for the part it can represent faithfully:
 
@@ -58,7 +58,7 @@ On A4H, the Fiori-shell URL for the transaction is:
 
 `https://a4h.marianzeis.de/sap/bc/ui2/flp?sap-client=001#Shell-startGUI?sap-ui2-tcode=ZABAPGIT`
 
-Do not manually install only the report source. That omits the dynpros, table, and authorization object and cannot reproduce a supported installation.
+Do not manually install only the report source. That omits the dynpros, table, authorization object, and transaction and cannot reproduce a supported installation. The repository-managed launcher is report transaction `ZTOAD` for program `ZTOAD`; use `#Shell-startGUI?sap-ui2-tcode=ZTOAD` or standalone `~transaction=ZTOAD` for its A4H smoke test.
 
 ## 4. Local-first TDD flow with a stable `master`
 

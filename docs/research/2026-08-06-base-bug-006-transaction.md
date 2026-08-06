@@ -4,7 +4,7 @@ _Date: 2026-08-06 · finding: `BASE-BUG-006` · issue: [#2](https://github.com/m
 
 ## Problem and red baseline
 
-The repository has no `src/ztoad.tran.xml`. A4H's ADT transaction read for `ZTOAD` currently returns empty description, program, and package fields. The stable direct URLs therefore have no repository-managed transaction to resolve:
+The red repository baseline had no `src/ztoad.tran.xml`. A4H's ADT transaction read for absent `ZTOAD` returned empty description, program, and package fields. The stable direct URLs therefore had no repository-managed transaction to resolve:
 
 - FLP: `#Shell-startGUI?sap-ui2-tcode=ZTOAD`
 - standalone WebGUI: `~transaction=ZTOAD`
@@ -51,11 +51,19 @@ abapGit intentionally serializes only active, consistent object state and exclud
 
 - focused repository test is red before serialization and green afterward;
 - `npm ci`, configured abaplint, and the full diagnostic abaplint profile are reviewed;
-- A4H ADT read reports transaction `ZTOAD` mapped to program `ZTOAD` in package `ZTOAD`;
+- native serialization reports transaction `ZTOAD` mapped to program `ZTOAD`; the current ARC-1 `TRAN` reader is not authoritative for report-transaction program metadata and returns an empty program after creation;
 - native abapGit reports the transaction clean after the push/round trip;
 - direct FLP and standalone WebGUI URLs reach ZTOAD without an unknown-transaction error;
 - A4H active source, syntax, all ABAP Unit tests, selected ATC variants, and ST22 delta are checked;
 - NPL ARC-1/ADT reads and available lifecycle gates are recorded without browser, FLP, WebGUI, or SAP GUI automation.
+
+## Implemented result
+
+Native abapGit serialized `src/ztoad.tran.xml` with serializer `LCL_OBJECT_TRAN`. Its `TSTC` record identifies `ZTOAD`, program `ZTOAD`, selection screen `1000`, and the report-transaction flag. `TSTCC` enables WebGUI and Windows GUI; `TSTCT` contains the English short text `ZTOAD SQL query tool`. Only this transaction object was staged. Existing A4H drift in program screens, program metadata, table metadata, and package metadata was left out of the commit.
+
+Both direct A4H launch forms reached the ZTOAD editor without an unknown-transaction error. A pre/post ST22 comparison found no new dump. The screen still reports missing GUI status `STATUS010`, which confirms that transaction resolution is fixed while `BASE-BUG-007` remains independently reproducible.
+
+On NPL, exact ADT repository search returns no ZTOAD objects; report and table reads return not found. The ARC-1 transaction reader returns an all-empty placeholder for an absent transaction, so it cannot be treated as installation evidence. Because the real table and report are absent and the ADT-only boundary has no native `TRAN` round trip, exact SAP_BASIS 750 structural installation remains blocked.
 
 ## Sources
 
