@@ -5600,6 +5600,7 @@ CLASS ltc_query_generator DEFINITION FINAL
     METHODS generates_strict_aggregate FOR TESTING.
     METHODS keeps_escaped_count_valid FOR TESTING.
     METHODS keeps_legacy_select_valid FOR TESTING.
+    METHODS rejects_statement_injection FOR TESTING.
 
     METHODS generate_query
       IMPORTING query TYPE string
@@ -5725,6 +5726,23 @@ CLASS ltc_query_generator IMPLEMENTATION.
       act = generated_program
       msg = 'Legacy SELECT query must remain valid' ).
   ENDMETHOD.
+
+  METHOD rejects_statement_injection.
+    DATA generated_program TYPE sy-repid.
+    DATA new_syntax TYPE abap_bool.
+    DATA count_query TYPE abap_bool.
+
+    generate_query(
+      EXPORTING
+        query = `SELECT CARRID FROM SCARR WHERE CARRID = 'LH'. WRITE sy-uname`
+      IMPORTING generated_program = generated_program
+                new_syntax = new_syntax
+                count_query = count_query ).
+
+    cl_abap_unit_assert=>assert_initial(
+      act = generated_program
+      msg = 'User input must not terminate SELECT and append ABAP' ).
+  ENDMETHOD.
 ENDCLASS.
 
 
@@ -5822,6 +5840,7 @@ CLASS ltc_command_parser DEFINITION FINAL
     METHODS accepts_delete_from FOR TESTING.
     METHODS rejects_native_sql_by_default FOR TESTING.
     METHODS cannot_reenable_native_sql FOR TESTING.
+    METHODS rejects_dml_injection FOR TESTING.
 ENDCLASS.
 
 CLASS ltc_command_parser IMPLEMENTATION.
@@ -5912,5 +5931,20 @@ CLASS ltc_command_parser IMPLEMENTATION.
     cl_abap_unit_assert=>assert_true(
       act = no_authority
       msg = 'Legacy configuration must not re-enable Native SQL' ).
+  ENDMETHOD.
+
+  METHOD rejects_dml_injection.
+    DATA generated_program TYPE sy-repid.
+
+    PERFORM query_generate_noselect
+      USING 'UPDATE'
+            'SCARR'
+            `SET CARRNAME = 'X'. WRITE sy-uname`
+            space
+      CHANGING generated_program.
+
+    cl_abap_unit_assert=>assert_initial(
+      act = generated_program
+      msg = 'User DML must not append a generated ABAP statement' ).
   ENDMETHOD.
 ENDCLASS.
