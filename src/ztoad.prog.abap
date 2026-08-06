@@ -2,7 +2,7 @@
 *& Program : ZTOAD
 *& Author  : S. Hermann
 *& Date    : 25.02.2022
-*& Version : 4.0.4 " x-release-please-version
+*& Version : 5.0.0 " x-release-please-version
 *& Required: Table ZTOAD
 *&---------------------------------------------------------------------*
 *& This program allow you to execute query directly on the server
