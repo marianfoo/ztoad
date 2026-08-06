@@ -813,7 +813,6 @@ CLASS lcl_sql_source_scanner IMPLEMENTATION.
     DATA in_single_quote TYPE abap_bool.
     DATA in_backtick TYPE abap_bool.
     DATA in_template TYPE abap_bool.
-    DATA in_comment TYPE abap_bool.
 
     CLEAR sources.
     CLEAR invalid.
@@ -821,14 +820,6 @@ CLASS lcl_sql_source_scanner IMPLEMENTATION.
 
     WHILE index < query_length.
       character = query+index(1).
-
-      IF in_comment = abap_true.
-        IF character = cl_abap_char_utilities=>newline.
-          CLEAR in_comment.
-        ENDIF.
-        index = index + 1.
-        CONTINUE.
-      ENDIF.
 
       IF in_single_quote = abap_true.
         IF character = ''''.
@@ -896,7 +887,10 @@ CLASS lcl_sql_source_scanner IMPLEMENTATION.
         WHEN '|'.
           in_template = abap_true.
         WHEN '"'.
-          in_comment = abap_true.
+* Generated source is wrapped at 255 characters. A comment could therefore
+* hide a source here and end before that source in the generated program.
+          invalid = abap_true.
+          RETURN.
         WHEN '('.
           IF expect_source = abap_true.
             source_parenthesized = abap_true.
@@ -5732,6 +5726,7 @@ CLASS ltc_query_parser DEFINITION FINAL
     METHODS accepts_authorized_subquery FOR TESTING.
     METHODS rejects_two_level_subquery FOR TESTING.
     METHODS ignores_literal_source_keyword FOR TESTING.
+    METHODS rejects_source_comment FOR TESTING.
     METHODS accepts_authorized_join FOR TESTING.
     METHODS rejects_unauthorized_union FOR TESTING.
     METHODS rejects_dynamic_source FOR TESTING.
@@ -6103,17 +6098,35 @@ CLASS ltc_query_parser IMPLEMENTATION.
 
   METHOD ignores_literal_source_keyword.
     DATA no_authority TYPE abap_bool.
+    DATA parse_error TYPE abap_bool.
 
     s_customize-auth_select = 'SCARR'.
 
     parse_select(
       EXPORTING
-        query = `SELECT carrid FROM scarr WHERE carrid = 'FROM SFLIGHT' " JOIN sflight`
-      IMPORTING no_authority = no_authority ).
+        query = `SELECT carrid FROM scarr WHERE carrid = 'FROM SFLIGHT'`
+      IMPORTING no_authority = no_authority
+                parse_error = parse_error ).
 
     cl_abap_unit_assert=>assert_initial(
       act = no_authority
-      msg = 'Keywords in literals or comments are not data sources' ).
+      msg = 'Keywords in literals are not data sources' ).
+    cl_abap_unit_assert=>assert_initial( act = parse_error ).
+  ENDMETHOD.
+
+  METHOD rejects_source_comment.
+    DATA parse_error TYPE abap_bool.
+
+    s_customize-auth_select = '*'.
+
+    parse_select(
+      EXPORTING
+        query = `SELECT carrid FROM scarr " source can resume after generated line wrapping`
+      IMPORTING parse_error = parse_error ).
+
+    cl_abap_unit_assert=>assert_true(
+      act = parse_error
+      msg = 'Comments must fail before generated-source line wrapping' ).
   ENDMETHOD.
 
   METHOD accepts_authorized_join.
