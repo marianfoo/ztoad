@@ -16,6 +16,7 @@ The default authorization object normally makes this path reachable to a user wh
 - Nested subqueries must not hide an additional source.
 - `FROM` or `JOIN` text inside string literals or string templates must not create false authorization checks. Comments must fail closed because generated-source line wrapping can change where a comment ends.
 - Dynamic data-source syntax and unsupported CTE syntax must fail closed because the physical source cannot be proven by this parser.
+- Path-expression and hierarchy sources must fail closed because authorizing their leading syntax token does not prove the physical repository source used by the full `FROM` grammar.
 - Existing simple sources, aliases, joins, subqueries, and per-branch UNION processing must remain usable when every source is authorized.
 
 ## Options evaluated
@@ -34,7 +35,7 @@ Deferred. A complete cross-release grammar belongs with the broader parser redes
 
 ### Add a quote-aware physical-source scanner with fail-closed comments
 
-Selected. A small pure local class scans the current SELECT branch character by character, ignores quoted content, and collects each token following `FROM` or `JOIN` at any nesting depth. The existing authorization check is then applied once per unique source. Parenthesized dynamic names, host-variable sources, comments, and `WITH`/CTE input fail closed. `QUERY_PROCESS` already parses and authorizes every UNION branch separately.
+Selected. A small pure local class scans the current SELECT branch character by character, ignores quoted content, and collects each token following `FROM` or `JOIN` at any nesting depth. The existing authorization check is then applied once per unique source. Parenthesized dynamic names, host-variable sources, comments, path expressions, hierarchy sources, and `WITH`/CTE input fail closed. `QUERY_PROCESS` already parses and authorizes every UNION branch separately.
 
 Comments are rejected rather than ignored. `QUERY_GENERATE` feeds each query fragment through `ADD_LINE_TO_TABLE`, which wraps generated ABAP source at 255 characters. An ABAP `"` comment that appears to hide the rest of one input string can therefore end at a generated line boundary and allow later text to resume as code. The authorization scanner cannot safely treat that text as permanently commented out.
 
@@ -44,7 +45,7 @@ This is intentionally an authorization scanner, not a claim that all other exter
 
 - Red: a restricted fallback policy allows `SCARR` but must reject `SFLIGHT` in a nested subquery; the old parser incorrectly accepts it.
 - Green: authorize nested sources when both match, reject a second nesting level, preserve an ordinary authorized join, and ignore `FROM`/`JOIN` inside a literal.
-- Fail closed: reject source comments, a parenthesized dynamic data source even under wildcard authorization, and unsupported `WITH` input before generation.
+- Fail closed: reject source comments, a parenthesized dynamic data source even under wildcard authorization, path-expression/hierarchy sources, and unsupported `WITH` input before generation.
 - Regression: retain all existing parser/generator/editor/DML tests and run the full live suite.
 
 No query is executed for security proof. The test exercises the parser boundary directly and the A4H browser smoke starts the transaction only.

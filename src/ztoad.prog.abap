@@ -861,7 +861,7 @@ CLASS lcl_sql_source_scanner IMPLEMENTATION.
         CONTINUE.
       ENDIF.
 
-      IF character CO 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789_/@+'.
+      IF character CO 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789_/@+\'.
         CONCATENATE token character INTO token IN CHARACTER MODE.
         index = index + 1.
         CONTINUE.
@@ -949,6 +949,8 @@ CLASS lcl_sql_source_scanner IMPLEMENTATION.
 
       IF upper_token(1) = '@'
       OR upper_token(1) = '+'
+      OR upper_token(1) = '\'
+      OR upper_token CP 'HIERARCHY*'
       OR strlen( upper_token ) > 30.
         invalid = abap_true.
         RETURN.
@@ -5727,6 +5729,8 @@ CLASS ltc_query_parser DEFINITION FINAL
     METHODS rejects_two_level_subquery FOR TESTING.
     METHODS ignores_literal_source_keyword FOR TESTING.
     METHODS rejects_source_comment FOR TESTING.
+    METHODS rejects_path_source FOR TESTING.
+    METHODS rejects_hierarchy_source FOR TESTING.
     METHODS accepts_authorized_join FOR TESTING.
     METHODS rejects_unauthorized_union FOR TESTING.
     METHODS rejects_dynamic_source FOR TESTING.
@@ -6127,6 +6131,34 @@ CLASS ltc_query_parser IMPLEMENTATION.
     cl_abap_unit_assert=>assert_true(
       act = parse_error
       msg = 'Comments must fail before generated-source line wrapping' ).
+  ENDMETHOD.
+
+  METHOD rejects_path_source.
+    DATA parse_error TYPE abap_bool.
+
+    s_customize-auth_select = '*'.
+
+    parse_select(
+      EXPORTING query = `SELECT * FROM \_association`
+      IMPORTING parse_error = parse_error ).
+
+    cl_abap_unit_assert=>assert_true(
+      act = parse_error
+      msg = 'Path-expression sources cannot be mapped to a physical object' ).
+  ENDMETHOD.
+
+  METHOD rejects_hierarchy_source.
+    DATA parse_error TYPE abap_bool.
+
+    s_customize-auth_select = '*'.
+
+    parse_select(
+      EXPORTING query = `SELECT * FROM HIERARCHY( SOURCE scarr )`
+      IMPORTING parse_error = parse_error ).
+
+    cl_abap_unit_assert=>assert_true(
+      act = parse_error
+      msg = 'Hierarchy sources must fail until their grammar is modeled' ).
   ENDMETHOD.
 
   METHOD accepts_authorized_join.
