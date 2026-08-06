@@ -15,7 +15,7 @@ concurrency:
 
 jobs:
   abaplint:
-    name: abaplint (ABAP 7.50)
+    name: Repository quality (ABAP 7.50)
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
@@ -31,5 +31,5 @@ jobs:
       - name: Install pinned dependencies
         run: npm ci
 
-      - name: Run local ABAP checks
+      - name: Run ABAP and repository-contract checks
         run: npm test

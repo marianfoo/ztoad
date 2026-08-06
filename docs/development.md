@@ -70,7 +70,7 @@ Do not manually install only the report source. That omits the dynpros, table, a
 4. Write and review a plan under `docs/plans/` covering implementation, ABAP 7.50, Clean ABAP/Clean Core, local/live tests, rollback, browser smoke, and ST22.
 5. Edit source locally and make the smallest production change that turns the test green. For a frontend or other environment-dependent assumption, keep the candidate classified as a spike until live integration evidence accepts it. Keep serializer XML unchanged for a source-only fix.
 6. Run `npm ci`, `npm test`, `git diff --check`, and the final local/security review.
-7. Deploy the exact candidate source to SAP_BASIS 750 first through ARC-1/ADT when its real dependencies exist; record any missing ADT prerequisite as blocked. Keep the A4H native-abapGit link on `master` and record an unmerged candidate as a direct deployment. Follow every write with an explicit activation call and active/inactive object-state comparison; a write response or activation option alone is not proof that the active version changed.
+7. Deploy the exact candidate source to SAP_BASIS 750 first through ARC-1/ADT when its real dependencies exist; record any missing ADT prerequisite as blocked. Keep the A4H native-abapGit link on `master` and record an unmerged candidate as a direct deployment. Follow every write with an explicit activation call, active/inactive main-object comparison, and an inactive-child-part query for affected composite objects; a write response, activation option, or equal main-source hash alone does not prove that screens, statuses, texts, and includes are active.
 8. On NPL, activate only the intended object and run active syntax, all ABAP Unit tests, and complete ATC variants through ARC-1. On A4H/SAP_BASIS 758, repeat those checks and additionally start a fresh browser session for safe smoke and ST22 delta. Verify required dynpros/GUI statuses before attributing an end-to-end failure to the source candidate.
 9. If a correction must be made in SAP, export it through native abapGit or reproduce it locally, then review every serialized/source difference. Never leave an unexported system-only fix.
 10. Perform a final review, update evidence, commit/push the short-lived branch, open the PR, and wait for CI. After the first green run, audit the process/CI, update guidance in the same PR, move the plan to `docs/plans/finished/`, push, and wait again.
@@ -89,10 +89,11 @@ For these changes:
 
 1. Create/change the object on the ABAP 7.50 development system when the object type exists there.
 2. Activate and run the relevant checks.
-3. Stage only the affected object in native abapGit and push it to the pull-request branch after its relevant checks are green.
-4. Pull locally and inspect every generated file.
-5. Run `npm test`.
-6. Deploy the same pull-request candidate into 2023 and validate deserialization/activation.
+3. Refresh native abapGit and review the complete diff before staging. If unrelated system/Git drift is present, record it and never use **Add All**.
+4. Select only the affected object, review the staged filenames, and push it to the pull-request branch after its relevant checks are green.
+5. Refresh again and require the intended object to be clean; unrelated unselected drift may remain only when it is explicitly documented.
+6. Pull locally, inspect every generated file, and run `npm test`.
+7. Deploy the same pull-request candidate into 2023 and validate deserialization, explicit activation, main-object state, and all affected inactive child parts.
 
 If an object can only be created correctly on 2023, export it there first, then prove that the serialized form can be pulled and activated on 7.50 before accepting it. Do not fix serializer XML by guesswork.
 

@@ -70,10 +70,10 @@ Do not use ports 50000 or 50001. Credentials stay in the ignored `.env` file and
 
 Run this sequence after deployment:
 
-1. Confirm native abapGit points at `master` and its check is clean.
-2. Confirm no unrelated inactive divergence and record the exact candidate commit/source hash being tested.
+1. Confirm native abapGit points at the expected coordinated branch, refresh it, and review the complete system/Git diff. For normal source work this is `master`; a structural-object feature branch must be explicit in the evidence.
+2. Confirm no unrelated inactive divergence and record the exact candidate commit/source hash being tested. If unrelated drift exists, leave it unselected and list it; never use **Add All**.
 3. Deploy and explicitly activate only the intended changed objects. Do not describe an unmerged directly deployed source as a native-abapGit `master` pull, and do not rely on a write request's activation option.
-4. Confirm active and inactive source are identical, then run active SAP syntax.
+4. Confirm active and inactive main source are identical, query inactive child parts for changed composite objects, then run active SAP syntax. Screens, GUI statuses, text elements, and includes must be checked separately; main-source equality does not clear an inactive child part.
 5. Run all ABAP Unit tests; require zero failures.
 6. Run the recorded ATC variants and inspect prerequisite/check errors. A result with missing prerequisites is incomplete even when no finding rows are displayed.
 7. Record the latest ST22 dump timestamp before UI execution.
