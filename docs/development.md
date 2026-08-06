@@ -25,7 +25,7 @@ The local repository and SAP systems must not diverge silently. Every system-sid
 Prerequisites:
 
 - Git
-- Node.js 18 or newer (CI uses Node.js 22)
+- Node.js 18 or newer (CI currently uses Node.js 24)
 - npm
 - Access to native abapGit in each test system
 - Optional but recommended: ARC-1 connections for both test systems, one server instance per SAP destination
@@ -49,7 +49,7 @@ Setup procedure:
 
 1. Open transaction `ZABAPGIT`.
 2. Create an online repository for `https://github.com/marianfoo/ztoad`.
-3. Select `master` for the initial installation and bind it to the chosen empty package.
+3. Select `master` for the initial installation and bind it to the chosen empty package. Keep this shared repository on `master` during normal source-only PR testing.
 4. Pull and activate all objects.
 5. Confirm that the repository status is clean.
 6. Run ZTOAD once with the read-only smoke query below.
@@ -60,24 +60,24 @@ On A4H, the Fiori-shell URL for the transaction is:
 
 Do not manually install only the report source. That omits the dynpros, table, and authorization object and cannot reproduce a supported installation.
 
-## 4. Local-first TDD flow on `master`
+## 4. Local-first TDD flow with a stable `master`
 
-The current maintainer decision is to stay on `master`. This works only with one owner per live package and with red/incomplete states kept local rather than pushed.
+`master` remains the only long-lived integration/release line and the normal branch of each shared native-abapGit link. Development uses a short-lived pull-request branch so CI and review can evaluate the candidate without placing an unreviewed state on `master`.
 
-1. Synchronize local `master`, select one finding ID, and confirm the target SAP repositories have no unrelated local differences.
-2. Reproduce the problem on the oldest available affected system and save a sanitized regression input.
-3. Add the smallest ABAP Unit or integration test that fails for the intended reason.
-4. Edit source locally and make the smallest production change that turns the test green. Keep serializer XML unchanged for a source-only fix.
-5. Run the full local suite with `npm test`.
-6. Deploy the local source to SAP_BASIS 750 first through the configured ARC-1 destination, or push/pull `master` through native abapGit only after the complete local state is green.
-7. Activate and run syntax, all ABAP Unit tests, the recorded ATC variants, a safe smoke test, and an ST22 delta check.
-8. Repeat step 6–7 on A4H/SAP_BASIS 758.
-9. If a correction must be made in SAP, stage only the intended objects in native abapGit, round-trip it to Git, and review the complete diff.
-10. Update the finding evidence, commit with a Conventional Commit subject, and push `master` only when all required gates are green or an unavailable gate is explicitly recorded.
+1. Synchronize local `master`, create `codex/<finding-id>`, select one finding, and confirm the target systems have no unrelated differences.
+2. Research and reproduce the problem on the oldest available affected system. Check fixture availability before making a spike permanent.
+3. Add the smallest test, replay the original production code, and record the intended red failure.
+4. Write and review a plan under `docs/plans/` covering implementation, ABAP 7.50, Clean ABAP/Clean Core, local/live tests, rollback, browser smoke, and ST22.
+5. Edit source locally and make the smallest production change that turns the test green. Keep serializer XML unchanged for a source-only fix.
+6. Run `npm ci`, `npm test`, `git diff --check`, and the final local/security review.
+7. Deploy the exact candidate source to SAP_BASIS 750 first through a controlled ARC-1/editor write when available; keep the shared native-abapGit link on `master` and record that the candidate is a direct deployment.
+8. Activate only the intended object and run active syntax, all ABAP Unit tests, complete ATC variants, safe smoke, and ST22 delta. Repeat on A4H/SAP_BASIS 758.
+9. If a correction must be made in SAP, export it through native abapGit or reproduce it locally, then review every serialized/source difference. Never leave an unexported system-only fix.
+10. Perform a final review, update evidence, commit/push the short-lived branch, open the PR, and wait for CI. After the first green run, audit the process/CI, update guidance in the same PR, move the plan to `docs/plans/finished/`, push, and wait again.
 
 Always test 7.50 first when the destination is available. A change that uses newer syntax may appear correct on 2023 yet be impossible to deserialize or activate on the compatibility floor. Until the 7.50 ARC-1 profile is configured, this is a recorded missing gate rather than a pass.
 
-If concurrent development becomes necessary, move to short-lived branches and pull requests. Native abapGit branch switching changes the real objects in the system, and abapGit Flow remains beta, so neither is enabled by default now.
+Native abapGit branch switching changes real system objects, and abapGit Flow remains beta. Do not use either casually in the shared package. Structural-object PRs may require a dedicated package/system or an explicitly coordinated temporary branch procedure.
 
 ## 5. Structural object changes
 
@@ -87,10 +87,10 @@ For these changes:
 
 1. Create/change the object on the ABAP 7.50 development system when the object type exists there.
 2. Activate and run the relevant checks.
-3. Stage only the affected object in native abapGit and push it to `master` only after its relevant checks are green.
+3. Stage only the affected object in native abapGit and push it to the pull-request branch after its relevant checks are green.
 4. Pull locally and inspect every generated file.
 5. Run `npm test`.
-6. Pull the same `master` state into 2023 and validate deserialization/activation.
+6. Deploy the same pull-request candidate into 2023 and validate deserialization/activation.
 
 If an object can only be created correctly on 2023, export it there first, then prove that the serialized form can be pulled and activated on 7.50 before accepting it. Do not fix serializer XML by guesswork.
 
@@ -118,12 +118,14 @@ CLASS ltc_query_parser DEFINITION
 ENDCLASS.
 ```
 
-The baseline now contains 14 live-passing characterization tests across `LTC_QUERY_PARSER`, `LTC_LINE_SPLITTER`, and `LTC_COMMAND_PARSER`. The next regression corpus should cover the existing open parser reports:
+The baseline now contains 17 live-passing characterization tests across `LTC_QUERY_PARSER`, `LTC_QUERY_GENERATOR`, `LTC_LINE_SPLITTER`, and `LTC_COMMAND_PARSER`. The next regression corpus should cover the existing open parser reports:
 
 - aggregate functions around `CASE` (issue #7)
 - SQL string functions such as `SUBSTRING` and `CONCAT` (issue #4)
 - placement of `INTO TABLE` after `HAVING`/`ORDER BY` in strict SQL mode (issue #6)
 - comments, quoted dots, aliases, joins, unions, old syntax, and 7.50 new syntax
+
+Ordinary reports cannot use a separate native test include. Keep report-local tests with the legacy code until a cohesive area is extracted to a global class; abapGit can then serialize the class test include separately. See [the packaging research](research/2026-08-06-abap-unit-test-packaging.md).
 
 ABAP Unit tests should be `HARMLESS` and `SHORT`. Tests that alter persistent data are integration tests and need a disposable Z table, a dedicated user/role, and explicit cleanup.
 
@@ -135,7 +137,7 @@ Run these checks for the complete ZTOAD object set on both systems:
 2. All imported objects activate.
 3. SAP syntax check passes for program `ZTOAD`.
 4. ABAP Unit passes with no skipped relevant tests.
-5. ATC passes with the recorded project variants and no new unapproved findings. On A4H, `S4HANA_READINESS_2023` currently reports 0 findings; `ABAP_CLOUD_READINESS` reports 758 architectural findings and is an information/burn-down signal, not a zero baseline.
+5. ATC completes with the recorded project variants and has no new unapproved finding. The latest A4H `S4HANA_READINESS_2023` browser run displayed no finding rows but was incomplete because seven prerequisite checks are unavailable. The latest `ABAP_CLOUD_READINESS` run reported 767 architectural findings (466 P1, 301 P2); it is an information/burn-down signal, not a zero gate. The older 758 count remains historical baseline evidence, not a substitute for a complete current run.
 6. Manual read-only smoke tests pass.
 7. Authorization-negative tests confirm that unauthorized tables/activities remain blocked.
 8. ST22 and, when relevant, Gateway/system logs contain no new errors from the test.
@@ -165,6 +167,8 @@ Then exercise the parser feature being changed with a sanitized query and verify
 
 The current A4H WebGUI smoke is not green: startup dumps in `CL_GUI_ABAPEDIT=>CONSTRUCTOR` (`BASE-RUN-001`). Do not report browser E2E as passed until that finding is fixed and the post-run ST22 check is clean.
 
+Use `npm run lint:quality` to reproduce the non-blocking full default-rule inventory. Its current 1,857 findings are reduced through [the active zero-findings plan](plans/abaplint-zero-findings.md); only promote `npm run lint:quality -- --strict` to required CI after it is green.
+
 ## 8. Security review for every parser/execution change
 
 ZTOAD accepts dynamic ABAP SQL from a user, generates executable code, and can support DML/native SQL. A functional parser fix can therefore change an authorization boundary.
@@ -190,7 +194,7 @@ Release Please runs on pushes to `master` and reads Conventional Commit messages
 - the annotated version in `README.md`
 - the annotated version comment in `src/ztoad.prog.abap`
 
-When a `fix:` or `feat:` change reaches `master`, Release Please opens or updates one release PR. Review its version and changelog, let Quality pass, and merge it to create the unprefixed SemVer tag and GitHub Release. The action intentionally uses the repository `GITHUB_TOKEN` by default; see [setup-evaluation.md](setup-evaluation.md) before switching to a PAT or GitHub App token.
+When a `fix:` or `feat:` change reaches `master`, Release Please opens or updates one release PR. Review its version and changelog, let Quality pass, and merge it to create the unprefixed SemVer tag and GitHub Release. The action intentionally uses the repository `GITHUB_TOKEN` by default. GitHub places the resulting pull-request Quality workflow in an approval-required state; a maintainer must approve that run and wait for green CI. See [setup-evaluation.md](setup-evaluation.md) before switching to a GitHub App or fine-grained PAT for unattended triggering.
 
 ## 10. Primary references
 
@@ -206,3 +210,4 @@ When a `fix:` or `feat:` change reaches `master`, Release Please opens or update
 - [abaplint local setup](https://github.com/abaplint/abaplint/blob/main/docs/getting_started.md)
 - [Release Please Action](https://github.com/googleapis/release-please-action)
 - [Release Please manifest configuration](https://github.com/googleapis/release-please/blob/main/docs/manifest-releaser.md)
+- [GitHub `GITHUB_TOKEN` workflow-trigger behavior](https://docs.github.com/en/actions/concepts/security/github_token#when-github_token-triggers-workflow-runs)

@@ -2258,17 +2258,15 @@ FORM query_generate  USING    fw_select TYPE string
                   INTO lw_select SEPARATED BY space.
     ENDIF.
     c lw_select.
-    IF fw_newsyntax = abap_true.
-      c 'INTO TABLE @t_result'.                             "#EC NOTEXT
-    ELSE.
+* Keep legacy INTO and UP TO before FROM for compatibility.
+    IF fw_newsyntax IS INITIAL.
       c 'INTO TABLE t_result'.                              "#EC NOTEXT
-    ENDIF.
 
-* Add UP TO xxx ROWS
-    IF NOT fw_rows IS INITIAL.
-      c 'UP TO'.                                            "#EC NOTEXT
-      c fw_rows.
-      c 'ROWS'.                                             "#EC NOTEXT
+      IF NOT fw_rows IS INITIAL.
+        c 'UP TO'.                                          "#EC NOTEXT
+        c fw_rows.
+        c 'ROWS'.                                           "#EC NOTEXT
+      ENDIF.
     ENDIF.
   ENDIF.
 
@@ -2278,6 +2276,17 @@ FORM query_generate  USING    fw_select TYPE string
 * Where, group by, having, order by
   IF NOT fw_where IS INITIAL.
     c fw_where.
+  ENDIF.
+
+* New-syntax table queries can activate strict ABAP SQL. Use its valid
+* clause order: INTO follows the data-source clauses, then UP TO.
+  IF fw_newsyntax = abap_true AND fw_count IS INITIAL.
+    c 'INTO TABLE @t_result'.                               "#EC NOTEXT
+    IF NOT fw_rows IS INITIAL.
+      c 'UP TO'.                                            "#EC NOTEXT
+      c fw_rows.
+      c 'ROWS'.                                             "#EC NOTEXT
+    ENDIF.
   ENDIF.
   c '.'.
 
@@ -5339,6 +5348,148 @@ CLASS ltc_query_parser IMPLEMENTATION.
       act = parse_error
       exp = abap_true
       msg = 'SELECT without FROM must be rejected' ).
+  ENDMETHOD.
+ENDCLASS.
+
+
+CLASS ltc_query_generator DEFINITION FINAL
+  FOR TESTING
+  DURATION SHORT
+  RISK LEVEL HARMLESS.
+  PRIVATE SECTION.
+    TYPES ty_rows TYPE n LENGTH 6.
+
+    DATA saved_customize LIKE s_customize.
+
+    METHODS setup.
+    METHODS teardown.
+    METHODS generates_strict_aggregate FOR TESTING.
+    METHODS keeps_escaped_count_valid FOR TESTING.
+    METHODS keeps_legacy_select_valid FOR TESTING.
+
+    METHODS generate_query
+      IMPORTING query TYPE string
+      EXPORTING generated_program TYPE sy-repid
+                new_syntax TYPE abap_bool
+                count_query TYPE abap_bool.
+ENDCLASS.
+
+CLASS ltc_query_generator IMPLEMENTATION.
+  METHOD setup.
+    saved_customize = s_customize.
+    CLEAR s_customize-auth_object.
+    s_customize-auth_select = '*'.
+    s_customize-default_rows = 100.
+  ENDMETHOD.
+
+  METHOD teardown.
+    s_customize = saved_customize.
+  ENDMETHOD.
+
+  METHOD generate_query.
+    DATA select_part TYPE string.
+    DATA from_part TYPE string.
+    DATA tail_part TYPE string.
+    DATA union_part TYPE string.
+    DATA rows TYPE ty_rows.
+    DATA no_authority TYPE abap_bool.
+    DATA parse_error TYPE abap_bool.
+    DATA field_list TYPE ty_fieldlist_table.
+
+    PERFORM query_parse USING query
+                        CHANGING select_part
+                                 from_part
+                                 tail_part
+                                 union_part
+                                 rows
+                                 no_authority
+                                 new_syntax
+                                 parse_error.
+
+    cl_abap_unit_assert=>assert_initial( act = no_authority ).
+    cl_abap_unit_assert=>assert_initial( act = parse_error ).
+
+    PERFORM query_generate USING select_part
+                                 from_part
+                                 tail_part
+                                 space
+                                 new_syntax
+                           CHANGING generated_program
+                                    rows
+                                    field_list
+                                    count_query.
+  ENDMETHOD.
+
+  METHOD generates_strict_aggregate.
+    DATA generated_program TYPE sy-repid.
+    DATA new_syntax TYPE abap_bool.
+    DATA count_query TYPE abap_bool.
+
+    generate_query(
+      EXPORTING
+        query = `SELECT DISTINCT DATATYPE, COUNT( FIELDNAME ) AS CNT_FIELDNAME, MAX( TABNAME ) AS MAX_TABNAME`
+             && ` FROM DD03L WHERE TABNAME IS NOT NULL AND TABNAME <> ''`
+             && ` AND TABNAME LIKE 'Z%' AND AS4LOCAL = 'A' GROUP BY DATATYPE`
+             && ` HAVING COUNT( FIELDNAME ) > 1 ORDER BY DATATYPE`
+      IMPORTING
+        generated_program = generated_program
+        new_syntax = new_syntax
+        count_query = count_query ).
+
+    cl_abap_unit_assert=>assert_equals(
+      act = new_syntax
+      exp = abap_true
+      msg = 'Comma syntax must activate strict ABAP SQL generation' ).
+    cl_abap_unit_assert=>assert_initial(
+      act = count_query
+      msg = 'Aggregate select list must use the table-result path' ).
+
+    cl_abap_unit_assert=>assert_not_initial(
+      act = generated_program
+      msg = 'Strict aggregate query must produce a valid subroutine pool' ).
+  ENDMETHOD.
+
+  METHOD keeps_escaped_count_valid.
+    DATA generated_program TYPE sy-repid.
+    DATA new_syntax TYPE abap_bool.
+    DATA count_query TYPE abap_bool.
+
+    generate_query(
+      EXPORTING query = 'SELECT COUNT( * ) FROM DD03L INTO @DATA(result)'
+      IMPORTING generated_program = generated_program
+                new_syntax = new_syntax
+                count_query = count_query ).
+
+    cl_abap_unit_assert=>assert_equals(
+      act = new_syntax
+      exp = abap_true
+      msg = 'Escaped target must activate strict ABAP SQL generation' ).
+    cl_abap_unit_assert=>assert_equals(
+      act = count_query
+      exp = abap_true
+      msg = 'COUNT-only query must use the scalar-result path' ).
+    cl_abap_unit_assert=>assert_not_initial(
+      act = generated_program
+      msg = 'Escaped COUNT query must produce a valid subroutine pool' ).
+  ENDMETHOD.
+
+  METHOD keeps_legacy_select_valid.
+    DATA generated_program TYPE sy-repid.
+    DATA new_syntax TYPE abap_bool.
+    DATA count_query TYPE abap_bool.
+
+    generate_query(
+      EXPORTING query = 'SELECT FIELDNAME FROM DD03L'
+      IMPORTING generated_program = generated_program
+                new_syntax = new_syntax
+                count_query = count_query ).
+
+    cl_abap_unit_assert=>assert_initial(
+      act = new_syntax
+      msg = 'Space-separated select list must remain on the legacy path' ).
+    cl_abap_unit_assert=>assert_not_initial(
+      act = generated_program
+      msg = 'Legacy SELECT query must remain valid' ).
   ENDMETHOD.
 ENDCLASS.
 

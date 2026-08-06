@@ -2,6 +2,7 @@ node_modules/
 coverage/
 .DS_Store
 *.log
+.abaplint-quality-*.json
 
 # Never commit local SAP or ARC-1 credentials.
 .env
