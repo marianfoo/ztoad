@@ -2309,13 +2309,13 @@ FORM query_generate  USING    fw_select TYPE string
          lw_word(30),
          ls_fieldlist        TYPE ty_fieldlist,
          lw_strlen_string    TYPE string,
-         lw_explicit         TYPE string,
-         lw_security_input   TYPE string.
+         lw_explicit         TYPE string.
+  DATA security_input TYPE string.
 
   CLEAR fw_program.
   CONCATENATE 'SELECT' fw_select 'FROM' fw_from fw_where
-              INTO lw_security_input SEPARATED BY space.
-  IF lcl_query_input_validator=>is_safe( lw_security_input ) = abap_false.
+              INTO security_input SEPARATED BY space.
+  IF lcl_query_input_validator=>is_safe( security_input ) = abap_false.
     MESSAGE 'Cannot parse the query'(m07)
             TYPE c_msg_success DISPLAY LIKE c_msg_error.
     RETURN.
@@ -3884,13 +3884,13 @@ FORM query_generate_noselect  USING    fw_command TYPE string
          lw_wait_name(1)     TYPE c,
          lw_char(1)          TYPE c,
          lw_started(1)       TYPE c,
-         lw_started_field(1) TYPE c,
-         lw_security_input   TYPE string.
+         lw_started_field(1) TYPE c.
+  DATA security_input TYPE string.
 
   CLEAR fw_program.
   CONCATENATE fw_command fw_table fw_param
-              INTO lw_security_input SEPARATED BY space.
-  IF lcl_query_input_validator=>is_safe( lw_security_input ) = abap_false.
+              INTO security_input SEPARATED BY space.
+  IF lcl_query_input_validator=>is_safe( security_input ) = abap_false.
     MESSAGE 'Cannot parse the query'(m07)
             TYPE c_msg_success DISPLAY LIKE c_msg_error.
     RETURN.
