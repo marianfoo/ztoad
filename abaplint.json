@@ -1,0 +1,39 @@
+{
+  "$schema": "https://raw.githubusercontent.com/abaplint/abaplint/main/packages/config/schema.json",
+  "global": {
+    "files": "/src/**/*.*",
+    "skipGeneratedFunctionGroups": true
+  },
+  "dependencies": [
+    {
+      "url": "https://github.com/abaplint/deps",
+      "folder": "/deps",
+      "files": "/src/**/*.*"
+    }
+  ],
+  "syntax": {
+    "version": {
+      "release": "v762",
+      "language": "Normal"
+    },
+    "errorNamespace": "^(Z|Y|LCL_|LIF_|LTC_|TY_)"
+  },
+  "rules": {
+    "add_test_attributes": true,
+    "begin_end_names": true,
+    "cds_parser_error": true,
+    "check_ddic": true,
+    "check_include": true,
+    "check_syntax": true,
+    "global_class": true,
+    "identical_form_names": true,
+    "implement_methods": true,
+    "line_break_style": true,
+    "local_testclass_consistency": true,
+    "method_implemented_twice": true,
+    "parser_error": true,
+    "superclass_final": true,
+    "unknown_types": true,
+    "xml_consistency": true
+  }
+}

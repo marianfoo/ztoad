@@ -2,7 +2,7 @@
 *& Program : ZTOAD
 *& Author  : S. Hermann
 *& Date    : 25.02.2022
-*& Version : 4.0.3
+*& Version : 4.0.4 " x-release-please-version
 *& Required: Table ZTOAD
 *&---------------------------------------------------------------------*
 *& This program allow you to execute query directly on the server
@@ -5024,3 +5024,487 @@ FORM SET_STATUS_010 .
     ENDIF.
   ENDLOOP.
 ENDFORM.                    " SET_STATUS_010
+
+
+*######################################################################*
+*
+*                         ABAP UNIT TESTS
+*
+*######################################################################*
+" These characterization tests intentionally exercise the existing FORM
+" boundaries. They keep the legacy parser stable while its implementation
+" is moved behind testable classes incrementally.
+CLASS ltc_query_parser DEFINITION FINAL
+  FOR TESTING
+  DURATION SHORT
+  RISK LEVEL HARMLESS.
+  PRIVATE SECTION.
+    TYPES ty_rows TYPE n LENGTH 6.
+
+    DATA saved_customize LIKE s_customize.
+
+    METHODS setup.
+    METHODS teardown.
+    METHODS parses_simple_select FOR TESTING.
+    METHODS honors_explicit_limit FOR TESTING.
+    METHODS zero_limit_means_unlimited FOR TESTING.
+    METHODS keeps_tail_clauses FOR TESTING.
+    METHODS separates_union FOR TESTING.
+    METHODS detects_comma_syntax FOR TESTING.
+    METHODS strips_into_target FOR TESTING.
+    METHODS rejects_missing_from FOR TESTING.
+
+    METHODS parse_select
+      IMPORTING query TYPE string
+      EXPORTING select_part TYPE string
+                from_part TYPE string
+                tail_part TYPE string
+                union_part TYPE string
+                rows TYPE ty_rows
+                no_authority TYPE abap_bool
+                new_syntax TYPE abap_bool
+                parse_error TYPE abap_bool.
+ENDCLASS.
+
+CLASS ltc_query_parser IMPLEMENTATION.
+  METHOD setup.
+    saved_customize = s_customize.
+    CLEAR s_customize-auth_object.
+    s_customize-auth_select = '*'.
+    s_customize-default_rows = 100.
+  ENDMETHOD.
+
+  METHOD teardown.
+    s_customize = saved_customize.
+  ENDMETHOD.
+
+  METHOD parse_select.
+    PERFORM query_parse USING query
+                        CHANGING select_part
+                                 from_part
+                                 tail_part
+                                 union_part
+                                 rows
+                                 no_authority
+                                 new_syntax
+                                 parse_error.
+  ENDMETHOD.
+
+  METHOD parses_simple_select.
+    DATA select_part TYPE string.
+    DATA from_part TYPE string.
+    DATA tail_part TYPE string.
+    DATA union_part TYPE string.
+    DATA rows TYPE ty_rows.
+    DATA expected_rows TYPE ty_rows.
+    DATA no_authority TYPE abap_bool.
+    DATA new_syntax TYPE abap_bool.
+    DATA parse_error TYPE abap_bool.
+
+    expected_rows = 100.
+
+    parse_select(
+      EXPORTING query = 'SELECT carrid FROM scarr'
+      IMPORTING select_part = select_part
+                from_part = from_part
+                tail_part = tail_part
+                union_part = union_part
+                rows = rows
+                no_authority = no_authority
+                new_syntax = new_syntax
+                parse_error = parse_error ).
+
+    cl_abap_unit_assert=>assert_equals(
+      act = select_part
+      exp = 'carrid'
+      msg = 'SELECT list must be preserved' ).
+    cl_abap_unit_assert=>assert_equals(
+      act = from_part
+      exp = 'scarr'
+      msg = 'FROM source must be preserved' ).
+    cl_abap_unit_assert=>assert_equals(
+      act = rows
+      exp = expected_rows
+      msg = 'Default row limit must be applied' ).
+    cl_abap_unit_assert=>assert_initial( act = tail_part ).
+    cl_abap_unit_assert=>assert_initial( act = union_part ).
+    cl_abap_unit_assert=>assert_initial( act = no_authority ).
+    cl_abap_unit_assert=>assert_initial( act = new_syntax ).
+    cl_abap_unit_assert=>assert_initial( act = parse_error ).
+  ENDMETHOD.
+
+  METHOD honors_explicit_limit.
+    DATA select_part TYPE string.
+    DATA from_part TYPE string.
+    DATA tail_part TYPE string.
+    DATA union_part TYPE string.
+    DATA rows TYPE ty_rows.
+    DATA expected_rows TYPE ty_rows.
+    DATA no_authority TYPE abap_bool.
+    DATA new_syntax TYPE abap_bool.
+    DATA parse_error TYPE abap_bool.
+
+    expected_rows = 25.
+
+    parse_select(
+      EXPORTING query = 'SELECT carrid FROM scarr UP TO 25 ROWS'
+      IMPORTING select_part = select_part
+                from_part = from_part
+                tail_part = tail_part
+                union_part = union_part
+                rows = rows
+                no_authority = no_authority
+                new_syntax = new_syntax
+                parse_error = parse_error ).
+
+    CONDENSE from_part.
+    cl_abap_unit_assert=>assert_equals(
+      act = rows
+      exp = expected_rows
+      msg = 'Explicit row limit must override the default' ).
+    cl_abap_unit_assert=>assert_equals(
+      act = from_part
+      exp = 'scarr'
+      msg = 'UP TO clause must be removed before generation' ).
+  ENDMETHOD.
+
+  METHOD zero_limit_means_unlimited.
+    DATA select_part TYPE string.
+    DATA from_part TYPE string.
+    DATA tail_part TYPE string.
+    DATA union_part TYPE string.
+    DATA rows TYPE ty_rows.
+    DATA no_authority TYPE abap_bool.
+    DATA new_syntax TYPE abap_bool.
+    DATA parse_error TYPE abap_bool.
+
+    parse_select(
+      EXPORTING query = 'SELECT carrid FROM scarr UP TO 0 ROWS'
+      IMPORTING select_part = select_part
+                from_part = from_part
+                tail_part = tail_part
+                union_part = union_part
+                rows = rows
+                no_authority = no_authority
+                new_syntax = new_syntax
+                parse_error = parse_error ).
+
+    cl_abap_unit_assert=>assert_initial(
+      act = rows
+      msg = 'UP TO 0 ROWS intentionally disables the generated limit' ).
+  ENDMETHOD.
+
+  METHOD keeps_tail_clauses.
+    DATA select_part TYPE string.
+    DATA from_part TYPE string.
+    DATA tail_part TYPE string.
+    DATA union_part TYPE string.
+    DATA rows TYPE ty_rows.
+    DATA no_authority TYPE abap_bool.
+    DATA new_syntax TYPE abap_bool.
+    DATA parse_error TYPE abap_bool.
+
+    parse_select(
+      EXPORTING
+        query = `SELECT carrid COUNT( * ) FROM sflight WHERE connid > '0' GROUP BY carrid HAVING COUNT( * ) > 1 ORDER BY carrid`
+      IMPORTING select_part = select_part
+                from_part = from_part
+                tail_part = tail_part
+                union_part = union_part
+                rows = rows
+                no_authority = no_authority
+                new_syntax = new_syntax
+                parse_error = parse_error ).
+
+    cl_abap_unit_assert=>assert_equals(
+      act = tail_part
+      exp = ` WHERE connid > '0' GROUP BY carrid HAVING COUNT( * ) > 1 ORDER BY carrid`
+      msg = 'WHERE through ORDER BY must remain in one ordered tail' ).
+  ENDMETHOD.
+
+  METHOD separates_union.
+    DATA select_part TYPE string.
+    DATA from_part TYPE string.
+    DATA tail_part TYPE string.
+    DATA union_part TYPE string.
+    DATA rows TYPE ty_rows.
+    DATA no_authority TYPE abap_bool.
+    DATA new_syntax TYPE abap_bool.
+    DATA parse_error TYPE abap_bool.
+
+    parse_select(
+      EXPORTING
+        query = 'SELECT carrid FROM scarr UNION SELECT carrid FROM sflight'
+      IMPORTING select_part = select_part
+                from_part = from_part
+                tail_part = tail_part
+                union_part = union_part
+                rows = rows
+                no_authority = no_authority
+                new_syntax = new_syntax
+                parse_error = parse_error ).
+
+    cl_abap_unit_assert=>assert_equals(
+      act = union_part
+      exp = 'SELECT carrid FROM sflight'
+      msg = 'UNION remainder must be returned for the next parse pass' ).
+    cl_abap_unit_assert=>assert_equals(
+      act = from_part
+      exp = 'scarr'
+      msg = 'First UNION branch must remain intact' ).
+  ENDMETHOD.
+
+  METHOD detects_comma_syntax.
+    DATA select_part TYPE string.
+    DATA from_part TYPE string.
+    DATA tail_part TYPE string.
+    DATA union_part TYPE string.
+    DATA rows TYPE ty_rows.
+    DATA no_authority TYPE abap_bool.
+    DATA new_syntax TYPE abap_bool.
+    DATA parse_error TYPE abap_bool.
+
+    parse_select(
+      EXPORTING query = 'SELECT carrid, connid FROM sflight'
+      IMPORTING select_part = select_part
+                from_part = from_part
+                tail_part = tail_part
+                union_part = union_part
+                rows = rows
+                no_authority = no_authority
+                new_syntax = new_syntax
+                parse_error = parse_error ).
+
+    cl_abap_unit_assert=>assert_equals(
+      act = new_syntax
+      exp = abap_true
+      msg = 'Comma-separated SELECT list must select new syntax' ).
+  ENDMETHOD.
+
+  METHOD strips_into_target.
+    DATA select_part TYPE string.
+    DATA from_part TYPE string.
+    DATA tail_part TYPE string.
+    DATA union_part TYPE string.
+    DATA rows TYPE ty_rows.
+    DATA no_authority TYPE abap_bool.
+    DATA new_syntax TYPE abap_bool.
+    DATA parse_error TYPE abap_bool.
+
+    parse_select(
+      EXPORTING
+        query = 'SELECT carrid FROM scarr INTO TABLE @DATA(result)'
+      IMPORTING select_part = select_part
+                from_part = from_part
+                tail_part = tail_part
+                union_part = union_part
+                rows = rows
+                no_authority = no_authority
+                new_syntax = new_syntax
+                parse_error = parse_error ).
+
+    CONDENSE from_part.
+    cl_abap_unit_assert=>assert_equals(
+      act = from_part
+      exp = 'scarr'
+      msg = 'Caller-provided INTO target must be stripped' ).
+    cl_abap_unit_assert=>assert_equals(
+      act = new_syntax
+      exp = abap_true
+      msg = 'Escaped INTO target must select new syntax' ).
+  ENDMETHOD.
+
+  METHOD rejects_missing_from.
+    DATA select_part TYPE string.
+    DATA from_part TYPE string.
+    DATA tail_part TYPE string.
+    DATA union_part TYPE string.
+    DATA rows TYPE ty_rows.
+    DATA no_authority TYPE abap_bool.
+    DATA new_syntax TYPE abap_bool.
+    DATA parse_error TYPE abap_bool.
+
+    parse_select(
+      EXPORTING query = 'SELECT carrid'
+      IMPORTING select_part = select_part
+                from_part = from_part
+                tail_part = tail_part
+                union_part = union_part
+                rows = rows
+                no_authority = no_authority
+                new_syntax = new_syntax
+                parse_error = parse_error ).
+
+    cl_abap_unit_assert=>assert_equals(
+      act = parse_error
+      exp = abap_true
+      msg = 'SELECT without FROM must be rejected' ).
+  ENDMETHOD.
+ENDCLASS.
+
+
+CLASS ltc_line_splitter DEFINITION FINAL
+  FOR TESTING
+  DURATION SHORT
+  RISK LEVEL HARMLESS.
+  PRIVATE SECTION.
+    METHODS keeps_short_line FOR TESTING.
+    METHODS keeps_255_char_boundary FOR TESTING.
+    METHODS splits_long_line FOR TESTING.
+ENDCLASS.
+
+CLASS ltc_line_splitter IMPLEMENTATION.
+  METHOD keeps_short_line.
+    DATA line TYPE string.
+    DATA lines TYPE STANDARD TABLE OF string.
+
+    line = 'SELECT carrid FROM scarr'.
+
+    PERFORM add_line_to_table USING line CHANGING lines.
+
+    cl_abap_unit_assert=>assert_equals(
+      act = lines
+      exp = VALUE string_table( ( `SELECT carrid FROM scarr` ) )
+      msg = 'A short generated-code line must remain unchanged' ).
+  ENDMETHOD.
+
+  METHOD keeps_255_char_boundary.
+    DATA line TYPE string.
+    DATA lines TYPE STANDARD TABLE OF string.
+    DATA index TYPE i.
+
+    DO c_line_max TIMES.
+      line = line && 'A'.
+    ENDDO.
+
+    PERFORM add_line_to_table USING line CHANGING lines.
+
+    cl_abap_unit_assert=>assert_equals(
+      act = lines( lines )
+      exp = 1
+      msg = 'A 255-character line must not be split' ).
+    READ TABLE lines INDEX 1 INTO line.
+    index = strlen( line ).
+    cl_abap_unit_assert=>assert_equals(
+      act = index
+      exp = c_line_max
+      msg = 'Boundary line length must be preserved' ).
+  ENDMETHOD.
+
+  METHOD splits_long_line.
+    DATA line TYPE string.
+    DATA lines TYPE STANDARD TABLE OF string.
+    DATA first_line TYPE string.
+    DATA second_line TYPE string.
+    DATA index TYPE i.
+
+    DO 260 TIMES.
+      line = line && 'A'.
+    ENDDO.
+    line = line && ' BBB'.
+
+    PERFORM add_line_to_table USING line CHANGING lines.
+
+    cl_abap_unit_assert=>assert_equals(
+      act = lines( lines )
+      exp = 2
+      msg = 'Long generated-code line must be split' ).
+    READ TABLE lines INDEX 1 INTO first_line.
+    READ TABLE lines INDEX 2 INTO second_line.
+    index = strlen( first_line ).
+    cl_abap_unit_assert=>assert_equals(
+      act = index
+      exp = c_line_max
+      msg = 'First segment must use the safe maximum' ).
+    cl_abap_unit_assert=>assert_equals(
+      act = second_line
+      exp = 'AAAAA BBB'
+      msg = 'Remaining text must be preserved exactly' ).
+  ENDMETHOD.
+ENDCLASS.
+
+
+CLASS ltc_command_parser DEFINITION FINAL
+  FOR TESTING
+  DURATION SHORT
+  RISK LEVEL HARMLESS.
+  PRIVATE SECTION.
+    DATA saved_customize LIKE s_customize.
+
+    METHODS setup.
+    METHODS teardown.
+    METHODS parses_update FOR TESTING.
+    METHODS accepts_delete_from FOR TESTING.
+    METHODS prepares_native_sql FOR TESTING.
+ENDCLASS.
+
+CLASS ltc_command_parser IMPLEMENTATION.
+  METHOD setup.
+    saved_customize = s_customize.
+    CLEAR s_customize-auth_object.
+    s_customize-auth_insert = '*'.
+    s_customize-auth_update = '*'.
+    s_customize-auth_delete = '*'.
+    s_customize-auth_native = abap_true.
+  ENDMETHOD.
+
+  METHOD teardown.
+    s_customize = saved_customize.
+  ENDMETHOD.
+
+  METHOD parses_update.
+    DATA no_authority TYPE abap_bool.
+    DATA command TYPE string.
+    DATA table TYPE string.
+    DATA parameters TYPE string.
+
+    PERFORM query_parse_noselect
+      USING `UPDATE ztable SET field = 'X'`
+      CHANGING no_authority command table parameters.
+
+    cl_abap_unit_assert=>assert_equals( act = command exp = 'UPDATE' ).
+    cl_abap_unit_assert=>assert_equals( act = table exp = 'ZTABLE' ).
+    cl_abap_unit_assert=>assert_equals(
+      act = parameters
+      exp = `SET field = 'X'` ).
+    cl_abap_unit_assert=>assert_initial( act = no_authority ).
+  ENDMETHOD.
+
+  METHOD accepts_delete_from.
+    DATA no_authority TYPE abap_bool.
+    DATA command TYPE string.
+    DATA table TYPE string.
+    DATA parameters TYPE string.
+
+    PERFORM query_parse_noselect
+      USING `DELETE FROM ztable WHERE field = 'X'`
+      CHANGING no_authority command table parameters.
+
+    cl_abap_unit_assert=>assert_equals( act = command exp = 'DELETE' ).
+    cl_abap_unit_assert=>assert_equals( act = table exp = 'ZTABLE' ).
+    cl_abap_unit_assert=>assert_equals(
+      act = parameters
+      exp = `WHERE field = 'X'` ).
+    cl_abap_unit_assert=>assert_initial( act = no_authority ).
+  ENDMETHOD.
+
+  METHOD prepares_native_sql.
+    DATA no_authority TYPE abap_bool.
+    DATA command TYPE string.
+    DATA table TYPE string.
+    DATA parameters TYPE string.
+
+    PERFORM query_parse_noselect
+      USING `NATIVE DROP INDEX 'ZTEST_INDEX'`
+      CHANGING no_authority command table parameters.
+
+    cl_abap_unit_assert=>assert_equals(
+      act = command
+      exp = c_native_command ).
+    cl_abap_unit_assert=>assert_equals(
+      act = parameters
+      exp = 'DROP INDEX "ZTEST_INDEX"'
+      msg = 'Native SQL quotes must be converted for the kernel call' ).
+    cl_abap_unit_assert=>assert_initial( act = no_authority ).
+  ENDMETHOD.
+ENDCLASS.

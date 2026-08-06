@@ -1,0 +1,90 @@
+name: Bug report
+description: Report reproducible incorrect behavior in ZTOAD
+title: "fix: "
+labels:
+  - bug
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Remove business data, credentials, hostnames, and other secrets before submitting.
+
+  - type: input
+    id: ztoad-version
+    attributes:
+      label: ZTOAD version or commit
+      placeholder: "4.0.4 or commit SHA"
+    validations:
+      required: true
+
+  - type: input
+    id: sap-release
+    attributes:
+      label: SAP release
+      description: Include SAP_BASIS release and support package when known.
+      placeholder: "SAP_BASIS 750 SPxx / S/4HANA 2023"
+    validations:
+      required: true
+
+  - type: input
+    id: database
+    attributes:
+      label: Database
+      placeholder: "SAP HANA 2.0, ASE, ..."
+
+  - type: textarea
+    id: query
+    attributes:
+      label: Minimal query or action
+      description: Use standard demo tables or anonymized identifiers and values.
+      render: abap
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+    validations:
+      required: true
+
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behavior and exact error
+    validations:
+      required: true
+
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Reproduction steps
+      placeholder: "1. Open ZTOAD\n2. ..."
+    validations:
+      required: true
+
+  - type: dropdown
+    id: systems
+    attributes:
+      label: Reproduced on
+      multiple: true
+      options:
+        - ABAP 7.50 test system
+        - S/4HANA 2023 test system
+        - Another system
+    validations:
+      required: true
+
+  - type: textarea
+    id: diagnostics
+    attributes:
+      label: Diagnostics
+      description: Add sanitized screenshots, dumps, ATC findings, or generated-code output.
+
+  - type: checkboxes
+    id: safety
+    attributes:
+      label: Data safety
+      options:
+        - label: I removed credentials, personal data, and confidential business data.
+          required: true

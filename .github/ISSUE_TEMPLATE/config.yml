@@ -1,0 +1,5 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Security vulnerability
+    url: https://github.com/marianfoo/ztoad/security/advisories/new
+    about: Report vulnerabilities privately. Do not include production data or credentials in a public issue.
