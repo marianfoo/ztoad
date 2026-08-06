@@ -8,6 +8,8 @@ ZTOAD does not pass a dynamic token to one fixed ABAP SQL statement. `QUERY_GENE
 
 For example, the SELECT tail `WHERE CARRID = 'LH'. WRITE sy-uname` closes the generated SELECT with the injected period. ZTOAD's own final period then closes `WRITE`, producing a valid generated program. The same boundary exists in UPDATE/DELETE parameter text. This can extend SQL input into arbitrary ABAP statements executed under the current user.
 
+`EDITOR_GET_QUERY` currently treats a top-level period as a query separator and normally removes it before parsing. That reduces direct reachability of this exact payload from the current editor, and this research does not claim that the demonstrated string is an end-to-end UI exploit today. It is not a sufficient sink-side security invariant: the generator FORMs accept the fragment, parser/selection behavior is already tracked as defective, and any alternate/internal caller or future parser correction would expose valid injected ABAP. The durable control belongs at the generator boundary that can actually create executable source.
+
 The existing parser removes a caller-provided `INTO` target before generation and intentionally accepts SQL expressions and literals. The security boundary therefore belongs immediately before generated source is created, after safe parser normalization but before any fragment is emitted.
 
 ## Security contract
@@ -15,6 +17,7 @@ The existing parser removes a caller-provided `INTO` target before generation an
 - Parser output may describe one intended ABAP SQL statement only; it must not terminate that statement or introduce ABAP comments, host references, chained statements, string templates, or another source-language construct.
 - Ordinary identifiers, aliases, SQL functions, parentheses, comparisons, arithmetic, wildcards, namespace slashes, and single-quoted SQL literals remain usable.
 - A period is accepted only inside a single-quoted literal or between two digits in a decimal literal. A minus sign is accepted only for a numeric literal, not as an unescaped ABAP host-component selector such as `sy-uname`.
+- ABAP SQL type namespaces such as `abap.dec` currently fail closed. Safely preserving them requires grammar-aware recognition of a CAST type position; accepting any apparent `ABAP.<word>` sequence would weaken the statement-terminator invariant.
 - Single-quoted literals must be balanced and doubled quotes remain valid.
 - SELECT and generated INSERT/UPDATE/DELETE use the same validator at the last pre-generation boundary. Native SQL is outside this generated-program path and remains the independent `BASE-SEC-002` finding.
 - Table-source authorization completeness remains the independent `BASE-SEC-003` finding. The validator prevents transition from SQL text into ABAP source; it does not invent a field-level authorization policy that ZTOAD does not have.
@@ -41,6 +44,7 @@ Selected. A pure local validator recognizes the small set of characters required
 
 - Red: prove the original SELECT and UPDATE generators both create a subroutine pool from a payload that closes the SQL statement and appends `WRITE sy-uname`; do not execute either generated pool.
 - Green: reject statement terminators, comments, host escapes, unbalanced quotes, backtick/template literals, chained-statement punctuation, and `sy-...` host-component syntax.
+- Adversarial: reject an `AS ABAP.WRITE ...` lookalike so a namespace-shaped token cannot reintroduce a general period exception.
 - Preserve: simple SELECT, joins, aggregates, comparisons, decimal and negative numeric literals, namespace names, doubled single quotes, SQL wildcard/multiplication, and parser-stripped caller `INTO` syntax.
 - Regression: run the complete local and A4H suite; no malicious SQL or generated pool is executed.
 

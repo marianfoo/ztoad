@@ -411,6 +411,26 @@ CLASS lcl_editor_configuration DEFINITION FINAL.
 ENDCLASS.
 
 *----------------------------------------------------------------------*
+*       CLASS lcl_query_input_validator DEFINITION
+*----------------------------------------------------------------------*
+*       Keep external SQL fragments inside generated SQL statements
+*----------------------------------------------------------------------*
+CLASS lcl_query_input_validator DEFINITION FINAL.
+  PUBLIC SECTION.
+    CLASS-METHODS is_safe
+      IMPORTING fragment TYPE string
+      RETURNING VALUE(safe) TYPE abap_bool.
+
+  PRIVATE SECTION.
+    CLASS-METHODS is_digit
+      IMPORTING character TYPE c
+      RETURNING VALUE(result) TYPE abap_bool.
+    CLASS-METHODS is_whitespace
+      IMPORTING character TYPE c
+      RETURNING VALUE(result) TYPE abap_bool.
+ENDCLASS.
+
+*----------------------------------------------------------------------*
 *       CLASS lcl_editor DEFINITION
 *----------------------------------------------------------------------*
 *       Common API for the desktop source editor and WebGUI text editor
@@ -519,6 +539,118 @@ CLASS lcl_editor_configuration IMPLEMENTATION.
     ELSE.
       r_editor_type = 'ABAP'.
     ENDIF.
+  ENDMETHOD.
+ENDCLASS.
+
+CLASS lcl_query_input_validator IMPLEMENTATION.
+  METHOD is_safe.
+    DATA index TYPE i.
+    DATA fragment_length TYPE i.
+    DATA previous_index TYPE i.
+    DATA next_index TYPE i.
+    DATA character TYPE c LENGTH 1.
+    DATA previous_character TYPE c LENGTH 1.
+    DATA next_character TYPE c LENGTH 1.
+    DATA in_literal TYPE abap_bool.
+
+    safe = abap_false.
+    fragment_length = strlen( fragment ).
+    IF fragment_length = 0.
+      RETURN.
+    ENDIF.
+
+    WHILE index < fragment_length.
+      character = fragment+index(1).
+
+      IF in_literal = abap_true.
+        IF character = ''''.
+          next_index = index + 1.
+          IF next_index < fragment_length.
+            next_character = fragment+next_index(1).
+            IF next_character = ''''.
+              index = index + 2.
+              CONTINUE.
+            ENDIF.
+          ENDIF.
+          CLEAR in_literal.
+        ENDIF.
+        index = index + 1.
+        CONTINUE.
+      ENDIF.
+
+      IF character = ''''.
+        in_literal = abap_true.
+        index = index + 1.
+        CONTINUE.
+      ENDIF.
+
+      IF is_whitespace( character ) = abap_true
+      OR character CO 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789_ /~(),=<>+*%&!$'.
+        index = index + 1.
+        CONTINUE.
+      ENDIF.
+
+      IF character = '.'.
+        previous_index = index - 1.
+        next_index = index + 1.
+        IF previous_index >= 0 AND next_index < fragment_length.
+          previous_character = fragment+previous_index(1).
+          next_character = fragment+next_index(1).
+          IF is_digit( previous_character ) = abap_true
+          AND is_digit( next_character ) = abap_true.
+            index = index + 1.
+            CONTINUE.
+          ENDIF.
+        ENDIF.
+        RETURN.
+      ENDIF.
+
+      IF character = '-'.
+        next_index = index + 1.
+        IF next_index >= fragment_length.
+          RETURN.
+        ENDIF.
+        next_character = fragment+next_index(1).
+        IF index > 0.
+          previous_index = index - 1.
+          previous_character = fragment+previous_index(1).
+          IF is_whitespace( previous_character ) = abap_true
+          AND is_whitespace( next_character ) = abap_true.
+            index = index + 1.
+            CONTINUE.
+          ENDIF.
+        ENDIF.
+        IF is_digit( next_character ) = abap_false.
+          RETURN.
+        ENDIF.
+        IF index > 0.
+          previous_index = index - 1.
+          previous_character = fragment+previous_index(1).
+          IF is_whitespace( previous_character ) = abap_false
+          AND previous_character NA '(,=<>+-*/'.
+            RETURN.
+          ENDIF.
+        ENDIF.
+        index = index + 1.
+        CONTINUE.
+      ENDIF.
+
+      RETURN.
+    ENDWHILE.
+
+    safe = xsdbool( in_literal = abap_false ).
+  ENDMETHOD.
+
+  METHOD is_digit.
+    result = xsdbool( character CO '0123456789' ).
+  ENDMETHOD.
+
+  METHOD is_whitespace.
+    result = xsdbool(
+      character = space
+      OR character = cl_abap_char_utilities=>horizontal_tab
+      OR character = cl_abap_char_utilities=>newline
+      OR character = cl_abap_char_utilities=>cr_lf(1) ).
   ENDMETHOD.
 ENDCLASS.
 
@@ -1597,6 +1729,9 @@ FORM query_process USING fw_display TYPE c
       PERFORM query_generate_noselect USING lw_command lw_from
                                             lw_where fw_display
                                       CHANGING lw_program.
+      IF lw_program IS INITIAL.
+        RETURN.
+      ENDIF.
       w_run = w_run + 1.
     ELSE.
       MESSAGE 'No more run available. Please restart program'(m50)
@@ -2174,7 +2309,17 @@ FORM query_generate  USING    fw_select TYPE string
          lw_word(30),
          ls_fieldlist        TYPE ty_fieldlist,
          lw_strlen_string    TYPE string,
-         lw_explicit         TYPE string.
+         lw_explicit         TYPE string,
+         lw_security_input   TYPE string.
+
+  CLEAR fw_program.
+  CONCATENATE 'SELECT' fw_select 'FROM' fw_from fw_where
+              INTO lw_security_input SEPARATED BY space.
+  IF lcl_query_input_validator=>is_safe( lw_security_input ) = abap_false.
+    MESSAGE 'Cannot parse the query'(m07)
+            TYPE c_msg_success DISPLAY LIKE c_msg_error.
+    RETURN.
+  ENDIF.
 
   DEFINE c.
     lw_strlen_string = &1.
@@ -3739,7 +3884,17 @@ FORM query_generate_noselect  USING    fw_command TYPE string
          lw_wait_name(1)     TYPE c,
          lw_char(1)          TYPE c,
          lw_started(1)       TYPE c,
-         lw_started_field(1) TYPE c.
+         lw_started_field(1) TYPE c,
+         lw_security_input   TYPE string.
+
+  CLEAR fw_program.
+  CONCATENATE fw_command fw_table fw_param
+              INTO lw_security_input SEPARATED BY space.
+  IF lcl_query_input_validator=>is_safe( lw_security_input ) = abap_false.
+    MESSAGE 'Cannot parse the query'(m07)
+            TYPE c_msg_success DISPLAY LIKE c_msg_error.
+    RETURN.
+  ENDIF.
 
   DEFINE c.
     lw_strlen_string = &1.
@@ -5586,6 +5741,104 @@ CLASS ltc_query_parser IMPLEMENTATION.
 ENDCLASS.
 
 
+CLASS ltc_query_input_validator DEFINITION FINAL
+  FOR TESTING
+  DURATION SHORT
+  RISK LEVEL HARMLESS.
+  PRIVATE SECTION.
+    METHODS accepts_common_sql FOR TESTING.
+    METHODS accepts_literal_metacharacters FOR TESTING.
+    METHODS accepts_doubled_quote FOR TESTING.
+    METHODS rejects_statement_terminator FOR TESTING.
+    METHODS rejects_source_comment FOR TESTING.
+    METHODS rejects_host_escape FOR TESTING.
+    METHODS rejects_host_component FOR TESTING.
+    METHODS rejects_unbalanced_literal FOR TESTING.
+    METHODS rejects_backtick_literal FOR TESTING.
+    METHODS rejects_string_template FOR TESTING.
+    METHODS rejects_chained_statement FOR TESTING.
+    METHODS rejects_namespace_like_period FOR TESTING.
+ENDCLASS.
+
+CLASS ltc_query_input_validator IMPLEMENTATION.
+  METHOD accepts_common_sql.
+    cl_abap_unit_assert=>assert_true(
+      act = lcl_query_input_validator=>is_safe(
+        `SELECT /DMO/TRAVEL~TRAVEL_ID, TOTAL_PRICE, COUNT( * )`
+        && ` FROM /DMO/TRAVEL WHERE TOTAL_PRICE - TAX >= -1.25` )
+      msg = 'Common SQL identifiers, functions, and numbers must remain valid' ).
+  ENDMETHOD.
+
+  METHOD accepts_literal_metacharacters.
+    cl_abap_unit_assert=>assert_true(
+      act = lcl_query_input_validator=>is_safe(
+        `WHERE TEXT = 'A.B@C:"|;:-'` )
+      msg = 'Source metacharacters inside a SQL literal are data' ).
+  ENDMETHOD.
+
+  METHOD accepts_doubled_quote.
+    cl_abap_unit_assert=>assert_true(
+      act = lcl_query_input_validator=>is_safe(
+        `WHERE CITY = 'O''HARE'` )
+      msg = 'Doubled SQL quotes must remain valid' ).
+  ENDMETHOD.
+
+  METHOD rejects_statement_terminator.
+    cl_abap_unit_assert=>assert_false(
+      act = lcl_query_input_validator=>is_safe(
+        `WHERE CARRID = 'LH'. WRITE sy-uname` ) ).
+  ENDMETHOD.
+
+  METHOD rejects_source_comment.
+    cl_abap_unit_assert=>assert_false(
+      act = lcl_query_input_validator=>is_safe(
+        `WHERE CARRID = 'LH' " comment` ) ).
+  ENDMETHOD.
+
+  METHOD rejects_host_escape.
+    cl_abap_unit_assert=>assert_false(
+      act = lcl_query_input_validator=>is_safe(
+        `WHERE CARRID = @sy-uname` ) ).
+  ENDMETHOD.
+
+  METHOD rejects_host_component.
+    cl_abap_unit_assert=>assert_false(
+      act = lcl_query_input_validator=>is_safe(
+        `WHERE CARRID = sy-uname` ) ).
+  ENDMETHOD.
+
+  METHOD rejects_unbalanced_literal.
+    cl_abap_unit_assert=>assert_false(
+      act = lcl_query_input_validator=>is_safe(
+        `WHERE CARRID = 'LH` ) ).
+  ENDMETHOD.
+
+  METHOD rejects_backtick_literal.
+    cl_abap_unit_assert=>assert_false(
+      act = lcl_query_input_validator=>is_safe(
+        'WHERE TEXT = `unsafe`' ) ).
+  ENDMETHOD.
+
+  METHOD rejects_string_template.
+    cl_abap_unit_assert=>assert_false(
+      act = lcl_query_input_validator=>is_safe(
+        'WHERE TEXT = |unsafe|' ) ).
+  ENDMETHOD.
+
+  METHOD rejects_chained_statement.
+    cl_abap_unit_assert=>assert_false(
+      act = lcl_query_input_validator=>is_safe(
+        `UPDATE SCARR SET CARRNAME = 'X': WRITE sy-uname` ) ).
+  ENDMETHOD.
+
+  METHOD rejects_namespace_like_period.
+    cl_abap_unit_assert=>assert_false(
+      act = lcl_query_input_validator=>is_safe(
+        `SELECT CARRID AS ABAP.WRITE sy-uname FROM SCARR` ) ).
+  ENDMETHOD.
+ENDCLASS.
+
+
 CLASS ltc_query_generator DEFINITION FINAL
   FOR TESTING
   DURATION SHORT
@@ -5841,6 +6094,7 @@ CLASS ltc_command_parser DEFINITION FINAL
     METHODS rejects_native_sql_by_default FOR TESTING.
     METHODS cannot_reenable_native_sql FOR TESTING.
     METHODS rejects_dml_injection FOR TESTING.
+    METHODS keeps_valid_dml_generation FOR TESTING.
 ENDCLASS.
 
 CLASS ltc_command_parser IMPLEMENTATION.
@@ -5946,5 +6200,20 @@ CLASS ltc_command_parser IMPLEMENTATION.
     cl_abap_unit_assert=>assert_initial(
       act = generated_program
       msg = 'User DML must not append a generated ABAP statement' ).
+  ENDMETHOD.
+
+  METHOD keeps_valid_dml_generation.
+    DATA generated_program TYPE sy-repid.
+
+    PERFORM query_generate_noselect
+      USING 'UPDATE'
+            'SCARR'
+            `SET CARRNAME = 'Test carrier' WHERE CARRID = 'ZZ'`
+            space
+      CHANGING generated_program.
+
+    cl_abap_unit_assert=>assert_not_initial(
+      act = generated_program
+      msg = 'A valid authorized DML fragment must still generate safely' ).
   ENDMETHOD.
 ENDCLASS.

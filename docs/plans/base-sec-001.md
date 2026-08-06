@@ -9,9 +9,9 @@ Prevent parser output from escaping the intended SQL statement and becoming addi
 ## Patch contract
 
 - Vulnerable path: editor input → procedural parser fragments → `QUERY_GENERATE` / `QUERY_GENERATE_NOSELECT` → `SYNTAX-CHECK FOR` → `GENERATE SUBROUTINE POOL` → later execution.
-- Attacker prerequisite: ability to submit a ZTOAD SELECT or authorized DML command.
+- Attacker prerequisite: a crafted fragment reaching either generator. The current editor usually strips a top-level period, so exact end-to-end UI reachability is reduced but not accepted as the generator's security boundary.
 - Invariant: every emitted user-derived fragment remains inside one intended ABAP SQL statement; source terminators/comments/host references and unsupported literal forms fail before generation.
-- Preserved behavior: common SELECT/DML syntax, SQL identifiers/functions/operators, single-quoted and decimal/negative literals, parser-stripped `INTO`, SAP_BASIS 750 syntax, and existing authorization decisions.
+- Preserved behavior: covered SELECT/DML syntax, SQL identifiers/functions/operators, single-quoted and decimal/negative literals, parser-stripped `INTO`, SAP_BASIS 750 syntax, and existing authorization decisions. ABAP type namespaces fail closed until they can be recognized in a grammar-aware CAST position.
 - Out of scope: native SQL retirement (`BASE-SEC-002`), nested-source authorization (`BASE-SEC-003`), complete SQL grammar/parser redesign, and adding a new per-column authorization model.
 
 ## Reviewed sequence
@@ -31,7 +31,7 @@ Prevent parser output from escaping the intended SQL statement and becoming addi
 
 - The failing regressions exercise the real generator boundary and prove exploitability without executing injected code or touching data.
 - Validation after parsing preserves the safe removal of caller-provided `INTO` targets and avoids treating characters inside SQL literals as ABAP source.
-- A positive character policy is easier to audit than an ABAP-keyword deny list. Explicit decimal/minus rules preserve common numeric predicates without allowing a general statement terminator or `sy-uname` form.
+- A positive character policy is easier to audit than an ABAP-keyword deny list. Explicit decimal/minus rules preserve common numeric predicates without allowing a general statement terminator or `sy-uname` form; an adversarial `ABAP.<word>` lookalike remains rejected rather than creating a context-free period exception.
 - Guarding both generators avoids a SELECT-only fix while leaving native SQL wholly owned by SEC-002.
 - The local class is cohesive and pure; replacing the generic pool architecture remains a later structural change.
 
