@@ -15,7 +15,7 @@ Use each tool for the part it can represent faithfully:
 | abaplint | Fast local parsing, 7.50 syntax floor, and XML consistency | No; local preflight only |
 | ARC-1 | System discovery, dependency reads, object state, syntax, ABAP Unit, ATC, and controlled targeted writes | Authoritative for the connected live system |
 | ARC-1 source mirror | Searchable read-only snapshot | No; it does not contain all abapGit metadata |
-| ABAP 7.50 system | Minimum-release compile/runtime gate | Yes, for 7.50 behavior |
+| ABAP 7.50 NPL | ADT-only minimum-release activation, syntax, Unit, and ATC gate | Yes, when ZTOAD's real DDIC dependency is installed |
 | S/4HANA 2023 system | Current-platform compile/runtime gate | Yes, for 2023 behavior |
 
 The local repository and SAP systems must not diverge silently. Every system-side correction is exported through native abapGit and reviewed as a Git diff.
@@ -39,9 +39,9 @@ npm test
 
 `@abaplint/cli` is pinned exactly because the project does not claim semantic-version compatibility. The config uses abaplint's canonical release `v762`, which maps to on-premise SAP_BASIS 750. The initial rule set deliberately concentrates on parsing, syntax, type resolution, includes, method consistency, line endings, and abapGit XML consistency. It creates a zero-warning baseline for this legacy report. Add stricter rules only with the refactoring that resolves their existing findings.
 
-## 3. Native abapGit setup on each SAP system
+## 3. Native abapGit setup on the complete-object test system
 
-Use a separate native-abapGit repository link in each test system. The repository already declares `/src/` as its starting folder and `PREFIX` folder logic, so the root package name may differ per system.
+Use native abapGit on A4H for complete object round trips. The repository already declares `/src/` as its starting folder and `PREFIX` folder logic, so the root package name may differ per system. NPL is deliberately ARC-1/ADT-only: do not use its FLP, WebGUI, SAP GUI, or browser automation.
 
 For an isolated sandbox with no transport requirement, use a local package such as `$ZTOAD`. For a shared/transportable test package, use a customer package selected by the system owner and record its transport layer. A4H now uses transportable package `ZTOAD`, layer `ZDEV`, and request `A4HK906379`. Do not create a second clone in the same system: ABAP object names are system-global, so two ZTOAD work states cannot coexist under different packages.
 
@@ -65,19 +65,21 @@ Do not manually install only the report source. That omits the dynpros, table, a
 `master` remains the only long-lived integration/release line and the normal branch of each shared native-abapGit link. Development uses a short-lived pull-request branch so CI and review can evaluate the candidate without placing an unreviewed state on `master`.
 
 1. Synchronize local `master`, create `codex/<finding-id>`, select one finding, and confirm the target systems have no unrelated differences.
-2. Research and reproduce the problem on the oldest available affected system. Check fixture availability before making a spike permanent.
+2. Research and reproduce the problem on the oldest available affected system. Check fixture and serialized UI-metadata availability before making a spike permanent.
 3. Add the smallest test, replay the original production code, and record the intended red failure.
 4. Write and review a plan under `docs/plans/` covering implementation, ABAP 7.50, Clean ABAP/Clean Core, local/live tests, rollback, browser smoke, and ST22.
-5. Edit source locally and make the smallest production change that turns the test green. Keep serializer XML unchanged for a source-only fix.
+5. Edit source locally and make the smallest production change that turns the test green. For a frontend or other environment-dependent assumption, keep the candidate classified as a spike until live integration evidence accepts it. Keep serializer XML unchanged for a source-only fix.
 6. Run `npm ci`, `npm test`, `git diff --check`, and the final local/security review.
-7. Deploy the exact candidate source to SAP_BASIS 750 first through a controlled ARC-1/editor write when available; keep the shared native-abapGit link on `master` and record that the candidate is a direct deployment.
-8. Activate only the intended object and run active syntax, all ABAP Unit tests, complete ATC variants, safe smoke, and ST22 delta. Repeat on A4H/SAP_BASIS 758.
+7. Deploy the exact candidate source to SAP_BASIS 750 first through ARC-1/ADT when its real dependencies exist; record any missing ADT prerequisite as blocked. Keep the A4H native-abapGit link on `master` and record an unmerged candidate as a direct deployment. Follow every write with an explicit activation call and active/inactive object-state comparison; a write response or activation option alone is not proof that the active version changed.
+8. On NPL, activate only the intended object and run active syntax, all ABAP Unit tests, and complete ATC variants through ARC-1. On A4H/SAP_BASIS 758, repeat those checks and additionally start a fresh browser session for safe smoke and ST22 delta. Verify required dynpros/GUI statuses before attributing an end-to-end failure to the source candidate.
 9. If a correction must be made in SAP, export it through native abapGit or reproduce it locally, then review every serialized/source difference. Never leave an unexported system-only fix.
 10. Perform a final review, update evidence, commit/push the short-lived branch, open the PR, and wait for CI. After the first green run, audit the process/CI, update guidance in the same PR, move the plan to `docs/plans/finished/`, push, and wait again.
 
-Always test 7.50 first when the destination is available. A change that uses newer syntax may appear correct on 2023 yet be impossible to deserialize or activate on the compatibility floor. Until the 7.50 ARC-1 profile is configured, this is a recorded missing gate rather than a pass.
+Always test 7.50 first when the destination and the candidate's real dependencies are available. A change that uses newer syntax may appear correct on 2023 yet be impossible to activate on the compatibility floor. The `arc-1-750` profile and ADT lifecycle are configured and proven; exact ZTOAD validation remains blocked while transparent table `ZTOAD` is absent because SAP_BASIS 750 cannot create transparent tables over ADT. See [the NPL dossier](research/2026-08-06-npl-adt-only-validation.md).
 
 Native abapGit branch switching changes real system objects, and abapGit Flow remains beta. Do not use either casually in the shared package. Structural-object PRs may require a dedicated package/system or an explicitly coordinated temporary branch procedure.
+
+If ARC-1's pre-write linter reports an incorrect ABAP release, do not weaken all write checks. After the pinned repository abaplint gate passes, disable only the mis-profiled local lint request, retain server preflight, activate explicitly, and run SAP syntax/Unit/ATC/object-state checks. Track the tool mismatch separately from the product change.
 
 ## 5. Structural object changes
 
@@ -118,7 +120,7 @@ CLASS ltc_query_parser DEFINITION
 ENDCLASS.
 ```
 
-The baseline now contains 17 live-passing characterization tests across `LTC_QUERY_PARSER`, `LTC_QUERY_GENERATOR`, `LTC_LINE_SPLITTER`, and `LTC_COMMAND_PARSER`. The next regression corpus should cover the existing open parser reports:
+The baseline now contains 19 live-passing tests across `LTC_QUERY_PARSER`, `LTC_QUERY_GENERATOR`, `LTC_LINE_SPLITTER`, `LTC_COMMAND_PARSER`, and `LTCL_EDITOR_CONFIGURATION`. The next regression corpus should cover the existing open parser reports:
 
 - aggregate functions around `CASE` (issue #7)
 - SQL string functions such as `SUBSTRING` and `CONCAT` (issue #4)
@@ -137,8 +139,8 @@ Run these checks for the complete ZTOAD object set on both systems:
 2. All imported objects activate.
 3. SAP syntax check passes for program `ZTOAD`.
 4. ABAP Unit passes with no skipped relevant tests.
-5. ATC completes with the recorded project variants and has no new unapproved finding. The latest A4H `S4HANA_READINESS_2023` browser run displayed no finding rows but was incomplete because seven prerequisite checks are unavailable. The latest `ABAP_CLOUD_READINESS` run reported 767 architectural findings (466 P1, 301 P2); it is an information/burn-down signal, not a zero gate. The older 758 count remains historical baseline evidence, not a substitute for a complete current run.
-6. Manual read-only smoke tests pass.
+5. ATC completes with the recorded project variants and has no new unapproved finding. The latest A4H `S4HANA_READINESS_2023` run returned no finding rows but was incomplete because seven prerequisite checks are unavailable. The latest `ABAP_CLOUD_READINESS` run reported 768 architectural findings (463 P1, 305 P2); it is an information/burn-down signal, not a zero gate.
+6. Manual read-only browser smoke tests pass on A4H; NPL UI smoke is not applicable by maintainer direction.
 7. Authorization-negative tests confirm that unauthorized tables/activities remain blocked.
 8. ST22 and, when relevant, Gateway/system logs contain no new errors from the test.
 
@@ -165,9 +167,9 @@ SELECT SINGLE mandt FROM t000
 
 Then exercise the parser feature being changed with a sanitized query and verify both the generated source and result. Never use INSERT, UPDATE, DELETE, or native SQL against SAP/business tables for smoke testing. Such tests are permitted only against an isolated disposable Z table with explicit authorization.
 
-The current A4H WebGUI smoke is not green: startup dumps in `CL_GUI_ABAPEDIT=>CONSTRUCTOR` (`BASE-RUN-001`). Do not report browser E2E as passed until that finding is fixed and the post-run ST22 check is clean.
+`BASE-RUN-001` is fixed at the editor boundary: a fresh A4H WebGUI launch renders the fallback editor, accepts the sanitized query, and creates no new ST22 dump. Full query execution is still not green because the current A4H installation lacks GUI status `STATUS010` (`BASE-BUG-007`). Keep product behavior failures separate from incomplete system metadata, and never run this browser protocol on NPL.
 
-Use `npm run lint:quality` to reproduce the non-blocking full default-rule inventory. Its current 1,857 findings are reduced through [the active zero-findings plan](plans/abaplint-zero-findings.md); only promote `npm run lint:quality -- --strict` to required CI after it is green.
+Use `npm run lint:quality` to reproduce the non-blocking full default-rule inventory. `master` has 1,857 findings; the BASE-RUN-001 candidate has 1,878, with 19 adapter-API naming diagnostics plus 2 classic-exception diagnostics needed to preserve the legacy Control Framework `sy-subrc` contract. The raw defaults contain conflicting prefix/no-prefix naming rules, so the strict profile must resolve that configuration conflict explicitly while the raw inventory remains visible. Continue the [active zero-findings plan](plans/abaplint-zero-findings.md); only promote the resolved strict command to required CI after it is green.
 
 ## 8. Security review for every parser/execution change
 

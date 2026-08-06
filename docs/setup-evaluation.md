@@ -21,7 +21,7 @@ _Prepared 2026-08-06 from repository inspection, open GitHub issues, SAP Docs MC
 
 ### 1. Exact ATC variant on ABAP 7.50
 
-A4H currently has an incomplete `S4HANA_READINESS_2023` browser run: no finding rows were displayed, but seven prerequisite checks are unavailable. `ABAP_CLOUD_READINESS` currently reports 767 findings (466 P1, 301 P2). The recorded 758 result remains historical baseline evidence. The Cloud variant proves the classic report is not ABAP Cloud compatible and is retained as an architectural burn-down signal, not a zero gate.
+A4H currently has an incomplete `S4HANA_READINESS_2023` run: no finding rows were returned, but seven prerequisite checks are unavailable. On the BASE-RUN-001 candidate, `ABAP_CLOUD_READINESS` reports 768 findings (463 P1, 305 P2). Earlier 758/767 results remain historical evidence. The Cloud variant proves the classic report is not ABAP Cloud compatible and is retained as an architectural burn-down signal, not a zero gate.
 
 The matching SAP_BASIS 750 variant remains open because that destination is not configured. Recommendation: inventory the available 7.50 variants, select the closest effective security/performance/syntax set, and document differences rather than assuming identical names mean identical checks.
 
@@ -95,4 +95,4 @@ The pinned local default inventory is 1,857 findings across 57 rules. `npm run l
 | #2 Transaction code | Requires a serialized `TRAN` object, not only source. | Create it in SAP, export through native abapGit, and validate on both systems. |
 | #5 Manual installation | Source-only copying is incomplete because the report has dynpros/table/auth metadata. | Native-abapGit installation is now verified; document the WebGUI startup defect separately from installation. |
 
-The setup also discovered `BASE-RUN-001`: WebGUI/FLP startup dumps in `CL_GUI_ABAPEDIT`. See [baseline-findings.md](baseline-findings.md) for the complete ordered register and evidence. No existing GitHub issue was closed and no production bug fix was made during baseline characterization.
+The setup also discovered `BASE-RUN-001`: WebGUI startup dumped in `CL_GUI_ABAPEDIT`. The later BASE-RUN-001 candidate fixes editor startup/render/input without a new ST22 dump; full query dispatch is independently blocked by missing installed GUI status `STATUS010` (`BASE-BUG-007`). See [baseline-findings.md](baseline-findings.md) for the complete ordered register and current evidence. No existing GitHub issue was closed during the original baseline characterization.
