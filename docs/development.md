@@ -73,13 +73,15 @@ Do not manually install only the report source. That omits the dynpros, table, a
 7. Deploy the exact candidate source to SAP_BASIS 750 first through ARC-1/ADT when its real dependencies exist; record any missing ADT prerequisite as blocked. Keep the A4H native-abapGit link on `master` and record an unmerged candidate as a direct deployment. Follow every write with an explicit activation call, active/inactive main-object comparison, and an inactive-child-part query for affected composite objects; a write response, activation option, or equal main-source hash alone does not prove that screens, statuses, texts, and includes are active.
 8. On NPL, activate only the intended object and run active syntax, all ABAP Unit tests, and complete ATC variants through ARC-1. On A4H/SAP_BASIS 758, repeat those checks and additionally start a fresh browser session for safe smoke and ST22 delta. Verify required dynpros/GUI statuses before attributing an end-to-end failure to the source candidate.
 9. If a correction must be made in SAP, export it through native abapGit or reproduce it locally, then review every serialized/source difference. Never leave an unexported system-only fix.
-10. Perform a final review, update evidence, commit/push the short-lived branch, open the PR, and wait for CI. After the first green run, audit the process/CI, update guidance in the same PR, move the plan to `docs/plans/finished/`, push, and wait again.
+10. Perform a final review, update evidence, commit/push the short-lived branch, open the PR, and wait for CI. After the first green run, audit the process/CI, update guidance in the same PR, move the plan to `docs/plans/finished/`, push, and wait again. After maintainer acceptance, use GitHub's squash merge so the PR lands as one Conventional Commit even though its branch preserves red/green/audit history.
 
 Always test 7.50 first when the destination and the candidate's real dependencies are available. A change that uses newer syntax may appear correct on 2023 yet be impossible to activate on the compatibility floor. The `arc-1-750` profile and ADT lifecycle are configured and proven; exact ZTOAD validation remains blocked while transparent table `ZTOAD` is absent because SAP_BASIS 750 cannot create transparent tables over ADT. See [the NPL dossier](research/2026-08-06-npl-adt-only-validation.md).
 
 Native abapGit branch switching changes real system objects, and abapGit Flow remains beta. Do not use either casually in the shared package. Structural-object PRs may require a dedicated package/system or an explicitly coordinated temporary branch procedure.
 
 If ARC-1's pre-write linter reports an incorrect ABAP release, do not weaken all write checks. After the pinned repository abaplint gate passes, disable only the mis-profiled local lint request, retain server preflight, activate explicitly, and run SAP syntax/Unit/ATC/object-state checks. Track the tool mismatch separately from the product change.
+
+For the large ZTOAD report, an ARC-1 stdin write can fail with `EAGAIN` before SAP receives the source. Retry through a bounded temporary JSON payload file, then require a successful write response and explicit activation. Large ATC result JSON can exceed terminal output limits; capture the complete result first and derive exact finding counts, priority counts, and prerequisite errors from that complete payload rather than parsing truncated console text.
 
 ## 5. Structural object changes
 
@@ -183,7 +185,7 @@ For every relevant change, verify:
 - values are bound or safely quoted instead of concatenated where possible;
 - comments, aliases, nested expressions, subqueries, and unions cannot hide additional statements;
 - row limits remain enforced unless the user explicitly requests the documented override;
-- native SQL remains disabled by default;
+- Native SQL remains unconditionally rejected and forbidden sinks such as `C_DB_EXECUTE` do not return;
 - error/generated-code displays do not leak credentials or confidential values.
 
 Run ATC security checks on the live systems. Local abaplint cannot prove runtime authorization or dynamic-SQL safety.

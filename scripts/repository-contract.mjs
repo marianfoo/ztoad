@@ -2,8 +2,10 @@ import { readFile } from "node:fs/promises";
 import { strict as assert } from "node:assert";
 
 const transactionPath = new URL("../src/ztoad.tran.xml", import.meta.url);
+const reportPath = new URL("../src/ztoad.prog.abap", import.meta.url);
 
 let transactionXml;
+let reportSource;
 
 try {
   transactionXml = await readFile(transactionPath, "utf8");
@@ -13,6 +15,8 @@ try {
   }
   throw error;
 }
+
+reportSource = await readFile(reportPath, "utf8");
 
 const expectedFragments = [
   'serializer="LCL_OBJECT_TRAN"',
@@ -33,4 +37,9 @@ for (const fragment of expectedFragments) {
   );
 }
 
-console.log("Repository contract passed: TRAN ZTOAD is serialized for report, WebGUI, and Windows startup.");
+assert.ok(
+  !reportSource.includes("C_DB_EXECUTE"),
+  "Unsupported native SQL kernel call C_DB_EXECUTE must not exist in src/ztoad.prog.abap",
+);
+
+console.log("Repository contract passed: launcher metadata and forbidden-kernel-call checks are green.");
