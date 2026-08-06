@@ -19,7 +19,7 @@ Reach zero findings under the pinned abaplint default rules without changing int
 1. Capture a machine-readable baseline and add a comparison command that fails only on newly introduced findings.
 2. Resolve parser errors and prove ABAP 7.50/live syntax parity.
 3. Address dangerous statements, SQL escaping/strictness, authorization paths, unchecked return codes, and database-loop findings with security-focused tests.
-4. Extract parser, generator, authorization, and editor boundaries into classes; move their tests to native class test includes.
+4. Follow the [test-object extraction TODO](test-object-extraction.md): extract parser, generator, authorization, and editor boundaries into classes and move their tests to native class test includes.
 5. Remove obsolete and ambiguous constructs in small reviewed batches.
 6. Apply mechanical formatting/naming batches last, with no functional changes.
 7. When `npm run lint:quality -- --strict` is green locally and on both SAP targets, add it to `.github/workflows/quality.yml` and make the check required.

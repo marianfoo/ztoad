@@ -1,6 +1,6 @@
 # ABAP Unit packaging for ZTOAD
 
-_Research date: 2026-08-06 · Decision status: recommended direction recorded_
+_Research date: 2026-08-06 · Decision status: tracked in [the test-object extraction TODO](../plans/test-object-extraction.md)_
 
 ## Question
 
@@ -26,3 +26,5 @@ Can the ABAP Unit tests be moved out of `ZTOAD` so a manual installer can copy o
 Keep the current report-local tests while fixing issues incrementally. When a parser/generator area is next refactored, extract a cohesive global class and move its tests into the class test include. Do not create a second hand-maintained test report merely to make the manual copy shorter.
 
 For users who need a reduced download, add a generated source-only artifact only after the complete object dependencies and limitations are documented and tested. Native abapGit remains the supported installation path.
+
+Implementation and acceptance criteria are tracked in [`docs/plans/test-object-extraction.md`](../plans/test-object-extraction.md).
