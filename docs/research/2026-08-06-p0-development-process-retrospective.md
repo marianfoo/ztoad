@@ -32,52 +32,52 @@ Conversation compaction removed the reliable full call ledger, so this report do
 
 #### Shared target retained an unmerged candidate
 
-**Severity:** major  
-**Root cause:** the workflow specified candidate deployment but not the cleanup/handoff state after evidence collection.  
+**Severity:** major
+**Root cause:** the workflow specified candidate deployment but not the cleanup/handoff state after evidence collection.
 **Correction:** restore the intended `master` object, activate it, and verify baseline tests plus object state unless the maintainer explicitly reserves the candidate.
 
 #### Expensive evidence preceded the final source freeze
 
-**Severity:** major  
-**Root cause:** a legitimate declaration cleanup happened after live Unit/ATC evidence, forcing deployment and affected gates to be repeated.  
+**Severity:** major
+**Root cause:** a legitimate declaration cleanup happened after live Unit/ATC evidence, forcing deployment and affected gates to be repeated.
 **Correction:** freeze a candidate commit/hash after local review and before live validation; any later source/object change invalidates affected evidence.
 
 #### Large/raw evidence caused retries
 
-**Severity:** minor  
-**Root cause:** large write/ATC output was initially streamed to the terminal, and temporary result locations were not consistently retained for one-pass parsing.  
+**Severity:** minor
+**Root cause:** large write/ATC output was initially streamed to the terminal, and temporary result locations were not consistently retained for one-pass parsing.
 **Correction:** the earlier P0 process PR already requires bounded temporary payload/result files and concise summaries derived from the complete result. Reuse that rule rather than rerunning diagnostics solely to recover truncated output.
 
 #### ABAP Unit response shape varied with coverage mode
 
-**Severity:** minor  
-**Root cause:** the diagnostic result is an array without coverage and an object containing `tests` with coverage, so one summary parser failed after the SAP call had succeeded.  
+**Severity:** minor
+**Root cause:** the diagnostic result is an array without coverage and an object containing `tests` with coverage, so one summary parser failed after the SAP call had succeeded.
 **Correction:** caller-side parsing must branch on the documented mode. A stable envelope from ARC-1 would remove this avoidable client condition.
 
 #### CI evidence created an extra CI run
 
-**Severity:** minor  
-**Root cause:** committing the successful run ID changed the checked head and required another run.  
+**Severity:** minor
+**Root cause:** committing the successful run ID changed the checked head and required another run.
 **Correction:** freeze repository content after the post-green audit and record the final run link in the PR description/comment.
 
 #### Parallel PRs changed aggregate documentation independently
 
-**Severity:** major  
-**Root cause:** each independently based PR correctly updated its own evidence but also changed shared test/finding counts, guaranteeing semantic conflicts.  
+**Severity:** major
+**Root cause:** each independently based PR correctly updated its own evidence but also changed shared test/finding counts, guaranteeing semantic conflicts.
 **Correction:** merge one report PR at a time, rebase the next, deliberately combine the test corpus, recompute aggregate counts, and rerun affected gates. Keep exact branch counts out of long-lived playbooks.
 
 ### Suggested ARC-1 improvements
 
 #### Stable Unit diagnostic envelope
 
-**Category:** schema consistency  
-**Severity:** minor  
+**Category:** schema consistency
+**Severity:** minor
 Return `{ tests, coverage? }` for both coverage modes so consumers do not need mode-dependent result-shape logic.
 
 #### Compact validation summary mode
 
-**Category:** missing operation  
-**Severity:** enhancement  
+**Category:** missing operation
+**Severity:** enhancement
 Provide a read-only summary/bundle for syntax, Unit counts/coverage, active-versus-inactive state, ATC counts/prerequisites, and source identity. This would reduce large-output retries while keeping individual raw operations available for investigation.
 
 The existing minimum-release not-found and release-profile issues remain tracked in the project findings register and are not duplicated here.

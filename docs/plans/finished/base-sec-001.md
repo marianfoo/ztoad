@@ -76,3 +76,11 @@ Prevent parser output from escaping the intended SQL statement and becoming addi
 - The DML sink now handles a failed `SYNTAX-CHECK` symmetrically with SELECT: user-visible error styling, cleared program handle, and explicit return. The red test previously ended with classic exception `E001(00)`; it now returns normally with no pool.
 - Long unbroken tokens and long literals without an outside-literal split point are deliberately rejected. This is preferable to silently changing their ABAP-source representation.
 - Final exact candidate: source SHA-256 `9d44d07b14fd26eae8ae6899529bd5a0a8535a36734ea177c495c1c099e97be7` and server-normalized active SHA-256 `1b2ad196292ab5f761dde3ff1d15e9b08fa77dc7cf15de3cc5d75fc808571b84`. A4H syntax has zero errors and three warnings, active/inactive source matches, and all 39 tests pass with 21.59% statement, 19.28% branch, and 14.63% procedure coverage. `ABAP_CLOUD_READINESS` reports 676 findings (467 P1, 209 P2); `S4HANA_READINESS_2023` returns no rows but remains incomplete. Local configured abaplint stays at zero, while the diagnostic inventory is 1,986 findings across 59 non-gating rules.
+
+## Post-PR #18 integration validation
+
+- PR #18 was squash-merged first with an explicit breaking-change commit. This branch was rebased onto that commit and its Native SQL retirement logic plus both rejection tests were combined deliberately with the complete BASE-SEC-001 corpus.
+- Exact rebased source SHA-256: `58dc34ebe9a5d18863fd0f26d863ba8ed78e132789d663dde417aeaabac567eb`; A4H server-normalized active/inactive SHA-256: `7a6bf2dc6c43fb598fbf2dee8bbc646d5070d5ae8a83380a2153a50ebae9dd73` with no divergence.
+- A4H syntax has zero errors and two POSIX warnings. ABAP Unit passes 40/40 with 21.86% statement, 19.23% branch, and 14.81% procedure coverage.
+- `ABAP_CLOUD_READINESS` reports 667 findings (461 P1, 206 P2). `S4HANA_READINESS_2023` returned zero rows but remains incomplete because its known prerequisites are unavailable. Local configured abaplint remains at zero; the diagnostic inventory is 1,949 findings across 59 non-gating rules.
+- A fresh FLP launch rendered the editor and DDIC panes with no browser errors, no SQL execution, and no new ST22 dump. The known missing `STATUS010` notice remains independent.
