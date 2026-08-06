@@ -6626,6 +6626,7 @@ CLASS ltc_query_generator DEFINITION FINAL
 
     METHODS setup.
     METHODS teardown.
+    METHODS generates_case_sum_expression FOR TESTING.
     METHODS generates_strict_aggregate FOR TESTING.
     METHODS keeps_escaped_count_valid FOR TESTING.
     METHODS keeps_legacy_select_valid FOR TESTING.
@@ -6712,6 +6713,33 @@ CLASS ltc_query_generator IMPLEMENTATION.
     cl_abap_unit_assert=>assert_not_initial(
       act = generated_program
       msg = 'Strict aggregate query must produce a valid subroutine pool' ).
+  ENDMETHOD.
+
+  METHOD generates_case_sum_expression.
+    DATA generated_program TYPE sy-repid.
+    DATA new_syntax TYPE abap_bool.
+    DATA count_query TYPE abap_bool.
+
+    generate_query(
+      EXPORTING
+        query = `SELECT SUM( CASE SFLIGHT~CARRID WHEN 'LH' THEN SFLIGHT~PRICE`
+             && ` ELSE SFLIGHT~PRICE * -1 END ) AS NET_PRICE, SFLIGHT~CARRID`
+             && ` FROM SFLIGHT GROUP BY SFLIGHT~CARRID`
+      IMPORTING
+        generated_program = generated_program
+        new_syntax = new_syntax
+        count_query = count_query ).
+
+    cl_abap_unit_assert=>assert_equals(
+      act = new_syntax
+      exp = abap_true
+      msg = 'CASE aggregate must use strict ABAP SQL generation' ).
+    cl_abap_unit_assert=>assert_initial(
+      act = count_query
+      msg = 'CASE aggregate must use the table-result path' ).
+    cl_abap_unit_assert=>assert_not_initial(
+      act = generated_program
+      msg = 'SUM CASE expression must produce a valid subroutine pool' ).
   ENDMETHOD.
 
   METHOD keeps_escaped_count_valid.
