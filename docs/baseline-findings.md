@@ -1,6 +1,6 @@
 # ZTOAD baseline findings
 
-_Snapshot: 2026-08-06 · branch `codex/fix-base-sec-001` rebased after BASE-SEC-002 · live system A4H client 001, SAP_BASIS 758 SP02 · secondary target NPL client 001, SAP_BASIS 750 SP02_
+_Snapshot: 2026-08-06 · branch `codex/fix-base-sec-003` rebased after BASE-SEC-002 and BASE-SEC-001 · live system A4H client 001, SAP_BASIS 758 SP02 · secondary target NPL client 001, SAP_BASIS 750 SP02_
 
 This is the ordered work list for incremental TDD. It records observed defects separately from broad style debt so a new failure cannot disappear inside the legacy backlog. A finding is closed only after its regression test is green locally where possible, green on A4H, and green on the SAP_BASIS 750 target.
 
@@ -9,15 +9,15 @@ This is the ordered work list for incremental TDD. It records observed defects s
 | Gate | Result | Interpretation |
 |---|---|---|
 | Repository `npm test` | Passed, 0 configured abaplint findings | Fast compatibility/XML gate is green |
-| Pinned abaplint default profile | 1,949 findings across 59 rules; post-BASE-SEC-002 `master` baseline 1,841 across 58 | The added validator/splitter tests account for the reviewed increase; configured abaplint remains at zero |
-| A4H SAP syntax | 0 errors, 2 warnings | The merged Native SQL sink and its warning are absent; replacing the regex splitter removed another POSIX warning |
-| A4H ABAP Unit | 40 passed, 0 failed | The combined suite covers Native SQL retirement, generated-fragment validation, and representation-safe wrapping |
+| Pinned abaplint default profile | Exact combined count pending post-rebase validation | Configured abaplint remains the merge gate; diagnostic debt will be recomputed rather than copied from either branch |
+| A4H SAP syntax | Exact combined result pending post-rebase validation | The complete rebased source must be activated and checked |
+| A4H ABAP Unit | Exact combined result pending post-rebase validation | The combined suite covers all three P0 security fixes |
 | A4H ATC `S4HANA_READINESS_2023` | Initial run displayed 0 finding rows | Later evidence shows missing prerequisites; this is not an authoritative zero gate |
-| A4H ATC `ABAP_CLOUD_READINESS` | 667 findings: 461 priority 1, 206 priority 2 | Exact post-rebase inventory; still an architectural burn-down signal, not a zero gate |
-| A4H WebGUI smoke | Fresh editor startup passed; no SQL executed and no ST22 delta | Editor and DDIC panes render without browser errors; missing `STATUS010` remains `BASE-BUG-007` |
+| A4H ATC `ABAP_CLOUD_READINESS` | Exact combined result pending post-rebase validation | Branch-local ATC totals are invalid after integration |
+| A4H WebGUI smoke | Exact combined result pending post-rebase validation | Startup will be repeated without SQL execution; missing `STATUS010` remains `BASE-BUG-007` |
 | ABAP 7.50 live gate | ARC-1 lifecycle passed; ZTOAD blocked | `arc-1-750` can create/activate/syntax/unit/delete, but ZTOAD's transparent table is absent and SAP_BASIS 750 cannot create it over ADT |
 
-BASE-SEC-002 is merged and its Native SQL sink is absent from this candidate. The exact rebased source SHA-256 is `58dc34ebe9a5d18863fd0f26d863ba8ed78e132789d663dde417aeaabac567eb`; A4H active/inactive source matches at server-normalized SHA-256 `7a6bf2dc6c43fb598fbf2dee8bbc646d5070d5ae8a83380a2153a50ebae9dd73`. Coverage is 21.86% statements, 19.23% branches, and 14.81% procedures. `S4HANA_READINESS_2023` again returned zero rows but remains incomplete because known prerequisites are unavailable. See the [finished BASE-SEC-001 plan](plans/finished/base-sec-001.md), [BASE-SEC-002 research](research/2026-08-06-base-sec-002-native-sql.md), and [BASE-BUG-001 plan](plans/finished/base-bug-001.md).
+BASE-SEC-002 and BASE-SEC-001 are merged and their complete production/test corpus is preserved in this candidate. Exact syntax, Unit, ATC, source-hash, and smoke evidence for the combined BASE-SEC-003 candidate must be recomputed before merge. See the [BASE-SEC-003 plan](plans/base-sec-003.md), [finished BASE-SEC-001 plan](plans/finished/base-sec-001.md), and [BASE-SEC-002 research](research/2026-08-06-base-sec-002-native-sql.md).
 
 ## Ordered findings register
 
@@ -28,7 +28,7 @@ Priority meanings: **P0** blocks the requested test workflow or is an immediate 
 | BASE-RUN-001 | P0 | ZTOAD originally dumped in WebGUI through `DP_PUBLISH_URL`; a rejected SQL-mode spike then dumped in `CL_GUI_SOURCEEDIT`. The final adapter uses `CL_GUI_TEXTEDIT` in WebGUI and keeps `CL_GUI_ABAPEDIT` elsewhere. | Two editor-policy Unit tests plus fresh WebGUI launch/input and post-run ST22 delta. | Fixed candidate: 19/19 green, editor renders and accepts input, no new dump; full query dispatch waits on `BASE-BUG-007` |
 | BASE-SEC-001 | P0 | User text reached both generated-program sinks, and the original code accepted a harmless `.<space>WRITE sy-uname` statement-injection proof as valid ABAP. External review also confirmed that the 255-character hard cut could split a doubled quote while still producing a pool. | Direct SELECT/DML generator regressions plus a pure boundary matrix for literals, decimals, operators, comments, host escapes, templates, chained statements, unbalanced quotes, namespace-shaped period lookalikes, and safe generated-line wrapping. | Fixed candidate: exact post-#18 source is 40/40 green on A4H; unsafe fragments/layouts return no pool and no SQL was executed |
 | BASE-SEC-002 | P0 | Native SQL used unsupported kernel call `C_DB_EXECUTE`. It was a high-impact arbitrary database-command path and produced a live compiler warning. | Default rejection, rejection despite the deprecated enable flag, preserved UPDATE/DELETE parsing, and a no-kernel-call repository contract. | Fixed and merged in PR #18; inherited by this candidate |
-| BASE-SEC-003 | P0 | SELECT authorization extraction tokenizes top-level `FROM`/`JOIN` text and can miss nested subqueries/CTEs or concealed data sources. | Multi-table joins, nested subqueries, aliases, comments, quoted identifiers, UNION branches, and unauthorized inner-table cases. | Open |
+| BASE-SEC-003 | P0 | SELECT authorization extraction tokenized top-level `FROM`/`JOIN` text and could miss nested subqueries/CTEs or concealed data sources. A quote-aware scanner now applies the existing policy to every physical source and rejects unprovable dynamic/CTE/comment syntax. | Multi-table joins, nested subqueries, aliases, literal keywords, comment rejection, UNION branches, dynamic/CTE rejection, and unauthorized inner-table cases. | Fixed candidate; exact combined evidence pending after rebase |
 | BASE-BUG-001 | P1 | [Issue #6](https://github.com/marianfoo/ztoad/issues/6): a reported `SELECT DISTINCT ... COUNT ... MAX ... GROUP BY ... HAVING` query produces “The INTO/APPENDING clause must be at the end of the SELECT.” | Sanitized `DD03L` reproduction; check exact generated ordering around `HAVING`, `ORDER BY`, `UP TO`, and `INTO TABLE`. | Fixed and 17/17 green on A4H; live 7.50 pending |
 | BASE-BUG-002 | P1 | [Issue #7](https://github.com/marianfoo/ztoad/issues/7): a reported `SUM( CASE ... END ) AS ...` over `EKBE` produces “No component exists with the name CASE.” The expression is split into false result components. | Sanitized aggregate with multi-line `CASE`, qualified fields, multiplication, alias, WHERE, and GROUP BY; assert one aggregate expression and the expected generated row type. | Open |
 | BASE-BUG-003 | P1 | [Issue #4](https://github.com/marianfoo/ztoad/issues/4): `SUBSTRING`/`CONCAT` produce “No component exists with the name SUBSTRING(”, exposing naïve select-list tokenization. | Nested function arguments, commas inside functions, aliases, literals containing spaces/commas, and function composition. | Open |
@@ -59,7 +59,7 @@ This diagnostic profile is intentionally not the merge gate yet. Run `npm run li
 
 The program now ends with six harmless, short ABAP Unit classes:
 
-- `LTC_QUERY_PARSER`: 8 tests for simple SELECT, default/explicit/unlimited limits, tail clauses, UNION separation, comma syntax, caller `INTO` removal, and missing `FROM` rejection.
+- `LTC_QUERY_PARSER`: 17 tests for the original SELECT contract plus authorized/unauthorized nested sources, two-level nesting, authorized joins, literal keywords, comment rejection, later UNION branches, and fail-closed dynamic/CTE sources.
 - `LTC_QUERY_INPUT_VALIDATOR`: 12 tests for the supported SQL-fragment alphabet, literal state, decimals/minus, and source-boundary rejection.
 - `LTC_QUERY_GENERATOR`: 5 tests for strict aggregate clause ordering, escaped-count and legacy-select compatibility, statement-injection rejection, and doubled-quote wrapping rejection.
 - `LTC_LINE_SPLITTER`: 6 tests for short/exact/long safe lines, unsafe hard-cut and literal-space rejection, and column-one comment prevention.
