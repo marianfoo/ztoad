@@ -2,21 +2,19 @@
 
 This document defines the permanent test discipline for ZTOAD. The current baseline is intentionally a working, characterized version with known defects; new work proceeds one finding at a time from `docs/baseline-findings.md`.
 
-## Red–green–refactor on `master`
+## Red–green–refactor through pull requests
 
-The maintainer has selected `master` as the working branch for the current phase. Keep the Git working tree local while a test is red; do not push a known-red `master` state.
+`master` is the stable integration and release line. Each finding uses one short-lived branch and pull request; red states may exist locally or on the branch during development, but are never merged or pushed directly to `master`. The shared SAP native-abapGit repository remains linked to `master` for normal source-only work, so testing an unmerged source candidate must be recorded as a controlled direct deployment rather than a clean abapGit branch state.
 
 For every bug or feature:
 
-1. Select one finding ID and record a minimal, sanitized reproduction.
-2. Add one focused regression test that fails for the intended reason. Confirm the failure on the oldest available target.
-3. Make the smallest production change that turns the test green.
-4. Run the entire local and live regression suite.
-5. Refactor only while the suite stays green; do not mix mass style cleanup with a behavior fix.
-6. Update the finding status/evidence, then commit with a Conventional Commit subject.
-7. Push `master` only after all required gates are green or an explicitly documented gate is unavailable.
-
-If the project later enables multiple concurrent contributors, switch to short-lived branches and pull requests. Until that decision changes, native abapGit repositories remain on `master` and only one person should own the live package at a time.
+1. Research one finding, inspect dependencies and active/inactive state, and record a minimal sanitized reproduction.
+2. Add one focused regression test, then replay the original implementation to prove it fails for the intended reason.
+3. Write and review the implementation/live-test/rollback plan under `docs/plans/`.
+4. Make the smallest production change that turns the test green.
+5. Run the entire local and available live regression suite. Refactor only while it stays green; do not mix mass style cleanup with a behavior fix.
+6. Perform a final diff/security review, update finding evidence, open the PR, and wait for CI.
+7. After the first green run, audit the complete process and CI, improve the repository guidance in the same PR, move the plan to `docs/plans/finished/`, and wait for CI again.
 
 ## Test layers
 
@@ -70,15 +68,17 @@ Do not use ports 50000 or 50001. Credentials stay in the ignored `.env` file and
 Run this sequence after deployment:
 
 1. Confirm native abapGit points at `master` and its check is clean.
-2. Confirm no inactive divergence.
-3. Activate all changed objects.
+2. Confirm no unrelated inactive divergence and record the exact candidate commit/source hash being tested.
+3. Deploy and activate only the intended changed objects. Do not describe an unmerged directly deployed source as a native-abapGit `master` pull.
 4. Run SAP syntax.
 5. Run all ABAP Unit tests; require zero failures.
-6. Run the recorded ATC variants.
+6. Run the recorded ATC variants and inspect prerequisite/check errors. A result with missing prerequisites is incomplete even when no finding rows are displayed.
 7. Record the latest ST22 dump timestamp before UI execution.
 8. Launch ZTOAD and run only a read-only sanitized smoke query, initially `SELECT SINGLE mandt FROM t000`.
 9. Verify expected UI/result state and confirm ST22 has no new dump.
 10. Repeat on the other SAP target.
+
+If FLP cannot open WebGUI because the automation browser blocks a popup, record that environmental failure and use the standalone HTTPS WebGUI URL as a secondary diagnostic path. A missing `TRAN` object, application dump, or new ST22 entry remains a product gate failure.
 
 `BASE-RUN-001` currently blocks steps 8–9 in WebGUI because `CL_GUI_ABAPEDIT` dumps. Until fixed, unit/syntax/ATC checks remain valid, but browser end-to-end status is failed rather than skipped.
 

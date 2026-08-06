@@ -21,7 +21,7 @@ _Prepared 2026-08-06 from repository inspection, open GitHub issues, SAP Docs MC
 
 ### 1. Exact ATC variant on ABAP 7.50
 
-A4H is now verified: `S4HANA_READINESS_2023` reports 0 findings and `ABAP_CLOUD_READINESS` reports 758 findings. The latter proves the classic report is not ABAP Cloud compatible and is retained as an architectural burn-down signal, not a zero gate.
+A4H currently has an incomplete `S4HANA_READINESS_2023` browser run: no finding rows were displayed, but seven prerequisite checks are unavailable. `ABAP_CLOUD_READINESS` currently reports 767 findings (466 P1, 301 P2). The recorded 758 result remains historical baseline evidence. The Cloud variant proves the classic report is not ABAP Cloud compatible and is retained as an architectural burn-down signal, not a zero gate.
 
 The matching SAP_BASIS 750 variant remains open because that destination is not configured. Recommendation: inventory the available 7.50 variants, select the closest effective security/performance/syntax set, and document differences rather than assuming identical names mean identical checks.
 
@@ -45,9 +45,9 @@ Potential change: a fine-grained PAT or GitHub App token if release-PR creation 
 
 ### 5. Branch concurrency inside SAP
 
-Current decision: stay on `master`, keep red/incomplete work local, and allow one owner for package `ZTOAD` at a time. Native abapGit repository `000000000017` is linked to `master`.
+Current decision: keep `master` as the only long-lived integration/release branch and keep native abapGit repository `000000000017` linked to it. Develop each finding on a short-lived pull-request branch. For source-only candidates, deploy the exact source directly and record the candidate commit instead of switching the shared SAP repository branch.
 
-Alternative for later: short-lived branches and pull requests when concurrent contributors are needed. abapGit Flow can map filtered Git operations to transports, but its documentation marks it beta, so it is not enabled.
+Structural-object branches need a dedicated package/system or an explicitly coordinated branch switch because native abapGit changes the real system objects. abapGit Flow can map filtered Git operations to transports, but its documentation marks it beta, so it is not enabled.
 
 ### 6. Minimum release in `.abapgit.xml`
 
@@ -67,12 +67,30 @@ Current code and documentation identify version `4.0.4`, but Git contains only t
 
 Recommendation: after the current `master` state has passed both live-system gates, create a one-time `4.0.4` tag and GitHub Release at the exact verified commit. Do not backfill it before live verification, and do not move the tag later.
 
+### 9. Protecting `master`
+
+The GitHub API currently reports that `master` is not protected. Recommendation: after the pull-request workflow has been used successfully, require pull requests and the `abaplint (ABAP 7.50)` Quality check, block force pushes/deletion, and decide whether maintainer approval is required for a single-maintainer repository.
+
+This is not changed automatically in the bug PR because repository rules are external policy, can lock out emergency maintenance if configured incorrectly, and need the maintainer's explicit approval.
+
+### 10. ABAP 7.02 distribution
+
+Recommendation: keep the current SAP_BASIS 750 support floor and one canonical codebase. Do not create a hand-maintained second branch. A generated 7.02 artifact becomes reasonable only with a live 7.02 system and a deterministic activation/unit/ATC/smoke matrix. See the [7.02/downport research](research/2026-08-06-abap-702-and-abaplint-downport.md).
+
+### 11. Test and manual-installation packaging
+
+Recommendation: retain report-local tests until parser/generator areas are extracted to global classes; abapGit can then serialize class test includes separately. Do not add an arbitrary second test report. A later generated source-only artifact may help manual users, but native abapGit remains the supported complete installation because ZTOAD needs screens, table, authorization, and transaction metadata. See the [test-packaging research](research/2026-08-06-abap-unit-test-packaging.md).
+
+### 12. Full abaplint gate
+
+The pinned local default inventory is 1,857 findings across 57 rules. `npm run lint:quality` now reproduces it without making every PR red. Recommendation: burn the list down in correctness/architecture/mechanical phases and add `npm run lint:quality -- --strict` to required CI only when it reaches zero. See the [research](research/2026-08-06-abaplint-quality-roadmap.md) and [active plan](plans/abaplint-zero-findings.md).
+
 ## Open-issue orientation for the next phase
 
 | Issue | Setup implication | Suggested first move |
 |---|---|---|
 | #4 Open SQL functions | `SUBSTRING`/`CONCAT` are ABAP 7.50 SQL features and expose tokenizer assumptions. | Add the focused failing nested-function test described by `BASE-BUG-003`. |
-| #6 `INTO/APPENDING` placement | ABAP 7.50 strict mode requires `INTO` at the end for affected new-syntax statements. | Capture the exact generated source on both systems and test clause ordering. |
+| #6 `INTO/APPENDING` placement | Fixed with strict/legacy generator branches and three generator tests; 17/17 pass on A4H. | Complete the missing live SAP_BASIS 750 gate before release acceptance. |
 | #7 `CASE` in aggregate | Nested SQL expressions are being interpreted as result components. | Add an aggregate-with-CASE regression test and isolate select-list parsing. |
 | #2 Transaction code | Requires a serialized `TRAN` object, not only source. | Create it in SAP, export through native abapGit, and validate on both systems. |
 | #5 Manual installation | Source-only copying is incomplete because the report has dynpros/table/auth metadata. | Native-abapGit installation is now verified; document the WebGUI startup defect separately from installation. |

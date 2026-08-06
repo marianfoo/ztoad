@@ -9,15 +9,17 @@ This is the ordered work list for incremental TDD. It records observed defects s
 | Gate | Result | Interpretation |
 |---|---|---|
 | Repository `npm test` | Passed, 0 configured abaplint findings | Fast compatibility/XML gate is green |
-| Full ARC-1 lint profile | 1,086 findings: 992 errors, 94 warnings, 35 rules | Existing debt; grouped below, not an immediate all-or-nothing gate |
+| Pinned abaplint default profile | 1,857 findings across 57 rules on the current candidate | Existing debt; reproducible locally, not an immediate all-or-nothing gate |
 | A4H SAP syntax | 0 errors, 4 warnings | Program compiles on SAP_BASIS 758 |
 | A4H ABAP Unit | 14 passed, 0 failed | Initial parser/command/line-splitting characterization baseline is green |
-| A4H ATC `S4HANA_READINESS_2023` | 0 findings | No findings from this migration-readiness variant |
+| A4H ATC `S4HANA_READINESS_2023` | Initial run displayed 0 finding rows | Later evidence shows missing prerequisites; this is not an authoritative zero gate |
 | A4H ATC `ABAP_CLOUD_READINESS` | 758 findings: 466 priority 1, 292 priority 2 | Current classic report is not ABAP Cloud compatible |
 | A4H WebGUI smoke | Failed | New ST22 dump `RAISE_EXCEPTION` in `SAPLCNDP`, described by `BASE-RUN-001` |
 | ABAP 7.50 live gate | Not run | Separate ARC-1/abapGit destination is still required |
 
 The four normal syntax warnings are POSIX-regex deprecation at lines 1668, 1691, and 1817, plus the unsupported `C_DB_EXECUTE` call at line 3818.
+
+The current `BASE-BUG-001` candidate passes 17/17 A4H ABAP Unit methods and keeps the same four normal syntax warnings. Its latest `ABAP_CLOUD_READINESS` result is 767 findings (466 P1, 301 P2); two P2 `FORM` warnings are in the new characterization helper, while the production fix adds none. The latest `S4HANA_READINESS_2023` run is incomplete because seven prerequisite checks are unavailable. See the [finished issue plan](plans/finished/base-bug-001.md) for exact evidence.
 
 ## Ordered findings register
 
@@ -50,45 +52,7 @@ Priority meanings: **P0** blocks the requested test workflow or is an immediate 
 
 ## Full lint debt by rule
 
-This diagnostic profile is intentionally not the merge gate yet. New code must not add to the counts, and touched code should reduce relevant counts without mass-formatting unrelated lines.
-
-| Rule | Count | Treatment |
-|---|---:|---|
-| `space_before_colon` | 505 | Mechanical; clean only in touched statements |
-| `prefer_pragmas` | 122 | Replace pseudo-comments when modifying the statement |
-| `preferred_compare_operator` | 109 | Mechanical Clean ABAP cleanup |
-| `functional_writing` | 81 | Incremental expression cleanup |
-| `check_subrc` | 50 | Review individually; reliability-relevant |
-| `reduce_procedural_code` | 37 | Architectural extraction, not suppression |
-| `fully_type_itabs` | 31 | Add explicit table keys/types while extracting seams |
-| `prefer_is_not` | 27 | Mechanical cleanup |
-| `check_syntax` | 13 | Current audit lacks the live TABL dependency and reports `ZTOAD` table resolution; verify against live SAP |
-| `in_statement_indentation` | 13 | Mechanical cleanup |
-| `check_comments` | 10 | Improve comments in touched areas |
-| `double_space` | 10 | Mechanical cleanup |
-| `sy_modification` | 8 | Refactor; direct system-field modification is fragile |
-| `avoid_use` | 7 | Replace obsolete/weak constructs in touched paths |
-| `obsolete_statement` | 7 | Includes `REFRESH`; migrate incrementally |
-| `fully_type_constants` | 6 | Incremental typing |
-| `line_break_multiple_parameters` | 6 | Formatting |
-| `keyword_case` | 5 | Formatting |
-| `commented_code` | 4 | Remove after proving it is dead |
-| `dangerous_statement` | 4 | Two generated pools, kernel call, dynamic table SELECT; track individually |
-| `no_chained_assignment` | 4 | Refactor in touched code |
-| `select_performance` | 4 | Three `ENDSELECT`/looping reads plus `SELECT *`; review individually |
-| `if_in_if` | 3 | Simplify when touched |
-| `no_external_form_calls` | 3 | Remove through class extraction |
-| `unnecessary_chaining` | 3 | Mechanical cleanup |
-| `function_module_recommendations` | 2 | Review released/OO alternatives |
-| `line_only_punc` | 2 | Formatting |
-| `macro_naming` | 2 | Refactor macros when touched |
-| `space_before_dot` | 2 | Formatting |
-| `change_if_to_case` | 1 | Readability cleanup |
-| `downport` | 1 | Validate on SAP_BASIS 750 |
-| `expand_macros` | 1 | Prefer explicit/testable code |
-| `line_length` | 1 | Formatting |
-| `no_public_attributes` | 1 | Encapsulation cleanup |
-| `parser_error` | 1 | ARC lint's older parser rejects a table-valued ABAP Unit assertion that A4H syntax accepts; keep as tool discrepancy until 7.50 validation |
+This diagnostic profile is intentionally not the merge gate yet. Run `npm run lint:quality` to print the complete current per-rule list from the pinned CLI. New code must not add unexplained findings, and touched code should reduce relevant counts without mass-formatting unrelated lines. The counts, prioritization, and promotion-to-CI criteria are maintained in the [research report](research/2026-08-06-abaplint-quality-roadmap.md) and [active zero-findings plan](plans/abaplint-zero-findings.md).
 
 ## Initial executable tests
 

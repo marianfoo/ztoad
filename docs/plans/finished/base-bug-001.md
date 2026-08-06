@@ -115,3 +115,17 @@ Approved before production implementation, with the following conclusions:
 - Live SAP_BASIS 750 validation remains unavailable (`BASE-ENV-001`) and must not be inferred from local lint.
 
 The plan is complete when the local gate and pull-request CI are green, the implementation has passed final diff review, and all unavailable or failed live gates are stated in the pull request.
+
+## Post-PR process audit
+
+Pull request [#15](https://github.com/marianfoo/ztoad/pull/15) passed its first Quality run: the required ABAP 7.50 abaplint job and hosted abaplint check were green. The audit found these process gaps:
+
+- repository guidance still described direct development on `master` even though review and CI are safer on a short-lived branch;
+- the shared SAP abapGit repository and the Git candidate branch were not distinguished clearly enough for source-only live testing;
+- `docs/development.md` still named Node.js 22 while CI uses Node.js 24;
+- the live gate did not explicitly distinguish an incomplete ATC run from a true zero-finding result;
+- plan/research/completed-plan locations, fixture-availability checks, final review, and the post-first-green audit were not normative;
+- the full hosted abaplint debt could not be reproduced concisely with a local command;
+- test packaging and possible ABAP 7.02/downport distributions lacked written decisions.
+
+The same PR therefore updates `AGENTS.md`, the development/test playbooks, PR template, and setup evaluation; adds the non-blocking `npm run lint:quality` inventory; records the 7.02 and ABAP Unit packaging research; and creates the active zero-findings plan. Required CI remains the focused zero-finding `npm test` gate because the full inventory is still 1,857 findings. No CI workflow was weakened or broadened during this bug fix.

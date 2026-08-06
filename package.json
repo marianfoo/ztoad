@@ -4,6 +4,7 @@
   "description": "Local quality tooling for the ZTOAD abapGit repository",
   "scripts": {
     "lint": "abaplint",
+    "lint:quality": "node scripts/abaplint-quality.mjs",
     "test": "npm run lint"
   },
   "engines": {
