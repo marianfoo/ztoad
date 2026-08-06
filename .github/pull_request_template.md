@@ -21,6 +21,7 @@
 - [ ] ATC prerequisite/check errors were reviewed; an incomplete run is not reported as zero findings.
 - [ ] Authorization and SQL-injection implications were reviewed.
 - [ ] Security claims distinguish proven entry-point reachability from sink-level behavior and state actor prerequisites, or this is not applicable.
+- [ ] Generated/transformed input was reviewed on both sides of representation boundaries (comments, quoting, escaping, wrapping, and token/line splitting), or this is not applicable.
 - [ ] New or changed logic has ABAP Unit coverage where technically feasible.
 - [ ] Documentation and changelog impact were considered.
 - [ ] The accepted PR will use squash merge and a Conventional Commit PR title.
