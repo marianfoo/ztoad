@@ -28,7 +28,9 @@ _Observed 2026-08-06 to 2026-08-07 with ARC-1 1.0.2, A4H SAP_BASIS 758 SP02, nat
 ## Safe workflow until those gaps are fixed
 
 1. Probe the system and repository in the same ARC-1 process when possible.
-2. Use full branch refs such as `refs/heads/master` and reread repository details after every switch.
+2. Use the repository's current full branch ref, now `refs/heads/main`, and
+   reread repository details after every switch. The original reproduction used
+   `refs/heads/master` before the default-branch rename.
 3. Enable write scope only for genuine mutations and provide remote credentials through the approved secret channel; never print them.
 4. Stage explicit object selections, review returned filenames, and never use **Add All** with unrelated drift.
 5. Treat native abapGit as the complete serializer and ARC-1 source writes as source-only unless the exact child-object closure is independently proven.

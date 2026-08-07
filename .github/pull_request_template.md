@@ -17,7 +17,7 @@
 - [ ] Activation evidence covers affected child parts (screens, GUI statuses, text elements, and includes), not only main-source equality.
 - [ ] A safe manual ZTOAD smoke test passes on both systems, or the omitted system/check is explained below.
 - [ ] ST22 was checked before/after live smoke using an explicit dump ID/timestamp marker and client-side comparison; known and new dumps are distinguished.
-- [ ] Directly deployed objects on shared systems were restored to `master`, or an explicit temporary reservation is documented.
+- [ ] Directly deployed objects on shared systems were restored to `main`, or an explicit temporary reservation is documented.
 - [ ] ATC prerequisite/check errors were reviewed; an incomplete run is not reported as zero findings.
 - [ ] Authorization and SQL-injection implications were reviewed.
 - [ ] Security claims distinguish proven entry-point reachability from sink-level behavior and state actor prerequisites, or this is not applicable.

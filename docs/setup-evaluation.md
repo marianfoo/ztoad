@@ -45,7 +45,7 @@ Potential change: a dedicated GitHub App installation token or fine-grained PAT 
 
 ### 5. Branch concurrency inside SAP
 
-Current decision: keep `master` as the only long-lived integration/release branch and keep native abapGit repository `000000000017` linked to it. Develop each finding on a short-lived pull-request branch. For source-only candidates, deploy the exact source directly and record the candidate commit instead of switching the shared SAP repository branch.
+Current decision: keep `main` as the only long-lived integration/release branch and keep native abapGit repository `000000000017` linked to it. Develop each finding on a short-lived pull-request branch. For source-only candidates, deploy the exact source directly and record the candidate commit instead of switching the shared SAP repository branch.
 
 Structural-object branches need a dedicated package/system or an explicitly coordinated branch switch because native abapGit changes the real system objects. abapGit Flow can map filtered Git operations to transports, but its documentation marks it beta, so it is not enabled.
 
@@ -61,15 +61,15 @@ Recommendation: extract query parser/generator units issue by issue, beginning w
 
 Alternative: a full OO rewrite could improve design faster but greatly expands regression risk and makes cross-release comparison harder.
 
-### 8. Historical `4.0.4` tag
+### 8. Historical `4.0.4` tag — resolved
 
-Current code and documentation identify version `4.0.4`, but Git contains only the `4.0.3` tag. The Release Please manifest starts at the declared code version `4.0.4`; current PR #10 correctly proposes `4.1.0` because the accumulated conventional commits include a feature. Its first generated compare link still assumes that a `4.0.4` tag exists.
+The one-time immutable `4.0.4` tag now exists, so Release Please compare links
+have their required baseline. Release Please subsequently created release and
+tag `5.0.0`. Do not recreate or move either tag.
 
-Recommendation: after the current `master` state has passed both live-system gates, create a one-time `4.0.4` tag and GitHub Release at the exact verified commit. Do not backfill it before live verification, and do not move the tag later.
+### 9. Protecting `main`
 
-### 9. Protecting `master`
-
-The GitHub API currently reports that `master` is not protected. Recommendation: after the pull-request workflow has been used successfully, require pull requests and the `abaplint (ABAP 7.50)` Quality check, block force pushes/deletion, and decide whether maintainer approval is required for a single-maintainer repository.
+The GitHub API reports that `main` is not protected. Recommendation: require pull requests and the `Repository quality (ABAP 7.50)` check, block force pushes/deletion, and decide whether maintainer approval is required for a single-maintainer repository.
 
 This is not changed automatically in the bug PR because repository rules are external policy, can lock out emergency maintenance if configured incorrectly, and need the maintainer's explicit approval.
 
@@ -83,7 +83,7 @@ Recommendation: retain report-local tests until parser/generator areas are extra
 
 ### 12. Full abaplint gate
 
-Exact integrated master `2360fe4` has 2,051 findings across 61 rules; the `BASE-RUN-006` candidate is 2,109 across the same 61 rules. `npm run lint:quality` reproduces the inventory without making every PR red. Recommendation: burn the list down in correctness/architecture/mechanical phases and add `npm run lint:quality -- --strict` to required CI only when it reaches zero. See the [research](research/2026-08-06-abaplint-quality-roadmap.md) and [active plan](plans/abaplint-zero-findings.md).
+Exact integrated default-branch checkpoint `2360fe4` has 2,051 findings across 61 rules; the `BASE-RUN-006` candidate is 2,109 across the same 61 rules. `npm run lint:quality` reproduces the inventory without making every PR red. Recommendation: burn the list down in correctness/architecture/mechanical phases and add `npm run lint:quality -- --strict` to required CI only when it reaches zero. See the [research](research/2026-08-06-abaplint-quality-roadmap.md) and [active plan](plans/abaplint-zero-findings.md).
 
 ## Open-issue orientation for the next phase
 
