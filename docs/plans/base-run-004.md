@@ -69,6 +69,46 @@ research note.
     this plan under `docs/plans/finished/`, wait for green CI again, then squash
     merge and synchronize local master.
 
+## Pre-PR execution record
+
+- Steps 1–11 through shared-system restoration are complete for frozen source
+  commit `832d057656dc2923e79b87eff5016b718dad42fe`; local source
+  SHA-256 is
+  `b8d5d7807e42832b105deabe4d55f142ee10408a4f1ef975cf9530d17cf2ebb4`.
+  Both candidate deployments reported normalized active/inactive SHA-256
+  `1e93f56cd0575ca73a1cc2c5b270ee07436db9839e3412ddd73448a8cc771264`.
+- The focused NPL red replay at commit `ccea897` passed 112/113 Unit and
+  failed only `LTC_QUERY_PARSER->REJECTS_ZERO_LIMIT`; no SELECT was executed.
+- `npm ci`, configured abaplint, repository and installation contracts,
+  `git diff --check`, both server-side dry syntax checks, and the complete diff
+  review are green. The diagnostic quality inventory is 2,524 findings across
+  62 rules and remains outside the merge gate.
+- NPL is green at 120/120 Unit with clean active syntax, equal source state,
+  zero inactive ZTOAD parts, and complete DEFAULT ATC unchanged at 85 findings
+  (P1 3, P2 4, P3 78). Its four-dump result set and latest marker remained
+  unchanged across the candidate checks.
+- A4H is green at 120/120 Unit with the known seven POSIX warnings, equal
+  source state, and zero inactive ZTOAD parts. Complete
+  ABAP_CLOUD_READINESS improved from 709 to 706 findings (P1 487, P2 219): a
+  stable-signature comparison shows only two fewer restricted-form errors and
+  one fewer generic restricted-syntax error, with no new signature.
+  `S4HANA_READINESS_2023` again returned zero displayed findings without
+  proving its unavailable prerequisites and remains explicitly incomplete.
+- A fresh authenticated Chrome/WebGUI session entered both queries with
+  editor-scoped click, real typing, and blur. The zero-limit query
+  `SELECT mandt FROM t000 UP TO 0 ROWS` stopped with `Cannot parse the query`
+  and an empty grid. A following
+  `SELECT tabname FROM dd02l UP TO 2 ROWS` returned exactly two rows and the
+  success message reported two entries. The complete 49-ID ST22 set retained
+  its latest `2026-08-07T06:26:10Z` marker and gained no ID.
+- Both shared targets were restored to merged master `ef54657`, explicitly
+  activated, and verified at 113/113 Unit, expected syntax, equal active and
+  inactive SHA-256
+  `736c93b341c8a14cd40f88522b6b542fa14b82bceaea5a34b0bedcfdab2699b8`,
+  and zero inactive ZTOAD part.
+- The PR, first green CI run, and post-green audit remain to complete step 11
+  and step 12.
+
 ## Plan review
 
 - **Compatibility:** no syntax or API newer than SAP_BASIS 750 is planned.
