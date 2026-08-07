@@ -10,7 +10,7 @@ _Updated: 2026-08-07_ · _Source: live ARC-1 discovery on A4H and NPL, native ab
 | System type | on-premise S/4HANA |
 | Release | ABAP Platform 2023 / SAP_BASIS 758 SP02 |
 | Kernel | Not reported by the available ADT discovery endpoints |
-| Host | `https://a4h.marianzeis.de` (HTTPS reverse proxy; no SAP port suffix) |
+| Host | Private HTTPS reverse proxy loaded from ignored `.env` variable `SAP_URL`; no SAP port suffix |
 | Client | 001 |
 | Language | EN |
 | User | MARIAN |
@@ -105,6 +105,6 @@ See [the NPL ADT-only validation dossier](docs/research/2026-08-06-npl-adt-only-
 
 ## Verified A4H Access Paths
 
-- FLP transaction intent: `https://a4h.marianzeis.de/sap/bc/ui2/flp?sap-client=001#Shell-startGUI?sap-ui2-tcode=<TCODE>`
-- Standalone WebGUI: `https://a4h.marianzeis.de/sap/bc/gui/sap/its/webgui?sap-client=001&~transaction=<TCODE>`
+- FLP transaction intent: `${SAP_URL}/sap/bc/ui2/flp?sap-client=001#Shell-startGUI?sap-ui2-tcode=<TCODE>`
+- Standalone WebGUI: `${SAP_URL}/sap/bc/gui/sap/its/webgui?sap-client=001&~transaction=<TCODE>`
 - Do not use ports `50000` or `50001` from clients; only the HTTPS reverse proxy is supported.
