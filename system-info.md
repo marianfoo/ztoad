@@ -97,9 +97,9 @@ The first request created during setup, `A4HK906377`, is an empty local request 
 | ARC-1 | Separate `arc-1-750` profile, pinned to ARC-1 1.0.2; package ceiling configured as `*`; data preview and free SQL disabled |
 | UI boundary | No FLP, WebGUI, SAP GUI, or browser automation for validation; A4H owns UI smoke |
 | ZTOAD state | Complete object set provisioned through native abapGit 1.134.0 offline repository in local package `$ZTOAD2`: PROG, real transparent TABL, TRAN, and SUSO |
-| Structural warning | Table enhancement category was absent; NPL activated and normalized it to `#NOT_CLASSIFIED`, leaving a diff tracked as `BASE-DDIC-001` |
-| Completion status | Exact candidate `9e8d881`: syntax 0 errors, 67/67 Unit, ATC `DEFAULT` 88 unchanged findings, equal active/inactive source, zero inactive ZTOAD parts |
-| Shared target after evidence | Restored and activated to `origin/master` `d532b2e`, server SHA-256 `e32d7d3b8bebdb38457cd81f52e90a3b00dc0e830ac537b7690b70cee4544897`; the known pre-fix fixture reproduces at 66/67 until the PR merges |
+| Structural state | BASE-DDIC-001 candidate is active as `#NOT_EXTENSIBLE`; all seven table fields are unchanged and the offline serializer warning is resolved |
+| Completion status | Exact native candidate `4206a1a`: explicit table/report activation, syntax 0 errors, 67/67 Unit, complete `DEFAULT` ATC 88 unchanged findings (3 P1, 4 P2, 81 P3), and zero inactive ZTOAD parts |
+| ARC-1 table-state caveat | Direct active `TABL` object-state returns 404 on this 7.50 endpoint; automatic and inactive-version reads resolve the active table and report no inactive draft. Explicit activation, exact metadata comparison, search, and the global inactive inventory are the compensating evidence. |
 
 See [the NPL ADT-only validation dossier](docs/research/2026-08-06-npl-adt-only-validation.md) and the [BASE-BUG-001 grammar investigation](docs/research/2026-08-07-base-bug-001-npl-count-grammar.md). No stub DDIC structure may be used to claim compatibility.
 
