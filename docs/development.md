@@ -39,6 +39,8 @@ npm test
 
 `@abaplint/cli` is pinned exactly because the project does not claim semantic-version compatibility. The config uses abaplint's canonical release `v762`, which maps to on-premise SAP_BASIS 750. The initial rule set deliberately concentrates on parsing, syntax, type resolution, includes, method consistency, line endings, and abapGit XML consistency. It creates a zero-warning baseline for this legacy report. Add stricter rules only with the refactoring that resolves their existing findings.
 
+`npm test` also checks the complete native-abapGit installation closure: the source/object files, four dynpros with their separately serialized flow-logic files, and three GUI statuses. Native abapGit 1.133.0 stores each dynpro's flow logic in `ztoad.prog.screen_<number>.abap`; the program XML still carries the screen layout and CUA metadata. For a live composite-object gate, capture `SAPRead(type="INACTIVE_OBJECTS")` as JSON and run `node scripts/installation-contract.mjs --inactive-objects <file>`. Unrelated inactive objects are ignored; any ZTOAD source, CUA, screen, or text part makes the gate fail.
+
 ## 3. Native abapGit setup on the complete-object test system
 
 Use native abapGit on A4H for complete object round trips. The repository already declares `/src/` as its starting folder and `PREFIX` folder logic, so the root package name may differ per system. NPL is deliberately ARC-1/ADT-only: do not use its FLP, WebGUI, SAP GUI, or browser automation.
@@ -51,8 +53,11 @@ Setup procedure:
 2. Create an online repository for `https://github.com/marianfoo/ztoad`.
 3. Select `master` for the initial installation and bind it to the chosen empty package. Keep this shared repository on `master` during normal source-only PR testing.
 4. Pull and activate all objects.
-5. Confirm that the repository status is clean.
-6. Run ZTOAD once with the read-only smoke query below.
+5. Query inactive objects and require the ZTOAD installation-closure command above to pass. Main-source equality is insufficient for a composite program.
+6. Confirm that the repository status is clean.
+7. Run ZTOAD once with the read-only smoke query below.
+
+If the ARC-1 abapGit bridge is used to restore the shared branch after a coordinated round trip, pass `refs/heads/master`, not only `master`, and verify the selected branch with a fresh `list_repos` call. On the current A4H bridge the short value returned success without changing the repository, while the full ref switched it correctly. Re-run the inactive-child contract after restoration.
 
 On A4H, the Fiori-shell URL for the transaction is:
 
@@ -174,7 +179,7 @@ SELECT SINGLE mandt FROM t000
 
 Then exercise the parser feature being changed with a sanitized query and verify both the generated source and result. Never use INSERT, UPDATE, DELETE, or native SQL against SAP/business tables for smoke testing. Such tests are permitted only against an isolated disposable Z table with explicit authorization.
 
-`BASE-RUN-001` is fixed at the editor boundary: a fresh A4H WebGUI launch renders the fallback editor, accepts the sanitized query, and creates no new ST22 dump. Full query execution is still not green because the current A4H installation lacks GUI status `STATUS010` (`BASE-BUG-007`). Keep product behavior failures separate from incomplete system metadata, and never run this browser protocol on NPL.
+`BASE-RUN-001` is fixed at the editor boundary: a fresh A4H WebGUI launch renders the fallback editor and accepts the sanitized query. `BASE-BUG-007` restored the complete active program installation and GUI status, so query dispatch now reaches `EXECUTE`; that action exposes the independently tracked `BASE-RUN-006` Control Framework flush dump. Keep product behavior failures separate from incomplete system metadata, and never run this browser protocol on NPL.
 
 Use `npm run lint:quality` to reproduce the non-blocking full default-rule inventory. Record exact dated totals and intentional deltas in the [baseline findings register](baseline-findings.md); do not copy volatile counts into this long-lived playbook. The raw defaults contain conflicting prefix/no-prefix naming rules, so the strict profile must resolve that configuration conflict explicitly while the raw inventory remains visible. Continue the [active zero-findings plan](plans/abaplint-zero-findings.md); only promote the resolved strict command to required CI after it is green.
 

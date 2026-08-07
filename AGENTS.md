@@ -38,6 +38,10 @@ When several PRs change the same ABAP object, keep them independently reviewable
 
 For a coordinated structural-object round trip, refresh native abapGit before staging, review all system/Git drift, and select only the intended object. Never use **Add All** when unrelated changes are present. Review the staged filenames before commit, record every intentionally unselected drift item, push, refresh again, and require the intended object to be clean.
 
+When ARC-1's abapGit bridge is used to restore the shared repository branch, pass the full ref such as `refs/heads/master` and verify the result with a fresh repository read. A short branch value can return success without changing the selected branch on the current A4H bridge.
+
+For ZTOAD program installation evidence, run the repository installation contract through `npm test`. On a live structural target, capture `SAPRead(type="INACTIVE_OBJECTS")` as JSON and run `node scripts/installation-contract.mjs --inactive-objects <file>`. The live gate must show no `PROG/P`, `PROG/PCA`, `PROG/PS`, or `PROG/PX` part for ZTOAD before GUI/runtime smoke is considered valid.
+
 If ARC-1's pre-write linter selects the wrong ABAP release, bypass only that local lint step after the repository's pinned abaplint gate is green. Keep server preflight, explicit activation, SAP syntax, Unit, ATC, and object-state verification enabled, and record the tooling mismatch in the findings register.
 
 ZTOAD's report source is large enough that streaming a complete `SAPWrite` JSON payload through stdin can return `EAGAIN`. If that occurs, create a bounded temporary JSON payload file, pass its path to ARC-1, and verify the subsequent write before activation; never interpret the failed streamed request as a deployed candidate. Capture very large ATC JSON to a temporary file and emit an exact count/priority/prerequisite summary so terminal truncation cannot corrupt the evidence.

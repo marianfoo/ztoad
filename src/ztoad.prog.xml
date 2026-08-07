@@ -609,36 +609,6 @@
        <REF_FIELD>SUB</REF_FIELD>
       </RPY_DYFATC>
      </FIELDS>
-     <FLOW_LOGIC>
-      <RPY_DYFLOW>
-       <LINE>PROCESS BEFORE OUTPUT.</LINE>
-      </RPY_DYFLOW>
-      <RPY_DYFLOW>
-       <LINE>MODULE STATUS_0010.</LINE>
-      </RPY_DYFLOW>
-      <RPY_DYFLOW>
-       <LINE>CALL SUBSCREEN SUB INCLUDING SY-REPID &apos;0100&apos;.</LINE>
-      </RPY_DYFLOW>
-      <RPY_DYFLOW/>
-      <RPY_DYFLOW>
-       <LINE>PROCESS AFTER INPUT.</LINE>
-      </RPY_DYFLOW>
-      <RPY_DYFLOW>
-       <LINE>CALL SUBSCREEN SUB.</LINE>
-      </RPY_DYFLOW>
-      <RPY_DYFLOW>
-       <LINE>module user_command_0010.</LINE>
-      </RPY_DYFLOW>
-     </FLOW_LOGIC>
-     <SPACES>
-      <item>0</item>
-      <item>2</item>
-      <item>2</item>
-      <item>0</item>
-      <item>0</item>
-      <item>2</item>
-      <item>2</item>
-     </SPACES>
     </item>
     <item>
      <HEADER>
@@ -683,28 +653,6 @@
        <INPUT_FLD>X</INPUT_FLD>
       </RPY_DYFATC>
      </FIELDS>
-     <FLOW_LOGIC>
-      <RPY_DYFLOW>
-       <LINE>PROCESS BEFORE OUTPUT.</LINE>
-      </RPY_DYFLOW>
-      <RPY_DYFLOW>
-       <LINE>&quot;MODULE STATUS_0100.</LINE>
-      </RPY_DYFLOW>
-      <RPY_DYFLOW/>
-      <RPY_DYFLOW>
-       <LINE>PROCESS AFTER INPUT.</LINE>
-      </RPY_DYFLOW>
-      <RPY_DYFLOW>
-       <LINE>&quot;MODULE USER_COMMAND_0100.</LINE>
-      </RPY_DYFLOW>
-     </FLOW_LOGIC>
-     <SPACES>
-      <item>0</item>
-      <item>1</item>
-      <item>0</item>
-      <item>0</item>
-      <item>1</item>
-     </SPACES>
     </item>
     <item>
      <HEADER>
@@ -832,34 +780,6 @@
        <INPUT_FLD>X</INPUT_FLD>
       </RPY_DYFATC>
      </FIELDS>
-     <FLOW_LOGIC>
-      <RPY_DYFLOW>
-       <LINE>PROCESS BEFORE OUTPUT.</LINE>
-      </RPY_DYFLOW>
-      <RPY_DYFLOW>
-       <LINE>MODULE STATUS_0200.</LINE>
-      </RPY_DYFLOW>
-      <RPY_DYFLOW>
-       <LINE>*</LINE>
-      </RPY_DYFLOW>
-      <RPY_DYFLOW>
-       <LINE>PROCESS AFTER INPUT.</LINE>
-      </RPY_DYFLOW>
-      <RPY_DYFLOW>
-       <LINE>MODULE USER_COMMAND_0200 at EXIT-COMMAND.</LINE>
-      </RPY_DYFLOW>
-      <RPY_DYFLOW>
-       <LINE>MODULE USER_COMMAND_0200.</LINE>
-      </RPY_DYFLOW>
-     </FLOW_LOGIC>
-     <SPACES>
-      <item>0</item>
-      <item>1</item>
-      <item>0</item>
-      <item>0</item>
-      <item>1</item>
-      <item>1</item>
-     </SPACES>
     </item>
     <item>
      <HEADER>
@@ -905,30 +825,6 @@
        <INPUT_FLD>X</INPUT_FLD>
       </RPY_DYFATC>
      </FIELDS>
-     <FLOW_LOGIC>
-      <RPY_DYFLOW>
-       <LINE>PROCESS BEFORE OUTPUT.</LINE>
-      </RPY_DYFLOW>
-      <RPY_DYFLOW>
-       <LINE>MODULE STATUS_0300.</LINE>
-      </RPY_DYFLOW>
-      <RPY_DYFLOW>
-       <LINE>*</LINE>
-      </RPY_DYFLOW>
-      <RPY_DYFLOW>
-       <LINE>PROCESS AFTER INPUT.</LINE>
-      </RPY_DYFLOW>
-      <RPY_DYFLOW>
-       <LINE>MODULE USER_COMMAND_0300.</LINE>
-      </RPY_DYFLOW>
-     </FLOW_LOGIC>
-     <SPACES>
-      <item>0</item>
-      <item>1</item>
-      <item>0</item>
-      <item>0</item>
-      <item>1</item>
-     </SPACES>
     </item>
    </DYNPROS>
    <CUA>
