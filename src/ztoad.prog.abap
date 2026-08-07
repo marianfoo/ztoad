@@ -919,11 +919,10 @@ CLASS lcl_select_list_scanner IMPLEMENTATION.
   ENDMETHOD.
 
   METHOD get_function_result_type.
-    DATA opening_offset TYPE i.
-
-    FIND FIRST OCCURRENCE OF '(' IN expression
-         MATCH OFFSET opening_offset.
-    IF sy-subrc <> 0 OR opening_offset = 0.
+    DATA(opening_offset) = find(
+      val = expression
+      sub = '(' ).
+    IF opening_offset <= 0.
       RETURN.
     ENDIF.
 
@@ -3270,11 +3269,11 @@ FORM query_generate  USING    fw_select TYPE string
 
       WHILE function_complete = abap_false
           AND function_invalid = abap_false.
-        READ TABLE lt_split INTO lw_string INDEX lw_index.
-        IF sy-subrc <> 0.
+        IF lines( lt_split ) < lw_index.
           function_invalid = abap_true.
           EXIT.
         ENDIF.
+        lw_string = lt_split[ lw_index ].
         CONCATENATE function_expression lw_string
                     INTO function_expression SEPARATED BY space.
         DELETE lt_split INDEX lw_index.
@@ -3298,13 +3297,15 @@ FORM query_generate  USING    fw_select TYPE string
 
       CLEAR ls_fieldlist-ref_table.
       ls_fieldlist-ref_field = function_expression.
-      READ TABLE lt_split INTO lw_string INDEX lw_index.
-      IF sy-subrc = 0 AND lw_string = 'AS'.
-        DELETE lt_split INDEX lw_index.
-        READ TABLE lt_split INTO lw_string INDEX lw_index.
-        IF sy-subrc = 0.
-          ls_fieldlist-ref_field = lw_string.
+      IF lines( lt_split ) >= lw_index.
+        lw_string = lt_split[ lw_index ].
+        IF lw_string = 'AS'.
           DELETE lt_split INDEX lw_index.
+          IF lines( lt_split ) >= lw_index.
+            lw_string = lt_split[ lw_index ].
+            ls_fieldlist-ref_field = lw_string.
+            DELETE lt_split INDEX lw_index.
+          ENDIF.
         ENDIF.
       ENDIF.
       APPEND ls_fieldlist TO ft_fieldlist.
@@ -7528,11 +7529,10 @@ CLASS ltc_query_generator IMPLEMENTATION.
     cl_abap_unit_assert=>assert_not_initial(
       act = generated_program
       msg = 'SUBSTRING must produce a valid generated program' ).
-    READ TABLE field_list INTO DATA(first_field) INDEX 1.
-    cl_abap_unit_assert=>assert_equals(
-      act = sy-subrc
-      exp = 0
-      msg = 'Function result metadata must exist' ).
+    IF field_list IS INITIAL.
+      cl_abap_unit_assert=>fail( msg = 'Function result metadata must exist' ).
+    ENDIF.
+    DATA(first_field) = field_list[ 1 ].
     cl_abap_unit_assert=>assert_equals(
       act = first_field-ref_field
       exp = 'PREFIX'
