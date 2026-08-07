@@ -83,8 +83,11 @@ FROM from clause
 [ORDER BY fields2]  
 [UNION SELECT...]  
 
-UP TO (Default max rows) ROWS added at end of query if omitted
-You could force select without limits by adding UP TO 0 ROWS
+UP TO (Default max rows) ROWS is applied if omitted.
+Every multirow SELECT is limited to 1-10,000 rows. `UP TO 0 ROWS`, invalid
+limits, and explicit values above 10,000 are rejected before execution. A saved
+default of zero or a negative value safely falls back to 100; a larger saved
+default is capped at 10,000.
 
 COUNT, AVG, MAX, MIN, SUM are managed  
 DO NOT FORGET SPACE in ( ) of aggregat  
