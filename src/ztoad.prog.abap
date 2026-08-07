@@ -6613,6 +6613,8 @@ CLASS ltc_query_parser DEFINITION FINAL
     METHODS keeps_tail_clauses FOR TESTING.
     METHODS separates_union FOR TESTING.
     METHODS separates_union_expression FOR TESTING.
+    METHODS separates_union_all FOR TESTING.
+    METHODS rejects_union_branch_limit FOR TESTING.
     METHODS detects_comma_syntax FOR TESTING.
     METHODS strips_into_target FOR TESTING.
     METHODS ignores_literal_from_keyword FOR TESTING.
@@ -7000,8 +7002,8 @@ CLASS ltc_query_parser IMPLEMENTATION.
 
     cl_abap_unit_assert=>assert_equals(
       act = union_part
-      exp = 'SELECT carrid FROM sflight'
-      msg = 'UNION remainder must be returned for the next parse pass' ).
+      exp = 'UNION SELECT carrid FROM sflight'
+      msg = 'The set operator must remain attached to its right branch' ).
     cl_abap_unit_assert=>assert_equals(
       act = from_part
       exp = 'scarr'
@@ -7027,9 +7029,46 @@ CLASS ltc_query_parser IMPLEMENTATION.
       msg = 'Masked expression content before UNION must not be truncated' ).
     cl_abap_unit_assert=>assert_equals(
       act = union_part
-      exp = 'SELECT carrname FROM scarr'
-      msg = 'The top-level UNION branch must still be separated' ).
+      exp = 'UNION SELECT carrname FROM scarr'
+      msg = 'The top-level set expression must preserve its operator' ).
     cl_abap_unit_assert=>assert_initial( act = parse_error ).
+  ENDMETHOD.
+
+  METHOD separates_union_all.
+    DATA union_part TYPE string.
+    DATA parse_error TYPE abap_bool.
+
+    parse_select(
+      EXPORTING
+        query = `SELECT carrid FROM scarr`
+             && cl_abap_char_utilities=>newline
+             && `UNION   ALL`
+             && cl_abap_char_utilities=>newline
+             && `SELECT carrid FROM sflight`
+      IMPORTING union_part = union_part
+                parse_error = parse_error ).
+
+    cl_abap_unit_assert=>assert_equals(
+      act = union_part
+      exp = `UNION   ALL`
+         && cl_abap_char_utilities=>newline
+         && `SELECT carrid FROM sflight`
+      msg = 'UNION ALL must follow the same top-level set path' ).
+    cl_abap_unit_assert=>assert_initial( act = parse_error ).
+  ENDMETHOD.
+
+  METHOD rejects_union_branch_limit.
+    DATA parse_error TYPE abap_bool.
+
+    parse_select(
+      EXPORTING
+        query = `SELECT carrid FROM scarr UP TO 1 ROWS`
+             && ` UNION ALL SELECT carrid FROM sflight`
+      IMPORTING parse_error = parse_error ).
+
+    cl_abap_unit_assert=>assert_true(
+      act = parse_error
+      msg = 'A row limit before another set branch is not a global cap' ).
   ENDMETHOD.
 
   METHOD detects_comma_syntax.
@@ -7916,6 +7955,10 @@ CLASS ltc_query_generator DEFINITION FINAL
     METHODS generates_length_function FOR TESTING.
     METHODS rejects_statement_injection FOR TESTING.
     METHODS rejects_wrapped_quote_boundary FOR TESTING.
+    METHODS generates_union_distinct FOR TESTING.
+    METHODS generates_union_all FOR TESTING.
+    METHODS rejects_union_layout_mismatch FOR TESTING.
+    METHODS limits_union_result FOR TESTING.
 
     METHODS generate_query
       IMPORTING query TYPE string
@@ -8233,6 +8276,109 @@ CLASS ltc_query_generator IMPLEMENTATION.
     cl_abap_unit_assert=>assert_initial(
       act = generated_program
       msg = 'A wrapped doubled quote must not produce executable source' ).
+  ENDMETHOD.
+
+  METHOD generates_union_distinct.
+    DATA generated_program TYPE sy-repid.
+    DATA new_syntax TYPE abap_bool.
+    DATA count_query TYPE abap_bool.
+    DATA result TYPE REF TO data.
+    DATA runtime TYPE p LENGTH 8 DECIMALS 2.
+    DATA row_count TYPE i.
+    FIELD-SYMBOLS <result> TYPE STANDARD TABLE.
+
+    generate_query(
+      EXPORTING
+        query = `SELECT COUNT( * ) FROM T000`
+             && ` UNION SELECT COUNT( * ) FROM DD02L`
+             && ` WHERE TABNAME = 'ZTOAD_DOES_NOT_EXIST'`
+      IMPORTING generated_program = generated_program
+                new_syntax = new_syntax
+                count_query = count_query ).
+
+    cl_abap_unit_assert=>assert_not_initial(
+      act = generated_program
+      msg = 'A valid UNION must compile as one set expression' ).
+    PERFORM run_sql IN PROGRAM (generated_program)
+            CHANGING result runtime row_count.
+    ASSIGN result->* TO <result>.
+    DESCRIBE TABLE <result> LINES row_count.
+    cl_abap_unit_assert=>assert_equals(
+      act = row_count
+      exp = 2
+      msg = 'UNION must return both distinct aggregate rows' ).
+    cl_abap_unit_assert=>assert_initial(
+      act = count_query
+      msg = 'A set of aggregates is a tabular result, not SELECT SINGLE' ).
+  ENDMETHOD.
+
+  METHOD generates_union_all.
+    DATA generated_program TYPE sy-repid.
+    DATA new_syntax TYPE abap_bool.
+    DATA count_query TYPE abap_bool.
+    DATA result TYPE REF TO data.
+    DATA runtime TYPE p LENGTH 8 DECIMALS 2.
+    DATA row_count TYPE i.
+    FIELD-SYMBOLS <result> TYPE STANDARD TABLE.
+
+    generate_query(
+      EXPORTING
+        query = `SELECT COUNT( * ) FROM T000`
+             && ` UNION ALL SELECT COUNT( * ) FROM T000`
+      IMPORTING generated_program = generated_program
+                new_syntax = new_syntax
+                count_query = count_query ).
+
+    cl_abap_unit_assert=>assert_not_initial(
+      act = generated_program
+      msg = 'UNION ALL must compile as one set expression' ).
+    PERFORM run_sql IN PROGRAM (generated_program)
+            CHANGING result runtime row_count.
+    ASSIGN result->* TO <result>.
+    DESCRIBE TABLE <result> LINES row_count.
+    cl_abap_unit_assert=>assert_equals(
+      act = row_count
+      exp = 2
+      msg = 'UNION ALL must preserve duplicate rows' ).
+    cl_abap_unit_assert=>assert_initial( act = count_query ).
+  ENDMETHOD.
+
+  METHOD rejects_union_layout_mismatch.
+    DATA generated_program TYPE sy-repid.
+
+    generate_query(
+      EXPORTING
+        query = `SELECT mandt FROM T000`
+             && ` UNION SELECT tabname, tabclass FROM DD02L`
+      IMPORTING generated_program = generated_program ).
+
+    cl_abap_unit_assert=>assert_initial(
+      act = generated_program
+      msg = 'SAP syntax must reject incompatible set branch layouts' ).
+  ENDMETHOD.
+
+  METHOD limits_union_result.
+    DATA generated_program TYPE sy-repid.
+    DATA result TYPE REF TO data.
+    DATA runtime TYPE p LENGTH 8 DECIMALS 2.
+    DATA row_count TYPE i.
+    FIELD-SYMBOLS <result> TYPE STANDARD TABLE.
+
+    generate_query(
+      EXPORTING
+        query = `SELECT COUNT( * ) FROM T000`
+             && ` UNION ALL SELECT COUNT( * ) FROM T000 UP TO 1 ROWS`
+      IMPORTING generated_program = generated_program ).
+
+    cl_abap_unit_assert=>assert_not_initial( act = generated_program ).
+    PERFORM run_sql IN PROGRAM (generated_program)
+            CHANGING result runtime row_count.
+    ASSIGN result->* TO <result>.
+    DESCRIBE TABLE <result> LINES row_count.
+    cl_abap_unit_assert=>assert_equals(
+      act = row_count
+      exp = 1
+      msg = 'The final ZTOAD row cap must bound the merged result' ).
   ENDMETHOD.
 ENDCLASS.
 
