@@ -1,6 +1,6 @@
 # BASE-BUG-001 NPL compatibility closure plan
 
-_Created: 2026-08-07 · finding: `BASE-BUG-001` · target branch: `codex/fix-base-bug-001-npl`_
+_Created: 2026-08-07 · completed: 2026-08-07 · finding: `BASE-BUG-001` · target branch: `codex/fix-base-bug-001-npl`_
 
 ## Objective
 
@@ -85,3 +85,11 @@ Revert the two `DISTINCT` additions and redeploy the previous `master` source. N
 - A4H 758: native abapGit remained on `refs/heads/master`; direct candidate activation; equal active/inactive source; zero inactive ZTOAD parts; syntax 0 errors plus the two pre-existing POSIX warnings; 67/67 Unit; `ABAP_CLOUD_READINESS` unchanged at 682 (474 P1, 208 P2); `S4HANA_READINESS_2023` returned zero rows but retains its documented prerequisite limitation.
 - Browser/ST22: not applicable because production behavior and serialized UI objects are unchanged.
 - Restore: both systems explicitly restored and activated to exact `origin/master` `d532b2e`, server SHA-256 `e32d7d3b8bebdb38457cd81f52e90a3b00dc0e830ac537b7690b70cee4544897`, with equal source and no inactive ZTOAD part. A4H restored at 67/67; NPL restored at the intentionally reproduced 66/67 pre-fix baseline.
+
+## Post-green process audit
+
+- First green PR head: `0e01a22`; GitHub Quality run `31162476498` passed the pinned install, abaplint, repository contract, and installation contract at the exact head. The external abaplint check also passed.
+- The red/live sequence correctly exposed that the minimum-release failure belonged to the regression fixture rather than production code. Freezing the source candidate before live gates and restoring both shared targets kept the evidence auditable.
+- The reusable gap was fixture compatibility: generated-source tests need an explicit rule that their own grammar must reach the intended invariant on SAP_BASIS 750. That rule is now recorded in `AGENTS.md` and `docs/test-strategy.md`, including the dry-run compiler-spike procedure used here.
+- CI already executes every applicable repository-local gate through `npm test`; the missing release-specific compiler evidence is necessarily supplied by the two live SAP targets. No workflow change is justified by this PR.
+- Scope, implementation, rollback, exact-candidate evidence, CI output, and final diff were reviewed. The plan is complete and moved to `docs/plans/finished/`.

@@ -61,6 +61,7 @@ NPL now has the complete ZTOAD object set in offline native-abapGit package `$ZT
 - Use dependency injection for external collaborators. Use test seams only as a temporary legacy-code bridge.
 - Test both the success path and invalid/untrusted input. ZTOAD executes dynamic SQL, so authorization boundaries, dynamic table/column input, escaping, DML, and native SQL are security-sensitive.
 - For generated source, test the actual emitted line representation: split only at whitespace outside literals, reject unsafe hard cuts, and never move `*` into ABAP source column one.
+- Generated-source test fixtures must themselves use grammar supported by SAP_BASIS 750. If the floor compiler rejects a fixture before the intended invariant is reached, isolate the grammar in dry-run compiler probes and correct the fixture before changing production code.
 - When a tokenizer or masker rebuilds text character by character, run its whitespace-preservation regression on SAP; converting a fixed-length `TYPE c` blank into a string can trim the separator even when static lint is green.
 - ABAP Unit tests must not change customizing or persistent business data. Any integration test that writes must use an explicitly disposable Z table and be cleaned up.
 - Local abaplint is a fast compatibility/static gate, not a substitute for SAP syntax, activation, ABAP Unit, or ATC.
