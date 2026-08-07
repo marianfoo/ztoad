@@ -2673,7 +2673,7 @@ FORM query_process USING fw_display TYPE c
       IMPORTING sources = lt_sources
                 invalid = lw_invalid ).
     IF lw_invalid = abap_true OR lt_sources IS INITIAL.
-      MESSAGE 'Cannot parse the query'(m07) TYPE c_msg_error.
+      RETURN.
     ENDIF.
     lw_set_from = lcl_sql_set_expression=>join_sources( lt_sources ).
     lw_where = lcl_sql_set_expression=>attach_suffix(
@@ -3203,6 +3203,17 @@ FORM query_parse  USING    fw_query TYPE string
   ENDIF.
   fw_select = lw_query+lw_offset(lw_length).
 
+* SINGLE is not valid for a tabular set result. Reject it before the generator
+* can reinterpret it as a one-row package size.
+  IF NOT fw_union IS INITIAL.
+    lw_string = fw_select.
+    TRANSLATE lw_string TO UPPER CASE.
+    IF strlen( lw_string ) GE 7 AND lw_string(7) = 'SINGLE'.
+      fw_error = abap_true.
+      RETURN.
+    ENDIF.
+  ENDIF.
+
 * Detect strict syntax from a result separator or a 7.50 SQL function.
   IF fw_select CS ','
       OR lcl_select_list_scanner=>contains_v750_function( fw_select ) = abap_true.
@@ -3361,8 +3372,6 @@ FORM query_generate  USING    fw_select TYPE string
     IMPORTING top_level = top_level_query
               invalid = top_level_invalid ).
   IF top_level_invalid = abap_true.
-    MESSAGE 'Cannot parse the query'(m07)
-            TYPE c_msg_success DISPLAY LIKE c_msg_error.
     RETURN.
   ENDIF.
   FIND FIRST OCCURRENCE OF REGEX
@@ -3403,8 +3412,6 @@ FORM query_generate  USING    fw_select TYPE string
     lw_char_10 = lw_select(7).
     IF lw_char_10 = 'SINGLE'.
       IF set_query = abap_true.
-        MESSAGE 'Cannot parse the query'(m07)
-                TYPE c_msg_success DISPLAY LIKE c_msg_error.
         RETURN.
       ENDIF.
 * Force rows number = 1 for select single
@@ -6696,6 +6703,7 @@ CLASS ltc_query_parser DEFINITION FINAL
     METHODS separates_union_all FOR TESTING.
     METHODS separates_union_distinct FOR TESTING.
     METHODS rejects_union_branch_limit FOR TESTING.
+    METHODS rejects_union_single FOR TESTING.
     METHODS detects_comma_syntax FOR TESTING.
     METHODS strips_into_target FOR TESTING.
     METHODS ignores_literal_from_keyword FOR TESTING.
@@ -7193,6 +7201,20 @@ CLASS ltc_query_parser IMPLEMENTATION.
     cl_abap_unit_assert=>assert_true(
       act = parse_error
       msg = 'A row limit before another set branch is not a global cap' ).
+  ENDMETHOD.
+
+  METHOD rejects_union_single.
+    DATA parse_error TYPE abap_bool.
+
+    parse_select(
+      EXPORTING
+        query = `SELECT SINGLE mandt FROM T000`
+             && ` UNION SELECT mandt FROM T000`
+      IMPORTING parse_error = parse_error ).
+
+    cl_abap_unit_assert=>assert_true(
+      act = parse_error
+      msg = 'SINGLE must not be silently rewritten as a set result cap' ).
   ENDMETHOD.
 
   METHOD detects_comma_syntax.
@@ -8074,7 +8096,6 @@ CLASS ltc_query_generator DEFINITION FINAL
     METHODS generates_union_all FOR TESTING.
     METHODS rejects_union_layout_mismatch FOR TESTING.
     METHODS rejects_union_type_mismatch FOR TESTING.
-    METHODS rejects_union_single FOR TESTING.
     METHODS generates_three_union_branches FOR TESTING.
     METHODS limits_union_result FOR TESTING.
     METHODS keeps_unlimited_union FOR TESTING.
@@ -8514,20 +8535,6 @@ CLASS ltc_query_generator IMPLEMENTATION.
     cl_abap_unit_assert=>assert_initial(
       act = generated_program
       msg = 'SAP syntax must reject incompatible set branch types' ).
-  ENDMETHOD.
-
-  METHOD rejects_union_single.
-    DATA generated_program TYPE sy-repid.
-
-    generate_query(
-      EXPORTING
-        query = `SELECT SINGLE mandt FROM T000`
-             && ` UNION SELECT mandt FROM T000`
-      IMPORTING generated_program = generated_program ).
-
-    cl_abap_unit_assert=>assert_initial(
-      act = generated_program
-      msg = 'SINGLE must not be silently rewritten as a set result cap' ).
   ENDMETHOD.
 
   METHOD generates_three_union_branches.
