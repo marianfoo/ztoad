@@ -1,6 +1,6 @@
 # BASE-BUG-005 implementation plan
 
-Status: implementation and exact live validation complete; pull request pending.
+Status: complete; PR #30 passed the first CI cycle and process audit.
 
 ## Goal
 
@@ -132,3 +132,25 @@ Test-only commit `8ff0d99` produced exactly one NPL failure
 (`GENERATES_UNION_ALL`, 105/106 passed). Candidate `680d051` condenses only the
 already-masked structural representation before matching; all local and live
 gates above were rerun from scratch after that production change.
+
+## Post-green process audit
+
+- The red-green sequence correctly isolated the original branch-append defect,
+  and the compatibility-floor replay caught both fixed-width token semantics
+  and the later generator-side whitespace mismatch.
+- The final diff review added material value: the parser regression covered
+  multiline input, but no executable generator test carried that spelling
+  through the second structural detector. The missing full-path regression was
+  replayed red before the normalization fix.
+- `AGENTS.md` and `docs/test-strategy.md` now require shared structural
+  predicates where possible and end-to-end stage coverage for tabs, line
+  breaks, and repeated spaces. This turns the review finding into a permanent
+  workflow rule.
+- GitHub Quality run `31181170374` installed pinned dependencies and passed
+  configured abaplint, repository contracts, and installation contracts. The
+  external abaplint check also passed; its observations job was neutrally
+  skipped as expected. No CI workflow change was necessary.
+- Candidate evidence was frozen before live testing, discarded after each
+  source change, rerun on both releases, and followed by an exact restoration
+  of the shared systems. The private endpoint remained only in ignored local
+  configuration.
