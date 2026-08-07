@@ -41,3 +41,12 @@ Reference: [abapGit TABL DDL serializer](https://github.com/abapGit/abapGit/blob
 - No column, key, type, delivery class, technical setting, or stored row changes.
 - Existing code has no append dependency; live structure discovery found no append on NPL. A4H where-used structure discovery is unavailable through its older ARC-1 adapter, so the native-abapGit diff and activation preaudit must remain authoritative there.
 - Rollback is a reviewed native-abapGit restoration of the previous table serialization. Returning to unclassified metadata is not recommended, but it does not require a database conversion.
+
+## Native round-trip evidence
+
+- Red contract commit: `fb60eca`; `npm run test:repository` failed only because `<EXCLASS>1</EXCLASS>` was absent.
+- Native-abapGit candidate commit: `4206a1a`; table XML SHA-256 `0a7b98b6c073e5062c56bfd314dc297ecd88dc0ea685bee643caabc9a76a1f40`.
+- A4H active candidate: `#NOT_EXTENSIBLE`, all seven fields unchanged, equal active/inactive table source, zero inactive ZTOAD parts, report syntax 0 errors plus two pre-existing POSIX warnings, and 67/67 Unit. `S4HANA_READINESS_2023` again returned zero rows with its known prerequisite limitation; Cloud ATC remained the unchanged legacy baseline.
+- The current serializer also added `MASTERLANG E` and removed redundant per-field `TABNAME`, `POSITION`, and `DDLANGUAGE` values. Field order, names, types, key, table class, delivery class, and technical settings are unchanged. This canonicalization is reviewed as part of the dedicated structural change.
+- Native abapGit staged only `TABL ZTOAD`; the pre-merge report drift was explicitly left unselected. A4H was then switched and pulled back to full `refs/heads/master`, activating current master report source and the pre-change unclassified table with equal active/inactive state.
+- Exact NPL import archive: `/tmp/ztoad-base-ddic-001.zip`, SHA-256 `a5c5745c55304e34f334ddb6b1e4ec7c4c3fbde9cf6ce46d01264f963059a4c5`. Only `TABL ZTOAD` is to be selected in the offline pull dialog; source will be synchronized separately through ARC-1.

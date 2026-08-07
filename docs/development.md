@@ -67,6 +67,8 @@ Do not manually install only the report source. That omits the dynpros, table, a
 
 For an offline NPL refresh, create an offline repository bound to the dedicated local package, import a ZIP generated from the exact Git commit, review and pull only `PROG ZTOAD`, `TABL ZTOAD`, `TRAN ZTOAD`, and `SUSO ZTOAD_AUTH`, then activate. Do not export the system-local root package as `package.devc.xml`, and do not accept release-normalized table metadata without a deliberate structural review. After this one-time structural provisioning, deploy source-only candidates directly through ARC-1 and keep all NPL validation UI-free.
 
+Current ARC-1 TABL `dryRun` requests can still create an inactive draft. After any DDIC dry-run or preflight, compare active/inactive object state immediately; never infer non-mutation from the option name or success text. The A4H abapGit ADT backend also uses version-specific staging/pull XML namespaces, so an empty ARC-1 stage result is not proof of a clean repository—verify the raw bridge result or native client before pushing.
+
 ## 4. Local-first TDD flow with a stable `master`
 
 `master` remains the only long-lived integration/release line and the normal branch of each shared native-abapGit link. Development uses a short-lived pull-request branch so CI and review can evaluate the candidate without placing an unreviewed state on `master`.

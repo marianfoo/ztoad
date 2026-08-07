@@ -56,3 +56,12 @@ Restore `TABL ZTOAD` from the reviewed `master` serialization through native aba
 - Structural XML comes only from a native-abapGit round trip.
 - The coordinated branch procedure prevents a system-only or master-only structural mutation.
 - Live gates cover both supported releases while respecting NPL's no-UI boundary.
+
+## Validation progress
+
+- Red contract commit `fb60eca` failed at the exact missing `EXCLASS 1` assertion.
+- Native-abapGit candidate commit `4206a1a`, table XML SHA-256 `0a7b98b6c073e5062c56bfd314dc297ecd88dc0ea685bee643caabc9a76a1f40`.
+- Local `npm ci`, `npm test`, and `git diff --check` are green.
+- A4H candidate activation/state, 67/67 Unit, syntax, inactive inventory, and recorded ATC gates are green; browser/ST22 remains not applicable.
+- A4H is restored to full `refs/heads/master`; current master report and pre-change table are active with no inactive divergence. The known table drift remains visible until this PR merges.
+- NPL is the remaining structural gate. Import `/tmp/ztoad-base-ddic-001.zip` (SHA-256 `a5c5745c55304e34f334ddb6b1e4ec7c4c3fbde9cf6ce46d01264f963059a4c5`) into the existing offline repository and select only `TABL ZTOAD`. After that one manual boundary, all activation/state/syntax/Unit/ATC evidence is collected through ARC-1.
