@@ -2664,6 +2664,7 @@ FORM query_process USING fw_display TYPE c
          lw_noauth(1)     TYPE c,
          lw_newsyntax(1)  TYPE c,
          lw_answer(1)     TYPE c,
+         lw_exec_failed   TYPE abap_bool,
          lw_from_concat   LIKE lw_from,
          lw_set_from      LIKE lw_from,
          lw_invalid       TYPE abap_bool,
@@ -2771,8 +2772,12 @@ FORM query_process USING fw_display TYPE c
 
 * Call the generated subroutine
   IF NOT lw_program IS INITIAL.
-    PERFORM run_sql IN PROGRAM (lw_program)
-                    CHANGING lo_result lw_time lw_count.
+    PERFORM query_execute USING lw_program
+                          CHANGING lo_result lw_time lw_count
+                                   lw_exec_failed.
+    IF lw_exec_failed = abap_true.
+      RETURN.
+    ENDIF.
     lw_from_concat = lw_from.
     IF NOT lw_set_from IS INITIAL.
       lw_from_concat = lw_set_from.
@@ -2810,6 +2815,27 @@ FORM query_process USING fw_display TYPE c
     PERFORM repo_save_current_query.
   ENDIF.
 ENDFORM.                    " QUERY_PROCESS
+
+*&---------------------------------------------------------------------*
+*&      Form  QUERY_EXECUTE
+*&---------------------------------------------------------------------*
+*       Execute the generated query program
+*----------------------------------------------------------------------*
+*      -->FW_PROGRAM Query subroutine pool
+*      <--FO_RESULT  Result data reference
+*      <--FW_TIME    Query runtime
+*      <--FW_COUNT   Result or affected-row count
+*      <--FW_FAILED  Execution failed
+*----------------------------------------------------------------------*
+FORM query_execute USING    fw_program TYPE sy-repid
+                   CHANGING fo_result TYPE REF TO data
+                            fw_time TYPE p
+                            fw_count TYPE i
+                            fw_failed TYPE abap_bool.
+  CLEAR fw_failed.
+  PERFORM run_sql IN PROGRAM (fw_program)
+                  CHANGING fo_result fw_time fw_count.
+ENDFORM.                    " QUERY_EXECUTE
 
 *&---------------------------------------------------------------------*
 *&      Form  EDITOR_GET_QUERY
@@ -8640,6 +8666,56 @@ CLASS ltc_query_generator IMPLEMENTATION.
       act = row_count
       exp = 2
       msg = 'UP TO 0 must retain the existing explicit unlimited contract' ).
+  ENDMETHOD.
+ENDCLASS.
+
+
+CLASS ltcl_query_execution DEFINITION FINAL
+  FOR TESTING
+  DURATION SHORT
+  RISK LEVEL HARMLESS.
+  PRIVATE SECTION.
+    METHODS contains_runtime_exception FOR TESTING.
+ENDCLASS.
+
+CLASS ltcl_query_execution IMPLEMENTATION.
+  METHOD contains_runtime_exception.
+    DATA source TYPE string_table.
+    DATA generated_program TYPE sy-repid.
+    DATA result TYPE REF TO data.
+    DATA runtime TYPE p LENGTH 8 DECIMALS 2.
+    DATA row_count TYPE i.
+    DATA execution_failed TYPE abap_bool.
+    DATA exception_escaped TYPE abap_bool.
+
+    APPEND 'PROGRAM SUBPOOL.' TO source.
+    APPEND 'FORM run_sql CHANGING fo_result TYPE REF TO data' TO source.
+    APPEND '                      fw_time TYPE p' TO source.
+    APPEND '                      fw_count TYPE i.' TO source.
+    APPEND 'DATA zero TYPE i.' TO source.
+    APPEND 'fw_count = 1 / zero.' TO source.
+    APPEND 'ENDFORM.' TO source.
+
+    GENERATE SUBROUTINE POOL source NAME generated_program.
+    cl_abap_unit_assert=>assert_equals(
+      act = sy-subrc
+      exp = 0
+      msg = 'The deterministic runtime-failure fixture must compile' ).
+
+    TRY.
+        PERFORM query_execute USING generated_program
+                              CHANGING result runtime row_count
+                                       execution_failed.
+      CATCH cx_sy_arithmetic_error.
+        exception_escaped = abap_true.
+    ENDTRY.
+
+    cl_abap_unit_assert=>assert_initial(
+      act = exception_escaped
+      msg = 'A generated-program exception must not escape the boundary' ).
+    cl_abap_unit_assert=>assert_true(
+      act = execution_failed
+      msg = 'A generated-program exception needs a stable failure result' ).
   ENDMETHOD.
 ENDCLASS.
 
