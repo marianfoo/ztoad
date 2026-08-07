@@ -18,7 +18,7 @@ This is the ordered work list for incremental TDD. It records observed defects s
 | NPL SAP syntax / ABAP Unit | 0 errors or warnings; 106 passed, 0 failed | Exact candidate is green on the SAP_BASIS 750 compatibility floor |
 | NPL ATC `DEFAULT` | 86 findings: 3 P1, 4 P2, 79 P3 | Complete exact-candidate run; two fewer P3 findings than master and tracked as legacy debt |
 
-All merged fixes through `BASE-BUG-004` are preserved in this candidate. Exact source commit `58aed8d443d3837bdc94b579e0b4f6b5bfba96df` has local SHA-256 `9848ace8fadb61ef72a0a28a7ee011e72d8e58ebebad4514d3268eafcb940a2e`; both systems reported equal active/inactive source at server-normalized SHA-256 `7ab32de5518a77c996e6dc1341618df4480c928ebd6529c63a918ab199e54d63`. NPL and A4H each passed 106/106 Unit tests and had no inactive ZTOAD part. `S4HANA_READINESS_2023` returned no rows but remains incomplete because its prerequisite checks are unavailable.
+All merged fixes through `BASE-BUG-004` are preserved in this candidate. Exact source commit `58aed8d443d3837bdc94b579e0b4f6b5bfba96df` has local SHA-256 `9848ace8fadb61ef72a0a28a7ee011e72d8e58ebebad4514d3268eafcb940a2e`; both systems reported equal active/inactive source at server-normalized SHA-256 `7ab32de5518a77c996e6dc1341618df4480c928ebd6529c63a918ab199e54d63`. NPL and A4H each passed 106/106 Unit tests and had no inactive ZTOAD part. `S4HANA_READINESS_2023` returned no rows but remains incomplete because its prerequisite checks are unavailable. After evidence, both systems were restored to master `15e6258`: 91/91 Unit, equal active/inactive server SHA-256 `fa0332e5679236d636bece64cbb3e28b3dccf2e8b21112c69efadd550ea78d0b`, and no inactive ZTOAD part.
 
 ## Ordered findings register
 

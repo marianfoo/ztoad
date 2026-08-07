@@ -138,3 +138,8 @@ Both systems normalized the active and inactive source to SHA-256
   `UNION ALL` aggregate with a final cap of one. The success state reported one
   result row, and a client-side comparison of the complete ST22 result sets
   found no new dump.
+- Both targets were then restored and explicitly activated to released master
+  `15e6258`; each passed 91/91 Unit tests, active and inactive source matched
+  server SHA-256
+  `fa0332e5679236d636bece64cbb3e28b3dccf2e8b21112c69efadd550ea78d0b`,
+  and the global inactive inventory contained no ZTOAD part.

@@ -121,3 +121,7 @@ tests exercise that boundary directly on both compilers.
   with a final one-row cap executed successfully and returned exactly one ALV
   row. Comparing the complete 50-entry ST22 sets before and after found no new
   dump.
+- After evidence collection, both shared systems were restored and explicitly
+  activated to released master `15e6258`: 91/91 Unit, equal active/inactive
+  server SHA-256 `fa0332e5679236d636bece64cbb3e28b3dccf2e8b21112c69efadd550ea78d0b`,
+  and no inactive ZTOAD part.
