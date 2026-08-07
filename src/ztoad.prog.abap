@@ -459,6 +459,10 @@ CLASS lcl_select_expression_analyzer DEFINITION FINAL.
       RETURNING VALUE(reference) TYPE string.
 
   PRIVATE SECTION.
+    CLASS-METHODS mask_literals
+      IMPORTING expression TYPE string
+      EXPORTING masked_expression TYPE string
+                valid TYPE abap_bool.
     CLASS-METHODS is_column_reference
       IMPORTING token TYPE string
       RETURNING VALUE(result) TYPE abap_bool.
@@ -760,8 +764,16 @@ CLASS lcl_select_expression_analyzer IMPLEMENTATION.
     DATA token TYPE string.
     DATA candidate TYPE string.
     DATA case_seen TYPE abap_bool.
+    DATA literals_valid TYPE abap_bool.
 
-    DATA(normalized_expression) = expression.
+    DATA normalized_expression TYPE string.
+    mask_literals(
+      EXPORTING expression = expression
+      IMPORTING masked_expression = normalized_expression
+                valid = literals_valid ).
+    IF literals_valid = abap_false.
+      RETURN.
+    ENDIF.
     TRANSLATE normalized_expression TO UPPER CASE.
     SPLIT normalized_expression AT space INTO TABLE tokens.
 
@@ -782,6 +794,45 @@ CLASS lcl_select_expression_analyzer IMPLEMENTATION.
       ENDIF.
       RETURN.
     ENDLOOP.
+  ENDMETHOD.
+
+  METHOD mask_literals.
+    DATA index TYPE i.
+    DATA next_index TYPE i.
+    DATA expression_length TYPE i.
+    DATA character TYPE c LENGTH 1.
+    DATA next_character TYPE c LENGTH 1.
+    DATA in_literal TYPE abap_bool.
+
+    CLEAR masked_expression.
+    expression_length = strlen( expression ).
+
+    WHILE index < expression_length.
+      character = expression+index(1).
+      IF in_literal = abap_true.
+        masked_expression = masked_expression && space.
+        IF character = ''''.
+          next_index = index + 1.
+          IF next_index < expression_length.
+            next_character = expression+next_index(1).
+            IF next_character = ''''.
+              masked_expression = masked_expression && space.
+              index = index + 2.
+              CONTINUE.
+            ENDIF.
+          ENDIF.
+          CLEAR in_literal.
+        ENDIF.
+      ELSEIF character = ''''.
+        in_literal = abap_true.
+        masked_expression = masked_expression && space.
+      ELSE.
+        masked_expression = masked_expression && character.
+      ENDIF.
+      index = index + 1.
+    ENDWHILE.
+
+    valid = xsdbool( in_literal = abap_false ).
   ENDMETHOD.
 
   METHOD is_column_reference.
