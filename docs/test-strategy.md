@@ -41,6 +41,7 @@ For every bug or feature:
 - Inject authorization, database, editor, generator, and executor collaborators through narrow interfaces as each path is changed.
 - Test valid, invalid, boundary, and hostile input. ZTOAD's parser is an authorization and injection boundary, not only a formatter.
 - For character-by-character tokenizers and literal maskers, assert that spaces and other separators survive the emitted ABAP string. Fixed-length character-to-string conversion can trim blanks and must be verified by live ABAP Unit, not inferred from abaplint.
+- Keep generated-source fixtures within the SAP_BASIS 750 grammar floor. When a fixture fails compilation before reaching the behavior under test, use isolated dry-run compiler probes to separate fixture compatibility from a production defect.
 - Never weaken a test merely to accommodate current behavior. If the current behavior is deliberately preserved, document why in the finding.
 
 ## Parser regression matrix
@@ -62,7 +63,7 @@ Each parser/generator change should select relevant cases from this matrix:
 
 ## Live test protocol
 
-NPL/SAP_BASIS 750 is ARC-1/ADT-only. Run activation, syntax, ABAP Unit, and ATC there; do not use FLP, WebGUI, SAP GUI, or browser automation. If a required object cannot be installed through the available ADT surface, record a blocked prerequisite rather than using an unfaithful substitute.
+NPL/SAP_BASIS 750 validation is ARC-1/ADT-only. Run activation, syntax, ABAP Unit, ATC, and inactive-object checks there; do not use FLP, WebGUI, SAP GUI, or browser automation for test execution. The complete object set was provisioned once by the maintainer through native abapGit's offline ZIP workflow because the real transparent table cannot be created through the 7.50 ADT surface. Future source candidates use ARC-1; future structural refreshes require another reviewed native-abapGit import rather than an unfaithful substitute.
 
 For A4H, use only the HTTPS reverse proxy:
 

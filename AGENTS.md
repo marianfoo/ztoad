@@ -8,7 +8,7 @@ These rules apply to every change in this repository. Read [docs/development.md]
 - Native abapGit is the source of truth for round-tripping complete SAP repository objects, including metadata XML, screens, text elements, authorization objects, tables, and transactions.
 - The ABAP 7.50 and S/4HANA 2023 systems are validation targets. Never treat an unexported system change as complete.
 - ARC-1 is the preferred interface for system context, focused object reads, syntax checks, ABAP Unit, and ATC. A source-only ARC-1 mirror is useful for inspection but is not a complete abapGit deployment.
-- NPL/SAP_BASIS 750 is an ARC-1/ADT-only target. Do not use FLP, WebGUI, SAP GUI, or browser automation there. UI/browser smoke belongs to A4H/SAP_BASIS 758.
+- NPL/SAP_BASIS 750 validation is ARC-1/ADT-only. Do not use FLP, WebGUI, SAP GUI, or browser automation there. The maintainer provisioned its complete object set once through native abapGit's offline ZIP workflow because 7.50 cannot create the transparent table through ADT; subsequent source deployment and all validation use ARC-1. UI/browser smoke belongs to A4H/SAP_BASIS 758.
 
 ## Compatibility contract
 
@@ -48,7 +48,7 @@ ZTOAD's report source is large enough that streaming a complete `SAPWrite` JSON 
 
 If ARC-1 authentication or a live system is unavailable, local checks may continue, but do not claim live validation. Record the missing gate in the PR and complete it before merge unless the maintainer explicitly accepts the risk.
 
-NPL currently lacks ZTOAD's transparent table. SAP_BASIS 750 has no ADT transparent-table create endpoint, so ARC-1 cannot provision it safely. Never substitute a DDIC structure. Until the real table is provisioned outside the ADT-only workflow, record NPL ZTOAD activation/syntax/Unit/ATC as blocked even though the ARC-1 object lifecycle itself is proven usable.
+NPL now has the complete ZTOAD object set in offline native-abapGit package `$ZTOAD2`, including the real transparent table. Never replace that table with a DDIC structure. Use ARC-1 for exact source deployment, explicit activation, syntax, Unit, ATC, and inactive-object checks. Structural refreshes require another reviewed native-abapGit ZIP import; do not export the local root package or accept release-normalized table metadata as a source change without a dedicated structural review. The missing table enhancement category is tracked separately as `BASE-DDIC-001`.
 
 ## Testing rules
 
@@ -61,6 +61,7 @@ NPL currently lacks ZTOAD's transparent table. SAP_BASIS 750 has no ADT transpar
 - Use dependency injection for external collaborators. Use test seams only as a temporary legacy-code bridge.
 - Test both the success path and invalid/untrusted input. ZTOAD executes dynamic SQL, so authorization boundaries, dynamic table/column input, escaping, DML, and native SQL are security-sensitive.
 - For generated source, test the actual emitted line representation: split only at whitespace outside literals, reject unsafe hard cuts, and never move `*` into ABAP source column one.
+- Generated-source test fixtures must themselves use grammar supported by SAP_BASIS 750. If the floor compiler rejects a fixture before the intended invariant is reached, isolate the grammar in dry-run compiler probes and correct the fixture before changing production code.
 - When a tokenizer or masker rebuilds text character by character, run its whitespace-preservation regression on SAP; converting a fixed-length `TYPE c` blank into a string can trim the separator even when static lint is green.
 - ABAP Unit tests must not change customizing or persistent business data. Any integration test that writes must use an explicitly disposable Z table and be cleaned up.
 - Local abaplint is a fast compatibility/static gate, not a substitute for SAP syntax, activation, ABAP Unit, or ATC.

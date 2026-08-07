@@ -64,17 +64,17 @@ The first request created during setup, `A4HK906377`, is an empty local request 
 
 | Check | Result on A4H |
 |---|---|
-| Candidate branch / exact tested commit | `codex/fix-base-bug-002` / source commit `36579848804e822f0863827479e221e3000231b5` |
+| Candidate branch / exact tested commit | `codex/fix-base-bug-001-npl` / source commit `9e8d881` |
 | Package / transport | `ZTOAD` / `A4HK906379` |
 | Repository objects | PROG `ZTOAD`, TABL `ZTOAD`, SUSO `ZTOAD_AUTH`, TRAN `ZTOAD` |
-| Active/inactive state | Candidate main source was equal at server SHA-256 `e32d7d3b8bebdb38457cd81f52e90a3b00dc0e830ac537b7690b70cee4544897`; global inactive inventory contained no ZTOAD child part |
+| Active/inactive state | Candidate main source was equal at server SHA-256 `c7d4cbcfcb9a3af1d322e3f912c586dfee12b8af0fe608049807cfa61e94cccd`; global inactive inventory contained no ZTOAD child part |
 | SAP syntax | 0 errors; 2 pre-existing POSIX warnings |
-| ABAP Unit | 67 passed, 0 failed; 26.98% statements / 26.31% branches / 20.45% procedures |
+| ABAP Unit | 67 passed, 0 failed |
 | ATC `S4HANA_READINESS_2023` | 0 rows returned; non-authoritative because known prerequisites are unavailable |
 | ATC `ABAP_CLOUD_READINESS` | Complete candidate run: 682 findings (474 P1, 208 P2); classic Dynpro/GUI design is not ABAP Cloud compatible |
-| WebGUI smoke | Fresh editor executed the sanitized SFLIGHT CASE aggregate; ALV returned eight grouped rows with `NET_PRICE`, F3 exited cleanly, and ST22 stayed unchanged after 06:26:10 UTC |
+| WebGUI smoke | Not rerun for the test-literal-only candidate; prior fresh editor/ALV/F3/ST22 evidence remains applicable because production and serialized UI objects are unchanged |
 | Transaction launch | Standalone WebGUI and FLP `Shell-startGUI` intent both reach the complete ZTOAD transaction closure |
-| Shared target after evidence | Restored and explicitly activated to `origin/master` `5218476`; active/inactive server SHA-256 `138d7cf38e68649abb7d714093afc809a27f7a26ca98b511d15dec4ef68d9e36`, 57/57 master Unit, no inactive ZTOAD part, native-abapGit check clean |
+| Shared target after evidence | Restored and explicitly activated to `origin/master` `d532b2e`; active/inactive server SHA-256 `e32d7d3b8bebdb38457cd81f52e90a3b00dc0e830ac537b7690b70cee4544897`, 67/67 master Unit, no inactive ZTOAD part; native abapGit remained on `refs/heads/master` |
 
 ## Coding Guidance
 
@@ -93,14 +93,15 @@ The first request created during setup, `A4HK906377`, is an empty local request 
 |---|---|
 | SID / client | NPL / 001 |
 | Release | SAP_BASIS 750 SP02; SAP_ABA, SAP_UI, and SAP_GWFND 750 SP02 |
-| Purpose | ADT-only minimum-release activation, syntax, ABAP Unit, and ATC gate |
-| ARC-1 | Separate `arc-1-750` profile, pinned to ARC-1 1.0.2; write/activate/syntax/Unit/cleanup lifecycle proven |
-| UI boundary | No FLP, WebGUI, SAP GUI, or browser automation; A4H owns UI smoke |
-| ZTOAD state | Exact ADT search finds no objects; program and transparent table are absent; the transaction reader returns an empty placeholder rather than reliable not-found evidence |
-| Blocking prerequisite | SAP_BASIS 750 exposes no ADT transparent-table create endpoint, so table `ZTOAD` cannot be safely provisioned through ARC-1 |
-| Completion status | Connection usable; exact ZTOAD activation/syntax/Unit/ATC blocked until the real table exists |
+| Purpose | ADT-only minimum-release activation, syntax, ABAP Unit, ATC, and inactive-object gate |
+| ARC-1 | Separate `arc-1-750` profile, pinned to ARC-1 1.0.2; package ceiling configured as `*`; data preview and free SQL disabled |
+| UI boundary | No FLP, WebGUI, SAP GUI, or browser automation for validation; A4H owns UI smoke |
+| ZTOAD state | Complete object set provisioned through native abapGit 1.134.0 offline repository in local package `$ZTOAD2`: PROG, real transparent TABL, TRAN, and SUSO |
+| Structural warning | Table enhancement category was absent; NPL activated and normalized it to `#NOT_CLASSIFIED`, leaving a diff tracked as `BASE-DDIC-001` |
+| Completion status | Exact candidate `9e8d881`: syntax 0 errors, 67/67 Unit, ATC `DEFAULT` 88 unchanged findings, equal active/inactive source, zero inactive ZTOAD parts |
+| Shared target after evidence | Restored and activated to `origin/master` `d532b2e`, server SHA-256 `e32d7d3b8bebdb38457cd81f52e90a3b00dc0e830ac537b7690b70cee4544897`; the known pre-fix fixture reproduces at 66/67 until the PR merges |
 
-See [the NPL ADT-only validation dossier](docs/research/2026-08-06-npl-adt-only-validation.md). A disposable report was created, activated, syntax-checked, unit-tested successfully, deleted, and confirmed absent. No stub DDIC structure may be used to claim compatibility.
+See [the NPL ADT-only validation dossier](docs/research/2026-08-06-npl-adt-only-validation.md) and the [BASE-BUG-001 grammar investigation](docs/research/2026-08-07-base-bug-001-npl-count-grammar.md). No stub DDIC structure may be used to claim compatibility.
 
 ## Verified A4H Access Paths
 

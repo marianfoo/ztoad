@@ -15,7 +15,7 @@ Use each tool for the part it can represent faithfully:
 | abaplint | Fast local parsing, 7.50 syntax floor, and XML consistency | No; local preflight only |
 | ARC-1 | System discovery, dependency reads, object state, syntax, ABAP Unit, ATC, and controlled targeted writes | Authoritative for the connected live system |
 | ARC-1 source mirror | Searchable read-only snapshot | No; it does not contain all abapGit metadata |
-| ABAP 7.50 NPL | ADT-only minimum-release activation, syntax, Unit, and ATC gate | Yes, when ZTOAD's real DDIC dependency is installed |
+| ABAP 7.50 NPL | ADT-only minimum-release activation, syntax, Unit, and ATC gate after one-time offline native-abapGit provisioning | Yes |
 | S/4HANA 2023 system | Current-platform compile/runtime gate | Yes, for 2023 behavior |
 
 The local repository and SAP systems must not diverge silently. Every system-side correction is exported through native abapGit and reviewed as a Git diff.
@@ -43,7 +43,7 @@ npm test
 
 ## 3. Native abapGit setup on the complete-object test system
 
-Use native abapGit on A4H for complete object round trips. The repository already declares `/src/` as its starting folder and `PREFIX` folder logic, so the root package name may differ per system. NPL is deliberately ARC-1/ADT-only: do not use its FLP, WebGUI, SAP GUI, or browser automation.
+Use native abapGit on A4H for complete object round trips. The repository already declares `/src/` as its starting folder and `PREFIX` folder logic, so the root package name may differ per system. NPL validation remains ARC-1/ADT-only: do not use its FLP, WebGUI, SAP GUI, or browser automation. Its complete object set was provisioned once by the maintainer with native abapGit's offline ZIP workflow because SAP_BASIS 750 has no ADT transparent-table create endpoint.
 
 For an isolated sandbox with no transport requirement, use a local package such as `$ZTOAD`. For a shared/transportable test package, use a customer package selected by the system owner and record its transport layer. A4H now uses transportable package `ZTOAD`, layer `ZDEV`, and request `A4HK906379`. Do not create a second clone in the same system: ABAP object names are system-global, so two ZTOAD work states cannot coexist under different packages.
 
@@ -65,6 +65,8 @@ On A4H, the Fiori-shell URL for the transaction is:
 
 Do not manually install only the report source. That omits the dynpros, table, authorization object, and transaction and cannot reproduce a supported installation. The repository-managed launcher is report transaction `ZTOAD` for program `ZTOAD`; use `#Shell-startGUI?sap-ui2-tcode=ZTOAD` or standalone `~transaction=ZTOAD` for its A4H smoke test.
 
+For an offline NPL refresh, create an offline repository bound to the dedicated local package, import a ZIP generated from the exact Git commit, review and pull only `PROG ZTOAD`, `TABL ZTOAD`, `TRAN ZTOAD`, and `SUSO ZTOAD_AUTH`, then activate. Do not export the system-local root package as `package.devc.xml`, and do not accept release-normalized table metadata without a deliberate structural review. After this one-time structural provisioning, deploy source-only candidates directly through ARC-1 and keep all NPL validation UI-free.
+
 ## 4. Local-first TDD flow with a stable `master`
 
 `master` remains the only long-lived integration/release line and the normal branch of each shared native-abapGit link. Development uses a short-lived pull-request branch so CI and review can evaluate the candidate without placing an unreviewed state on `master`.
@@ -80,7 +82,7 @@ Do not manually install only the report source. That omits the dynpros, table, a
 9. If a correction must be made in SAP, export it through native abapGit or reproduce it locally, then review every serialized/source difference. Never leave an unexported system-only fix.
 10. Perform a final review, update evidence, commit/push the short-lived branch, open the PR, and wait for CI. After the first green run, audit the process/CI, update guidance in the same PR, move the plan to `docs/plans/finished/`, push, and wait again. Put the final run link in the PR description/comment after it passes; committing that run ID would create a new unchecked head and an avoidable CI loop. After maintainer acceptance, use GitHub's squash merge so the PR lands as one Conventional Commit even though its branch preserves red/green/audit history.
 
-Always test 7.50 first when the destination and the candidate's real dependencies are available. A change that uses newer syntax may appear correct on 2023 yet be impossible to activate on the compatibility floor. The `arc-1-750` profile and ADT lifecycle are configured and proven; exact ZTOAD validation remains blocked while transparent table `ZTOAD` is absent because SAP_BASIS 750 cannot create transparent tables over ADT. See [the NPL dossier](research/2026-08-06-npl-adt-only-validation.md).
+Always test 7.50 first. A change that uses newer syntax may appear correct on 2023 yet be impossible to activate on the compatibility floor. The complete NPL installation and `arc-1-750` lifecycle are now proven; source candidates must pass activation, syntax, all Unit tests, ATC, and inactive-object checks there before A4H validation. See [the NPL dossier](research/2026-08-06-npl-adt-only-validation.md).
 
 Native abapGit branch switching changes real system objects, and abapGit Flow remains beta. Do not use either casually in the shared package. Structural-object PRs may require a dedicated package/system or an explicitly coordinated temporary branch procedure.
 

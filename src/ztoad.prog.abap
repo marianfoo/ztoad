@@ -6922,10 +6922,10 @@ CLASS ltc_query_generator IMPLEMENTATION.
 
     generate_query(
       EXPORTING
-        query = `SELECT DISTINCT DATATYPE, COUNT( FIELDNAME ) AS CNT_FIELDNAME, MAX( TABNAME ) AS MAX_TABNAME`
+        query = `SELECT DISTINCT DATATYPE, COUNT( DISTINCT FIELDNAME ) AS CNT_FIELDNAME, MAX( TABNAME ) AS MAX_TABNAME`
              && ` FROM DD03L WHERE TABNAME IS NOT NULL AND TABNAME <> ''`
              && ` AND TABNAME LIKE 'Z%' AND AS4LOCAL = 'A' GROUP BY DATATYPE`
-             && ` HAVING COUNT( FIELDNAME ) > 1 ORDER BY DATATYPE`
+             && ` HAVING COUNT( DISTINCT FIELDNAME ) > 1 ORDER BY DATATYPE`
       IMPORTING
         generated_program = generated_program
         new_syntax = new_syntax
