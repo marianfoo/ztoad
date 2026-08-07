@@ -31,5 +31,5 @@ jobs:
       - name: Install pinned dependencies
         run: npm ci
 
-      - name: Run ABAP and repository-contract checks
+      - name: Run ABAP, repository, and installation checks
         run: npm test

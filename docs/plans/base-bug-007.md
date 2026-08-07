@@ -22,7 +22,7 @@ Make the supported native-abapGit installation reproducibly complete: source, sc
 6. **Live green gates — complete within available prerequisites.** Zero inactive ZTOAD parts, active syntax, 55/55 Unit, complete Cloud ATC baseline, prerequisite-aware S/4 readiness status, and active/source consistency are recorded. NPL remains blocked by the already documented missing-table prerequisite.
 7. **Runtime acceptance — structurally unblocked but red overall.** A fresh A4H transaction renders `STATUS010` and reaches `EXECUTE`. The resulting post-dispatch Control Framework dump is independently registered as `BASE-RUN-006`; complete query smoke remains red and requires explicit maintainer acceptance before this plan can close without fixing that separate runtime finding.
 8. **Final review and round trip — complete.** Native abapGit 1.133.0's separate screen-flow files were reviewed and exported selectively; the executable closure contract now protects that representation. Restore the shared repository to `master` after final evidence.
-9. **PR/CI — in progress.** Push the structural candidate, open one Conventional Commit PR, wait for green CI, and audit the process. Move this plan to `docs/plans/finished/` only after the maintainer accepts the separate runtime limitation or `BASE-RUN-006` is fixed; rerun CI after any workflow change.
+9. **PR/CI — first run green; audit update pending.** PR #22's first Quality run `31150549473` and external abaplint check are green. The process audit clarified the CI step label and the verified full-ref branch-restoration rule; rerun CI after those changes. Move this plan to `docs/plans/finished/` only after the maintainer accepts the separate runtime limitation or `BASE-RUN-006` is fixed.
 
 ## Quality, compatibility, and security review
 
@@ -41,6 +41,14 @@ Make the supported native-abapGit installation reproducibly complete: source, sc
 - Shared repository restoration: the A4H link was returned to `refs/heads/master` and the live inactive-child contract remained green. Its program drift is expected until this PR is merged; do not pull the old serializer representation over the active candidate.
 - Runtime boundary: `STATUS010` is active and `EXECUTE` dispatches; a new 2026-08-07 04:31:22 UTC `SAPLOLEA`/`AC_SYSTEM_FLUSH` dump is separately tracked as `BASE-RUN-006`.
 - NPL/7.50: exact ZTOAD install remains prerequisite-blocked because the real transparent table is absent and cannot be created through the available ADT endpoint.
+
+## First-green process audit
+
+- The executable inactive-child contract caught the original gap that source equality missed, and the selective stage review prevented unrelated DEVC/TABL drift from entering the PR.
+- Native abapGit 1.133.0's representation change showed that the permanent repository gate must cover screen-flow files, not only screen numbers embedded in XML. That check is now part of normal `npm test` and CI.
+- ARC-1's short `master` branch switch returned success without changing the selected branch. The documented procedure now requires `refs/heads/master`, a fresh repository read, and another inactive-child check.
+- CI ran the right command but labeled it only as ABAP/repository checks. The workflow label now names the installation gate so reviewers can see what the required job actually covers.
+- No test or workflow can turn the new WebGUI dump into a pass. The PR and this active plan retain the limitation and explicit maintainer-decision gate.
 
 ## References
 

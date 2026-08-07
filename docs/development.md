@@ -57,6 +57,8 @@ Setup procedure:
 6. Confirm that the repository status is clean.
 7. Run ZTOAD once with the read-only smoke query below.
 
+If the ARC-1 abapGit bridge is used to restore the shared branch after a coordinated round trip, pass `refs/heads/master`, not only `master`, and verify the selected branch with a fresh `list_repos` call. On the current A4H bridge the short value returned success without changing the repository, while the full ref switched it correctly. Re-run the inactive-child contract after restoration.
+
 On A4H, the Fiori-shell URL for the transaction is:
 
 `https://a4h.marianzeis.de/sap/bc/ui2/flp?sap-client=001#Shell-startGUI?sap-ui2-tcode=ZABAPGIT`
