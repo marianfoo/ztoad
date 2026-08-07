@@ -75,3 +75,13 @@ Revert the two `DISTINCT` additions and redeploy the previous `master` source. N
 - Both supported releases receive authoritative syntax and Unit evidence.
 - Structural table cleanup remains isolated for a separate native-abapGit round trip.
 
+## Validation evidence
+
+- Frozen candidate commit: `9e8d881`
+- Local source SHA-256: `de46fab9bb8aa908c2efa66abe0c0f428f7f125b6bba81272990215964128831`
+- Server-normalized candidate SHA-256 on both systems: `c7d4cbcfcb9a3af1d322e3f912c586dfee12b8af0fe608049807cfa61e94cccd`
+- Local: `npm ci`, `npm test`, repository/installation contracts, and `git diff --check` green; configured abaplint 0 findings; diagnostic quality inventory unchanged at 2,169 findings across 63 rules.
+- NPL 750: explicit activation; equal active/inactive source; zero inactive ZTOAD parts; syntax 0 errors; 67/67 Unit; ATC `DEFAULT` unchanged at 88 (3 P1, 4 P2, 81 P3).
+- A4H 758: native abapGit remained on `refs/heads/master`; direct candidate activation; equal active/inactive source; zero inactive ZTOAD parts; syntax 0 errors plus the two pre-existing POSIX warnings; 67/67 Unit; `ABAP_CLOUD_READINESS` unchanged at 682 (474 P1, 208 P2); `S4HANA_READINESS_2023` returned zero rows but retains its documented prerequisite limitation.
+- Browser/ST22: not applicable because production behavior and serialized UI objects are unchanged.
+- Restore: both systems explicitly restored and activated to exact `origin/master` `d532b2e`, server SHA-256 `e32d7d3b8bebdb38457cd81f52e90a3b00dc0e830ac537b7690b70cee4544897`, with equal source and no inactive ZTOAD part. A4H restored at 67/67; NPL restored at the intentionally reproduced 66/67 pre-fix baseline.

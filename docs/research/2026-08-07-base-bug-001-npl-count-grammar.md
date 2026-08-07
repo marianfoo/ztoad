@@ -57,4 +57,3 @@ Adding `DISTINCT` inside both `COUNT` expressions does not weaken any of those p
 ## Separate installation finding
 
 NPL activated table `ZTOAD` with an enhancement-category warning and normalized it to `#NOT_CLASSIFIED`, leaving a table serialization difference. That is a structural metadata issue and must be addressed through a separate native-abapGit round trip; it is not part of this test-only correction.
-

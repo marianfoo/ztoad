@@ -62,7 +62,7 @@ Each parser/generator change should select relevant cases from this matrix:
 
 ## Live test protocol
 
-NPL/SAP_BASIS 750 is ARC-1/ADT-only. Run activation, syntax, ABAP Unit, and ATC there; do not use FLP, WebGUI, SAP GUI, or browser automation. If a required object cannot be installed through the available ADT surface, record a blocked prerequisite rather than using an unfaithful substitute.
+NPL/SAP_BASIS 750 validation is ARC-1/ADT-only. Run activation, syntax, ABAP Unit, ATC, and inactive-object checks there; do not use FLP, WebGUI, SAP GUI, or browser automation for test execution. The complete object set was provisioned once by the maintainer through native abapGit's offline ZIP workflow because the real transparent table cannot be created through the 7.50 ADT surface. Future source candidates use ARC-1; future structural refreshes require another reviewed native-abapGit import rather than an unfaithful substitute.
 
 For A4H, use only the HTTPS reverse proxy:
 
