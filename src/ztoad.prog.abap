@@ -428,6 +428,18 @@ CLASS lcl_editor_configuration DEFINITION FINAL.
 ENDCLASS.
 
 *----------------------------------------------------------------------*
+*       CLASS lcl_query_error_contract DEFINITION
+*----------------------------------------------------------------------*
+*       Convert technical query failures into a user-facing message
+*----------------------------------------------------------------------*
+CLASS lcl_query_error_contract DEFINITION FINAL.
+  PUBLIC SECTION.
+    CLASS-METHODS to_user_message
+      IMPORTING technical_detail TYPE string
+      RETURNING VALUE(user_message) TYPE string.
+ENDCLASS.
+
+*----------------------------------------------------------------------*
 *       CLASS lcl_query_input_validator DEFINITION
 *----------------------------------------------------------------------*
 *       Keep external SQL fragments inside generated SQL statements
@@ -713,6 +725,12 @@ CLASS lcl_editor_configuration IMPLEMENTATION.
   METHOD get_runtime_capabilities.
     r_capabilities = get_capabilities(
       i_webgui = xsdbool( cl_gui_control=>www_active IS NOT INITIAL ) ).
+  ENDMETHOD.
+ENDCLASS.
+
+CLASS lcl_query_error_contract IMPLEMENTATION.
+  METHOD to_user_message.
+    user_message = technical_detail.
   ENDMETHOD.
 ENDCLASS.
 
@@ -3975,6 +3993,8 @@ FORM query_generate  USING    fw_select TYPE string
   SYNTAX-CHECK FOR lt_code_string PROGRAM sy-repid
                MESSAGE lw_mess LINE lw_line WORD lw_word.
   IF sy-subrc NE 0 AND fw_display = space.
+    lw_mess = lcl_query_error_contract=>to_user_message(
+      CONV string( lw_mess ) ).
     MESSAGE lw_mess TYPE c_msg_success DISPLAY LIKE c_msg_error.
     CLEAR fw_program.
     RETURN.
@@ -5362,6 +5382,8 @@ FORM query_generate_noselect  USING    fw_command TYPE string
   SYNTAX-CHECK FOR lt_code_string PROGRAM sy-repid
                MESSAGE lw_mess LINE lw_line WORD lw_word.
   IF sy-subrc NE 0 AND fw_display = space.
+    lw_mess = lcl_query_error_contract=>to_user_message(
+      CONV string( lw_mess ) ).
     MESSAGE lw_mess TYPE c_msg_success DISPLAY LIKE c_msg_error.
     CLEAR fw_program.
     RETURN.
@@ -8676,6 +8698,7 @@ CLASS ltcl_query_execution DEFINITION FINAL
   RISK LEVEL HARMLESS.
   PRIVATE SECTION.
     METHODS contains_runtime_exception FOR TESTING.
+    METHODS sanitizes_technical_detail FOR TESTING.
 ENDCLASS.
 
 CLASS ltcl_query_execution IMPLEMENTATION.
@@ -8716,6 +8739,16 @@ CLASS ltcl_query_execution IMPLEMENTATION.
     cl_abap_unit_assert=>assert_true(
       act = execution_failed
       msg = 'A generated-program exception needs a stable failure result' ).
+  ENDMETHOD.
+
+  METHOD sanitizes_technical_detail.
+    DATA(user_message) = lcl_query_error_contract=>to_user_message(
+      `Compiler detail contains SECRET_QUERY_VALUE` ).
+
+    cl_abap_unit_assert=>assert_equals(
+      act = user_message
+      exp = 'Cannot parse the query'(m07)
+      msg = 'Technical query details must not reach the user message' ).
   ENDMETHOD.
 ENDCLASS.
 
