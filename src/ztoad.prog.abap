@@ -6860,6 +6860,10 @@ CLASS ltc_query_generator DEFINITION FINAL
     METHODS generates_strict_aggregate FOR TESTING.
     METHODS keeps_escaped_count_valid FOR TESTING.
     METHODS keeps_legacy_select_valid FOR TESTING.
+    METHODS generates_substring_function FOR TESTING.
+    METHODS generates_nested_functions FOR TESTING.
+    METHODS preserves_function_literal FOR TESTING.
+    METHODS generates_length_function FOR TESTING.
     METHODS rejects_statement_injection FOR TESTING.
     METHODS rejects_wrapped_quote_boundary FOR TESTING.
 
@@ -7056,6 +7060,70 @@ CLASS ltc_query_generator IMPLEMENTATION.
     cl_abap_unit_assert=>assert_not_initial(
       act = generated_program
       msg = 'Legacy SELECT query must remain valid' ).
+  ENDMETHOD.
+
+  METHOD generates_substring_function.
+    DATA generated_program TYPE sy-repid.
+    DATA new_syntax TYPE abap_bool.
+
+    generate_query(
+      EXPORTING
+        query = `SELECT SUBSTRING( DD03L~FIELDNAME, 1, 3 ) AS PREFIX,`
+             && ` DD03L~TABNAME FROM DD03L`
+      IMPORTING generated_program = generated_program
+                new_syntax = new_syntax ).
+
+    cl_abap_unit_assert=>assert_true(
+      act = new_syntax
+      msg = 'SUBSTRING argument commas require strict SQL generation' ).
+    cl_abap_unit_assert=>assert_not_initial(
+      act = generated_program
+      msg = 'SUBSTRING must produce a valid generated program' ).
+  ENDMETHOD.
+
+  METHOD generates_nested_functions.
+    DATA generated_program TYPE sy-repid.
+
+    generate_query(
+      EXPORTING
+        query = `SELECT CONCAT( DD03L~TABNAME,`
+             && ` SUBSTRING( DD03L~FIELDNAME, 1, 3 ) ) AS LABEL`
+             && ` FROM DD03L`
+      IMPORTING generated_program = generated_program ).
+
+    cl_abap_unit_assert=>assert_not_initial(
+      act = generated_program
+      msg = 'Nested 7.50 string functions must remain one select item' ).
+  ENDMETHOD.
+
+  METHOD preserves_function_literal.
+    DATA generated_program TYPE sy-repid.
+
+    generate_query(
+      EXPORTING
+        query = `SELECT CONCAT( DD03L~TABNAME, ', ' ) AS LABEL FROM DD03L`
+      IMPORTING generated_program = generated_program ).
+
+    cl_abap_unit_assert=>assert_not_initial(
+      act = generated_program
+      msg = 'A comma and space inside a literal must remain function data' ).
+  ENDMETHOD.
+
+  METHOD generates_length_function.
+    DATA generated_program TYPE sy-repid.
+    DATA new_syntax TYPE abap_bool.
+
+    generate_query(
+      EXPORTING query = `SELECT LENGTH( DD03L~FIELDNAME ) AS NAME_LENGTH FROM DD03L`
+      IMPORTING generated_program = generated_program
+                new_syntax = new_syntax ).
+
+    cl_abap_unit_assert=>assert_true(
+      act = new_syntax
+      msg = 'A 7.50 string function must activate strict SQL generation' ).
+    cl_abap_unit_assert=>assert_not_initial(
+      act = generated_program
+      msg = 'LENGTH must produce a valid generated program' ).
   ENDMETHOD.
 
   METHOD rejects_statement_injection.
