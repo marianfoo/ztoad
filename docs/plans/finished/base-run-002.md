@@ -33,7 +33,7 @@ SAP separately states that a `GENERATE SUBROUTINE POOL` generation error can sti
 - NPL is green with 109/109 Unit and complete `DEFAULT` ATC at 85 findings. A4H is green with 109/109 Unit, complete `ABAP_CLOUD_READINESS` accounting at 709 findings, the expected seven syntax warnings, and an unchanged 49-ID ST22 set across the browser smoke. `S4HANA_READINESS_2023` remains explicitly incomplete.
 - The failure-path smoke exposed only the generic message; the normal read-only smoke returned three client rows. Both shared systems were then restored to exact master `a5ad27c`, verified at 106/106 Unit with no inactive ZTOAD part.
 - The final Unit regression uses a missing generated-program handle to exercise the same external-call exception boundary without creating an additional disposable pool. The red arithmetic proof and the live read-only divide-by-zero probe retain coverage of an exception raised inside generated execution. This reduced candidate ATC by one P3 finding compared with master.
-- Steps 10–11 remain: publish the PR, require first green CI, audit the completed workflow, apply any useful process improvement, move this plan to `finished/`, and require CI again.
+- Step 10 and the audit portion of step 11 are complete in PR #31. This finished plan is part of the documentation-only audit commit; the remaining release gate is the second green CI run before squash merge.
 
 ## Plan review
 
@@ -46,8 +46,18 @@ SAP separately states that a `GENERATE SUBROUTINE POOL` generation error can sti
 - **Known limit:** uncatchable runtime errors and `GENERATE SUBROUTINE POOL` generation errors can still dump. `BASE-RUN-003` must prevent the 36-pool exhaustion path rather than relying on post-error handling.
 - **Rollback:** revert the source commit, directly deploy and explicitly activate reviewed `master` on each system, then rerun syntax, Unit, state, and inactive-part checks. No structural object or persistent data is introduced.
 
+## Post-green workflow audit
+
+- **Plan fidelity:** red research, plan review, smallest production change, local gates, frozen-source live validation, final review, shared-system restoration, and first PR CI were completed in order. Source remained frozen at `92946fe`; every later commit is documentation-only, so the recorded live evidence still applies.
+- **Test adjustment:** the final containment Unit test uses a missing generated-program handle rather than permanently allocating a second synthetic pool. The red arithmetic proof and the live read-only divide-by-zero probe cover an exception originating inside generated execution. This keeps the test harmless and reduced NPL ATC by one P3 finding compared with master.
+- **Browser evidence:** the initial in-app SAP logon shell loaded but kept all controls hidden. No DOM mutation was used. Because no browser family was mandated, the smoke continued in an authenticated Chrome session with a fresh tab, editor-scoped locator, real typing, and blur. The workflow now records this safe fallback.
+- **Evidence semantics:** a generic UI message alone cannot identify which internal boundary produced it. The guidance now requires an independent direct regression for boundary reachability plus the UI/ST22 check for safe presentation.
+- **CI review:** the first PR head passed the pinned install, configured zero-finding abaplint, repository contract, and installation contract on the merge ref. The non-blocking full quality profile and both live SAP gates remain deliberately outside GitHub CI and are recorded with exact counts.
+- **Security/privacy review:** exception text is never inspected or displayed; partial outputs, success, and history are suppressed on failure; parser, authorization, Native SQL, DML confirmation, and row-limit controls are unchanged. No private SAP hostname or credential is tracked.
+- **Outcome:** the process is adequate for the remaining runtime findings. The two durable improvements above were added to `AGENTS.md` and `docs/test-strategy.md`; no workflow-file change is justified, so live gates do not need rerunning and the second CI run is documentation-only.
+
 ## References
 
-- [Root-cause research](../research/2026-08-07-base-run-002-query-error-contract.md)
-- [Development playbook](../development.md)
-- [Test strategy](../test-strategy.md)
+- [Root-cause research](../../research/2026-08-07-base-run-002-query-error-contract.md)
+- [Development playbook](../../development.md)
+- [Test strategy](../../test-strategy.md)
