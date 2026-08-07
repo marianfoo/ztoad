@@ -423,6 +423,8 @@ CLASS lcl_editor_configuration DEFINITION FINAL.
     CLASS-METHODS get_capabilities
       IMPORTING i_webgui              TYPE abap_bool
       RETURNING VALUE(r_capabilities) TYPE ty_capabilities.
+    CLASS-METHODS get_runtime_capabilities
+      RETURNING VALUE(r_capabilities) TYPE ty_capabilities.
 ENDCLASS.
 
 *----------------------------------------------------------------------*
@@ -615,6 +617,11 @@ CLASS lcl_editor_configuration IMPLEMENTATION.
     r_capabilities-selected_statement = abap_true.
     r_capabilities-resize_result = abap_true.
     r_capabilities-persist_history = abap_true.
+  ENDMETHOD.
+
+  METHOD get_runtime_capabilities.
+    r_capabilities = get_capabilities(
+      i_webgui = xsdbool( cl_gui_control=>www_active IS NOT INITIAL ) ).
   ENDMETHOD.
 ENDCLASS.
 
@@ -1454,8 +1461,7 @@ CLASS lcl_application IMPLEMENTATION.
     DATA: ls_toolbar  TYPE stb_button.
     DATA capabilities TYPE lcl_editor_configuration=>ty_capabilities.
 
-    capabilities = lcl_editor_configuration=>get_capabilities(
-      i_webgui = xsdbool( cl_gui_control=>www_active IS NOT INITIAL ) ).
+    capabilities = lcl_editor_configuration=>get_runtime_capabilities( ).
     IF capabilities-resize_result = abap_false.
       RETURN.
     ENDIF.
@@ -1487,8 +1493,7 @@ CLASS lcl_application IMPLEMENTATION.
   METHOD hnd_result_user_command.
     DATA capabilities TYPE lcl_editor_configuration=>ty_capabilities.
 
-    capabilities = lcl_editor_configuration=>get_capabilities(
-      i_webgui = xsdbool( cl_gui_control=>www_active IS NOT INITIAL ) ).
+    capabilities = lcl_editor_configuration=>get_runtime_capabilities( ).
     IF e_ucomm = 'CLOSE_GRID'
     AND capabilities-resize_result = abap_true.
       CALL METHOD o_splitter->set_row_height
@@ -1740,8 +1745,7 @@ FORM screen_init.
 * Split the screen into 4 parts
   PERFORM screen_init_splitter.
 
-  capabilities = lcl_editor_configuration=>get_capabilities(
-    i_webgui = xsdbool( cl_gui_control=>www_active IS NOT INITIAL ) ).
+  capabilities = lcl_editor_configuration=>get_runtime_capabilities( ).
 
   IF capabilities-full_workspace = abap_false
   AND capabilities-preload_editor = abap_false.
@@ -1796,8 +1800,7 @@ FORM screen_init_splitter.
       rows    = 2
       columns = 1.
 
-  capabilities = lcl_editor_configuration=>get_capabilities(
-    i_webgui = xsdbool( cl_gui_control=>www_active IS NOT INITIAL ) ).
+  capabilities = lcl_editor_configuration=>get_runtime_capabilities( ).
 
   IF capabilities-full_workspace = abap_false.
     CALL METHOD o_splitter->get_container
@@ -2299,8 +2302,7 @@ FORM editor_get_query USING fw_force_last TYPE c
 
   CLEAR fw_query.
 
-  capabilities = lcl_editor_configuration=>get_capabilities(
-    i_webgui = xsdbool( cl_gui_control=>www_active IS NOT INITIAL ) ).
+  capabilities = lcl_editor_configuration=>get_runtime_capabilities( ).
 
 * Get selected content
   IF capabilities-selected_statement = abap_true.
@@ -3233,8 +3235,7 @@ FORM result_display  USING fo_result TYPE REF TO data
       it_outtab       = <lft_data>
       it_fieldcatalog = lt_fieldcat.
 
-  capabilities = lcl_editor_configuration=>get_capabilities(
-    i_webgui = xsdbool( cl_gui_control=>www_active IS NOT INITIAL ) ).
+  capabilities = lcl_editor_configuration=>get_runtime_capabilities( ).
   IF capabilities-resize_result = abap_false.
     RETURN.
   ENDIF.
@@ -3376,8 +3377,7 @@ FORM ddic_set_tree USING fw_from TYPE string.
          lt_ddic_fields LIKE TABLE OF ls_ddic_fields.
   DATA capabilities TYPE lcl_editor_configuration=>ty_capabilities.
 
-  capabilities = lcl_editor_configuration=>get_capabilities(
-    i_webgui = xsdbool( cl_gui_control=>www_active IS NOT INITIAL ) ).
+  capabilities = lcl_editor_configuration=>get_runtime_capabilities( ).
   IF capabilities-full_workspace = abap_false.
     RETURN.
   ENDIF.
@@ -3719,8 +3719,7 @@ FORM repo_fill.
          lw_dummy(1)     TYPE c.                            "#EC NEEDED
   DATA capabilities TYPE lcl_editor_configuration=>ty_capabilities.
 
-  capabilities = lcl_editor_configuration=>get_capabilities(
-    i_webgui = xsdbool( cl_gui_control=>www_active IS NOT INITIAL ) ).
+  capabilities = lcl_editor_configuration=>get_runtime_capabilities( ).
   IF capabilities-full_workspace = abap_false.
     RETURN.
   ENDIF.
@@ -3857,8 +3856,7 @@ FORM repo_save_current_query.
          lw_dummy_date    TYPE timestamp.                   "#EC NEEDED
   DATA capabilities TYPE lcl_editor_configuration=>ty_capabilities.
 
-  capabilities = lcl_editor_configuration=>get_capabilities(
-    i_webgui = xsdbool( cl_gui_control=>www_active IS NOT INITIAL ) ).
+  capabilities = lcl_editor_configuration=>get_runtime_capabilities( ).
   IF capabilities-persist_history = abap_false.
     RETURN.
   ENDIF.
@@ -4045,8 +4043,7 @@ FORM screen_exit.
          lw_string    TYPE string.
   DATA capabilities TYPE lcl_editor_configuration=>ty_capabilities.
 
-  capabilities = lcl_editor_configuration=>get_capabilities(
-    i_webgui = xsdbool( cl_gui_control=>www_active IS NOT INITIAL ) ).
+  capabilities = lcl_editor_configuration=>get_runtime_capabilities( ).
   IF capabilities-full_workspace = abap_false.
     LEAVE TO SCREEN 0.
   ENDIF.
@@ -4945,8 +4942,7 @@ FORM ddic_refresh_tree.
          lw_error(1)     TYPE c.
   DATA capabilities TYPE lcl_editor_configuration=>ty_capabilities.
 
-  capabilities = lcl_editor_configuration=>get_capabilities(
-    i_webgui = xsdbool( cl_gui_control=>www_active IS NOT INITIAL ) ).
+  capabilities = lcl_editor_configuration=>get_runtime_capabilities( ).
   IF capabilities-full_workspace = abap_false.
     RETURN.
   ENDIF.
@@ -5435,8 +5431,7 @@ FORM tab_new.
          l_tab TYPE string.
   DATA capabilities TYPE lcl_editor_configuration=>ty_capabilities.
 
-  capabilities = lcl_editor_configuration=>get_capabilities(
-    i_webgui = xsdbool( cl_gui_control=>www_active IS NOT INITIAL ) ).
+  capabilities = lcl_editor_configuration=>get_runtime_capabilities( ).
   IF capabilities-full_workspace = abap_false.
     MESSAGE 'Multiple tabs are available in desktop SAP GUI only'
             TYPE c_msg_success DISPLAY LIKE c_msg_error.
@@ -5824,8 +5819,7 @@ FORM SET_STATUS_010 .
   DATA capabilities TYPE lcl_editor_configuration=>ty_capabilities.
   DATA lt_exclude TYPE STANDARD TABLE OF sy-ucomm.
 
-  capabilities = lcl_editor_configuration=>get_capabilities(
-    i_webgui = xsdbool( cl_gui_control=>www_active IS NOT INITIAL ) ).
+  capabilities = lcl_editor_configuration=>get_runtime_capabilities( ).
   IF capabilities-full_workspace = abap_false.
     APPEND 'DOWNLOAD' TO lt_exclude.
     APPEND 'NEW' TO lt_exclude.
