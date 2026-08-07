@@ -454,7 +454,7 @@ CLASS lcl_subroutine_pool_budget DEFINITION FINAL.
       RETURNING VALUE(allowed)       TYPE abap_bool.
     CLASS-METHODS record_success
       IMPORTING is_display            TYPE c
-                generated_program     TYPE sy-repid
+                generated_program     TYPE progname
       CHANGING  generated_count       TYPE i.
 ENDCLASS.
 
@@ -9180,7 +9180,7 @@ CLASS ltc_command_parser IMPLEMENTATION.
   ENDMETHOD.
 ENDCLASS.
 
-CLASS ltc_subroutine_pool_budget DEFINITION FINAL
+CLASS ltcl_subroutine_pool_budget DEFINITION FINAL
   FOR TESTING
   RISK LEVEL HARMLESS
   DURATION SHORT.
@@ -9191,7 +9191,7 @@ CLASS ltc_subroutine_pool_budget DEFINITION FINAL
     METHODS ignores_failed_generation FOR TESTING.
 ENDCLASS.
 
-CLASS ltc_subroutine_pool_budget IMPLEMENTATION.
+CLASS ltcl_subroutine_pool_budget IMPLEMENTATION.
   METHOD stops_at_ztoad_limit.
     DATA generated_count TYPE i.
 
