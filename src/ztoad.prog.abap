@@ -6838,7 +6838,7 @@ CLASS ltc_query_parser DEFINITION FINAL
     METHODS teardown.
     METHODS parses_simple_select FOR TESTING.
     METHODS honors_explicit_limit FOR TESTING.
-    METHODS zero_limit_means_unlimited FOR TESTING.
+    METHODS rejects_zero_limit FOR TESTING.
     METHODS keeps_tail_clauses FOR TESTING.
     METHODS separates_union FOR TESTING.
     METHODS separates_union_expression FOR TESTING.
@@ -7191,7 +7191,7 @@ CLASS ltc_query_parser IMPLEMENTATION.
       msg = 'UP TO clause must be removed before generation' ).
   ENDMETHOD.
 
-  METHOD zero_limit_means_unlimited.
+  METHOD rejects_zero_limit.
     DATA select_part TYPE string.
     DATA from_part TYPE string.
     DATA tail_part TYPE string.
@@ -7212,9 +7212,12 @@ CLASS ltc_query_parser IMPLEMENTATION.
                 new_syntax = new_syntax
                 parse_error = parse_error ).
 
+    cl_abap_unit_assert=>assert_true(
+      act = parse_error
+      msg = 'UP TO 0 ROWS must not disable ZTOAD result limits' ).
     cl_abap_unit_assert=>assert_initial(
       act = rows
-      msg = 'UP TO 0 ROWS intentionally disables the generated limit' ).
+      msg = 'A rejected zero limit must not reach generation' ).
   ENDMETHOD.
 
   METHOD keeps_tail_clauses.
