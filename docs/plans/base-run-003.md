@@ -72,6 +72,41 @@ dump. Full analysis is in the linked research note.
     this plan to `docs/plans/finished/`, and wait for green CI again before
     squash merge.
 
+## Pre-PR execution record
+
+- Steps 1–10 are complete for frozen source commit
+  `4b37b69605e88129b0cf7825b27886a8e6fa62c0`; local source SHA-256 is
+  `dedb22526a4b22a18185dcb11cb7552c5e2c4fe663ae0dd26cd5e5a6cdc1dd70`.
+  The normalized active SAP source hash is
+  `736c93b341c8a14cd40f88522b6b542fa14b82bceaea5a34b0bedcfdab2699b8`
+  on both systems.
+- The focused NPL red replay at commit `9b98a2d` passed 109/110 Unit and failed
+  only `STAYS_BELOW_SYSTEM_LIMIT`; no live pool exhaustion was attempted.
+- `npm ci`, configured abaplint, repository contracts, installation contract,
+  `git diff --check`, server-side dry syntax, and the complete source review are
+  green. The diagnostic quality profile remains outside the merge gate.
+- NPL is green at 113/113 Unit with clean syntax, equal active/inactive source,
+  zero inactive ZTOAD parts, and complete `DEFAULT` ATC accounting at 85
+  findings (P1 3, P2 4, P3 78). Its latest dump predates the candidate.
+- A4H is green at 113/113 Unit with the known seven POSIX warnings, equal
+  active/inactive source, zero inactive ZTOAD parts, and complete
+  `ABAP_CLOUD_READINESS` accounting at the unchanged 709 findings (P1 490,
+  P2 219). `S4HANA_READINESS_2023` still returns no rows without proving its
+  unavailable prerequisite checks and remains explicitly incomplete.
+- A fresh authenticated Chrome/WebGUI session received the query through
+  editor-scoped click, typing, and blur. `SELECT SINGLE mandt FROM t000`
+  returned one row and the complete 65-ID ST22 set kept the same latest dump
+  marker (`2026-08-07T06:26:10Z`).
+- A first candidate used `sy-repid` for the pure policy parameter and raised
+  Cloud Readiness from 709 to 710. Signature comparison isolated one new
+  restricted-SY-field warning. Replacing it with compatible `PROGNAME` removed
+  the regression; all affected local and live gates were rerun for `4b37b69`.
+- Both shared targets were restored to intended master `b0b4d9f`, explicitly
+  activated, and verified at 109/109 Unit, expected syntax, equal source state,
+  and zero inactive ZTOAD parts.
+- Step 11 remains to push/open the PR and wait for first green CI. Step 12 is
+  intentionally deferred until that first green run.
+
 ## Plan review
 
 - **Compatibility:** no syntax or API newer than SAP_BASIS 750 is required.
