@@ -78,9 +78,9 @@ Run this sequence after deployment:
 4. Confirm active and inactive main source are identical, query inactive child parts for changed composite objects, then run active SAP syntax. Screens, GUI statuses, text elements, and includes must be checked separately; main-source equality does not clear an inactive child part.
 5. Run all ABAP Unit tests; require zero failures.
 6. Run the recorded ATC variants and inspect prerequisite/check errors. A result with missing prerequisites is incomplete even when no finding rows are displayed.
-7. Record the latest ST22 dump timestamp before UI execution.
+7. Record the latest ST22 dump ID and timestamp before UI execution. Afterward, compare the returned dump set client-side; ARC-1 diagnostic time filters may not be applied by every backend response.
 8. Verify the installed dynpro and GUI status required by the scenario, then launch ZTOAD in a fresh browser session and run only a read-only sanitized smoke query, initially `SELECT SINGLE mandt FROM t000`.
-9. Verify expected UI/result state and confirm ST22 has no new dump.
+9. Verify expected UI/result state and confirm ST22 has no dump newer than the captured marker. Keep browser locators scoped to the query-editor control because ALV grid cells also expose textbox roles after a result renders.
 10. Do not repeat the browser portion on NPL; repeat only the ADT activation/syntax/Unit/ATC gates there.
 11. On a shared target, restore and explicitly activate the intended `master` object after evidence collection, then verify the relevant baseline tests and active/inactive state. Record an exception only when the maintainer reserves the deployed candidate for immediate follow-up work.
 

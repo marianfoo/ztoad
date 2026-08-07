@@ -54,6 +54,14 @@ The smallest coherent fix is an explicit WebGUI core capability profile: initial
 
 ## References
 
-- [Root-cause research](../research/2026-08-07-base-run-006-webgui-execute-flush.md)
-- [Development playbook](../development.md)
-- [Test strategy](../test-strategy.md)
+- [Root-cause research](../../research/2026-08-07-base-run-006-webgui-execute-flush.md)
+- [Development playbook](../../development.md)
+- [Test strategy](../../test-strategy.md)
+
+## Post-green process audit
+
+- PR #24 first head `8ac8840` passed Quality run `31155861891` and external abaplint. CI checked the GitHub merge ref, installed pinned dependencies with `npm ci`, and ran the same complete `npm test` contract used locally; no workflow gap or CI change was justified.
+- Exact-candidate discipline worked: the initial ATC review exposed repeated frontend API boundaries, the source was refined, and every affected SAP/runtime gate was rerun before evidence was accepted. Documentation-only evidence commits did not invalidate the frozen source hash.
+- The shared native-abapGit repository remained on full ref `refs/heads/master`, the source-only candidate was deployed directly, and A4H was restored to exact master afterward. The ARC-1 audit now distinguishes installed system capability from client/schema/credential/postcondition gaps.
+- ARC-1 ignored the requested ST22 time filter, so the workflow now requires an explicit before-marker plus client-side dump-set comparison. Browser guidance now scopes editor actions because ALV adds other textbox roles after execution. These changes are in `AGENTS.md`, the test strategy, and the PR template.
+- No production source, serialized SAP object, CI workflow, dependency, release file, or live-system state changed during this audit. The plan is complete and moved to `docs/plans/finished/`; a second green PR run is required before handoff.
