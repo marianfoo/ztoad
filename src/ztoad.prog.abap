@@ -810,13 +810,15 @@ CLASS lcl_select_expression_analyzer IMPLEMENTATION.
     WHILE index < expression_length.
       character = expression+index(1).
       IF in_literal = abap_true.
-        masked_expression = masked_expression && space.
+        CONCATENATE masked_expression space INTO masked_expression
+                    RESPECTING BLANKS.
         IF character = ''''.
           next_index = index + 1.
           IF next_index < expression_length.
             next_character = expression+next_index(1).
             IF next_character = ''''.
-              masked_expression = masked_expression && space.
+              CONCATENATE masked_expression space INTO masked_expression
+                          RESPECTING BLANKS.
               index = index + 2.
               CONTINUE.
             ENDIF.
@@ -825,9 +827,11 @@ CLASS lcl_select_expression_analyzer IMPLEMENTATION.
         ENDIF.
       ELSEIF character = ''''.
         in_literal = abap_true.
-        masked_expression = masked_expression && space.
+        CONCATENATE masked_expression space INTO masked_expression
+                    RESPECTING BLANKS.
       ELSE.
-        masked_expression = masked_expression && character.
+        CONCATENATE masked_expression character INTO masked_expression
+                    RESPECTING BLANKS.
       ENDIF.
       index = index + 1.
     ENDWHILE.
