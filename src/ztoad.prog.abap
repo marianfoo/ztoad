@@ -310,7 +310,7 @@ DATA :  text(100) TYPE c,
 * Keep last loaded id
         w_last_loaded_query TYPE ztoad-queryid,
 
-* Count number of runs
+* Count successfully generated temporary subroutine pools
         w_run               TYPE i.
 
 DATA : w_okcode LIKE sy-ucomm,
@@ -377,7 +377,6 @@ CONSTANTS : c_ddic_col1            TYPE mtreeitm-item_name
             c_vers_active          TYPE as4local VALUE 'A',
             c_ddic_dtelm           TYPE comptype VALUE 'E',
             c_native_command       TYPE string VALUE 'NATIVE',
-            c_query_max_exec       TYPE i VALUE 1000,
 
             c_xmlnode_root TYPE string VALUE 'root',        "#EC NOTEXT
             c_xmlnode_file TYPE string VALUE 'query',       "#EC NOTEXT
@@ -437,6 +436,26 @@ CLASS lcl_query_error_contract DEFINITION FINAL.
     CLASS-METHODS to_user_message
       IMPORTING technical_detail TYPE string
       RETURNING VALUE(user_message) TYPE string.
+ENDCLASS.
+
+*----------------------------------------------------------------------*
+*       CLASS lcl_subroutine_pool_budget DEFINITION
+*----------------------------------------------------------------------*
+*       Keep ZTOAD below SAP's finite internal-session pool limit
+*----------------------------------------------------------------------*
+CLASS lcl_subroutine_pool_budget DEFINITION FINAL.
+  PUBLIC SECTION.
+    CONSTANTS c_system_limit TYPE i VALUE 36.
+    CONSTANTS c_reserved_slots TYPE i VALUE 6.
+    CONSTANTS c_ztoad_limit TYPE i VALUE 30.
+
+    CLASS-METHODS can_generate
+      IMPORTING generated_count      TYPE i
+      RETURNING VALUE(allowed)       TYPE abap_bool.
+    CLASS-METHODS record_success
+      IMPORTING is_display            TYPE c
+                generated_program     TYPE progname
+      CHANGING  generated_count       TYPE i.
 ENDCLASS.
 
 *----------------------------------------------------------------------*
@@ -732,6 +751,23 @@ CLASS lcl_query_error_contract IMPLEMENTATION.
   METHOD to_user_message.
 * The technical detail is deliberately accepted but never exposed.
     user_message = 'Cannot parse the query'(m07).
+  ENDMETHOD.
+ENDCLASS.
+
+CLASS lcl_subroutine_pool_budget IMPLEMENTATION.
+  METHOD can_generate.
+    allowed = abap_false.
+    IF generated_count < c_ztoad_limit.
+      allowed = abap_true.
+    ENDIF.
+  ENDMETHOD.
+
+  METHOD record_success.
+    IF is_display IS INITIAL
+      AND generated_program IS NOT INITIAL
+      AND can_generate( generated_count ) = abap_true.
+      generated_count = generated_count + 1.
+    ENDIF.
   ENDMETHOD.
 ENDCLASS.
 
@@ -2729,19 +2765,7 @@ FORM query_process USING fw_display TYPE c
       RETURN.
     ENDIF.
 
-* For other no select command, generate program
-    IF w_run LT c_query_max_exec.
-      PERFORM query_generate_noselect USING lw_command lw_from
-                                            lw_where fw_display
-                                      CHANGING lw_program.
-      IF lw_program IS INITIAL.
-        RETURN.
-      ENDIF.
-      w_run = w_run + 1.
-    ELSE.
-      MESSAGE 'No more run available. Please restart program'(m50)
-              TYPE c_msg_error.
-    ENDIF.
+* Confirm data changes before allocating an undeletable temporary pool.
     IF fw_display IS INITIAL.
       PERFORM ddic_set_tree USING lw_from.
       CONCATENATE 'Are you sure you want to do a'(m31) lw_command
@@ -2762,6 +2786,14 @@ FORM query_process USING fw_display TYPE c
         RETURN.
       ENDIF.
     ENDIF.
+
+* For other no select command, generate program
+    PERFORM query_generate_noselect USING lw_command lw_from
+                                          lw_where fw_display
+                                    CHANGING lw_program.
+    IF lw_program IS INITIAL.
+      RETURN.
+    ENDIF.
     lw_count_only = abap_true. "no result grid to display
   ELSEIF lw_noauth NE space.
     PERFORM ddic_set_tree USING lw_from.
@@ -2771,20 +2803,14 @@ FORM query_process USING fw_display TYPE c
     MESSAGE 'Cannot parse the query'(m07) TYPE c_msg_error.
   ELSE.
 * Generate SELECT subroutine
-    IF w_run LT c_query_max_exec.
-      PERFORM query_generate USING lw_select lw_from
-                                   lw_where fw_display
-                                   lw_newsyntax
-                             CHANGING lw_program lw_rows
-                                      lt_fieldlist lw_count_only.
-      IF lw_program IS INITIAL.
-        PERFORM ddic_set_tree USING lw_from.
-        RETURN.
-      ENDIF.
-      w_run = w_run + 1.
-    ELSE.
-      MESSAGE 'No more run available. Please restart program'(m50)
-              TYPE c_msg_error.
+    PERFORM query_generate USING lw_select lw_from
+                                 lw_where fw_display
+                                 lw_newsyntax
+                           CHANGING lw_program lw_rows
+                                    lt_fieldlist lw_count_only.
+    IF lw_program IS INITIAL.
+      PERFORM ddic_set_tree USING lw_from.
+      RETURN.
     ENDIF.
   ENDIF.
 
@@ -4011,6 +4037,12 @@ FORM query_generate  USING    fw_select TYPE string
   ENDIF.
 
   IF fw_display = space.
+    IF lcl_subroutine_pool_budget=>can_generate( w_run ) = abap_false.
+      MESSAGE 'No more run available. Please restart program'(m50)
+              TYPE c_msg_success DISPLAY LIKE c_msg_error.
+      CLEAR fw_program.
+      RETURN.
+    ENDIF.
     CLEAR lw_mess.
     GENERATE SUBROUTINE POOL lt_code_string NAME fw_program
              MESSAGE lw_mess.
@@ -4032,6 +4064,11 @@ FORM query_generate  USING    fw_select TYPE string
     EDITOR-CALL FOR lt_code_string DISPLAY-MODE
                 TITLE 'Generated code for current query'(t01).
   ENDIF.
+
+  lcl_subroutine_pool_budget=>record_success(
+    EXPORTING is_display        = fw_display
+              generated_program = fw_program
+    CHANGING  generated_count   = w_run ).
 
 ENDFORM.                    " QUERY_GENERATE
 
@@ -5409,6 +5446,12 @@ FORM query_generate_noselect  USING    fw_command TYPE string
   ENDIF.
 
   IF fw_display = space.
+    IF lcl_subroutine_pool_budget=>can_generate( w_run ) = abap_false.
+      MESSAGE 'No more run available. Please restart program'(m50)
+              TYPE c_msg_success DISPLAY LIKE c_msg_error.
+      CLEAR fw_program.
+      RETURN.
+    ENDIF.
     CLEAR lw_mess.
     GENERATE SUBROUTINE POOL lt_code_string NAME fw_program
              MESSAGE lw_mess.
@@ -5430,6 +5473,11 @@ FORM query_generate_noselect  USING    fw_command TYPE string
     EDITOR-CALL FOR lt_code_string DISPLAY-MODE
                 TITLE 'Generated code for current query'(t01).
   ENDIF.
+
+  lcl_subroutine_pool_budget=>record_success(
+    EXPORTING is_display         = fw_display
+              generated_program = fw_program
+    CHANGING  generated_count    = w_run ).
 ENDFORM.                    " QUERY_GENERATE_NOSELECT
 
 *&---------------------------------------------------------------------*
@@ -9129,5 +9177,73 @@ CLASS ltc_command_parser IMPLEMENTATION.
     cl_abap_unit_assert=>assert_not_initial(
       act = generated_program
       msg = 'A valid authorized DML fragment must still generate safely' ).
+  ENDMETHOD.
+ENDCLASS.
+
+CLASS ltcl_subroutine_pool_budget DEFINITION FINAL
+  FOR TESTING
+  RISK LEVEL HARMLESS
+  DURATION SHORT.
+  PRIVATE SECTION.
+    METHODS stops_at_ztoad_limit FOR TESTING.
+    METHODS reserves_system_capacity FOR TESTING.
+    METHODS ignores_display FOR TESTING.
+    METHODS ignores_failed_generation FOR TESTING.
+ENDCLASS.
+
+CLASS ltcl_subroutine_pool_budget IMPLEMENTATION.
+  METHOD stops_at_ztoad_limit.
+    DATA generated_count TYPE i.
+
+    DO 40 TIMES.
+      IF lcl_subroutine_pool_budget=>can_generate(
+           generated_count ) = abap_true.
+        lcl_subroutine_pool_budget=>record_success(
+          EXPORTING is_display       = space
+                    generated_program = 'ZTEST'
+          CHANGING  generated_count  = generated_count ).
+      ENDIF.
+    ENDDO.
+
+    cl_abap_unit_assert=>assert_equals(
+      act = generated_count
+      exp = lcl_subroutine_pool_budget=>c_ztoad_limit ).
+    cl_abap_unit_assert=>assert_false(
+      act = lcl_subroutine_pool_budget=>can_generate(
+        generated_count ) ).
+  ENDMETHOD.
+
+  METHOD reserves_system_capacity.
+    cl_abap_unit_assert=>assert_equals(
+      act = lcl_subroutine_pool_budget=>c_ztoad_limit
+          + lcl_subroutine_pool_budget=>c_reserved_slots
+      exp = lcl_subroutine_pool_budget=>c_system_limit
+      msg = 'ZTOAD must leave capacity below SAP''s 36-pool limit' ).
+  ENDMETHOD.
+
+  METHOD ignores_display.
+    DATA generated_count TYPE i VALUE 4.
+
+    lcl_subroutine_pool_budget=>record_success(
+      EXPORTING is_display        = abap_true
+                generated_program = 'ZTEST'
+      CHANGING  generated_count   = generated_count ).
+
+    cl_abap_unit_assert=>assert_equals(
+      act = generated_count
+      exp = 4 ).
+  ENDMETHOD.
+
+  METHOD ignores_failed_generation.
+    DATA generated_count TYPE i VALUE 4.
+
+    lcl_subroutine_pool_budget=>record_success(
+      EXPORTING is_display        = space
+                generated_program = space
+      CHANGING  generated_count   = generated_count ).
+
+    cl_abap_unit_assert=>assert_equals(
+      act = generated_count
+      exp = 4 ).
   ENDMETHOD.
 ENDCLASS.
