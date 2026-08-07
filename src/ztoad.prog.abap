@@ -6730,6 +6730,8 @@ CLASS ltcl_select_expr_analyzer DEFINITION FINAL
     METHODS finds_searched_case_result FOR TESTING.
     METHODS finds_unqualified_case_result FOR TESTING.
     METHODS ignores_quoted_then FOR TESTING.
+    METHODS ignores_spaced_quoted_then FOR TESTING.
+    METHODS ignores_escaped_quoted_then FOR TESTING.
     METHODS rejects_literal_result FOR TESTING.
 ENDCLASS.
 
@@ -6760,6 +6762,22 @@ CLASS ltcl_select_expr_analyzer IMPLEMENTATION.
       act = lcl_select_expression_analyzer=>find_case_result_reference(
         `SUM( CASE SFLIGHT~CARRID WHEN 'THEN' THEN SFLIGHT~PRICE ELSE SFLIGHT~PRICE END )` )
       exp = 'SFLIGHT~PRICE' ).
+  ENDMETHOD.
+
+  METHOD ignores_spaced_quoted_then.
+    cl_abap_unit_assert=>assert_equals(
+      act = lcl_select_expression_analyzer=>find_case_result_reference(
+        `SUM( CASE SFLIGHT~CARRID WHEN 'X THEN Y' THEN SFLIGHT~PRICE ELSE SFLIGHT~PRICE END )` )
+      exp = 'SFLIGHT~PRICE'
+      msg = 'THEN inside a spaced literal is not a CASE branch' ).
+  ENDMETHOD.
+
+  METHOD ignores_escaped_quoted_then.
+    cl_abap_unit_assert=>assert_equals(
+      act = lcl_select_expression_analyzer=>find_case_result_reference(
+        `SUM( CASE SFLIGHT~CARRID WHEN 'X'' THEN Y' THEN SFLIGHT~PRICE ELSE SFLIGHT~PRICE END )` )
+      exp = 'SFLIGHT~PRICE'
+      msg = 'THEN inside a doubled-quote literal is not a CASE branch' ).
   ENDMETHOD.
 
   METHOD rejects_literal_result.
