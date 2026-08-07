@@ -533,6 +533,9 @@ CLASS lcl_sql_set_expression DEFINITION FINAL.
     CLASS-METHODS join_sources
       IMPORTING sources TYPE ty_table_names
       RETURNING VALUE(from_clause) TYPE string.
+    CLASS-METHODS contains_union
+      IMPORTING top_level_query TYPE string
+      RETURNING VALUE(result) TYPE abap_bool.
 ENDCLASS.
 
 *----------------------------------------------------------------------*
@@ -1285,6 +1288,18 @@ CLASS lcl_sql_set_expression IMPLEMENTATION.
                     INTO from_clause SEPARATED BY space.
       ENDIF.
     ENDLOOP.
+  ENDMETHOD.
+
+  METHOD contains_union.
+    DATA padded_query TYPE string.
+
+    CONCATENATE top_level_query space
+                INTO padded_query RESPECTING BLANKS.
+    TRANSLATE padded_query TO UPPER CASE.
+    result = xsdbool(
+      padded_query CS ' UNION SELECT '
+      OR padded_query CS ' UNION ALL SELECT '
+      OR padded_query CS ' UNION DISTINCT SELECT ' ).
   ENDMETHOD.
 ENDCLASS.
 
@@ -3374,10 +3389,7 @@ FORM query_generate  USING    fw_select TYPE string
   IF top_level_invalid = abap_true.
     RETURN.
   ENDIF.
-  FIND FIRST OCCURRENCE OF REGEX
-       lcl_sql_set_expression=>union_pattern
-       IN top_level_query IGNORING CASE.
-  set_query = xsdbool( sy-subrc = 0 ).
+  set_query = lcl_sql_set_expression=>contains_union( top_level_query ).
   IF set_query = abap_true.
     use_newsyntax = abap_true.
   ENDIF.
@@ -6681,6 +6693,7 @@ CLASS ltcl_sql_set_expression DEFINITION FINAL
   PRIVATE SECTION.
     METHODS attaches_suffix FOR TESTING.
     METHODS joins_sources FOR TESTING.
+    METHODS detects_union FOR TESTING.
 ENDCLASS.
 
 CLASS ltc_query_parser DEFINITION FINAL
@@ -6863,6 +6876,17 @@ CLASS ltcl_sql_set_expression IMPLEMENTATION.
       act = lcl_sql_set_expression=>join_sources( sources )
       exp = `SCARR JOIN SFLIGHT`
       msg = 'The DDIC representation must retain every set source' ).
+  ENDMETHOD.
+
+  METHOD detects_union.
+    cl_abap_unit_assert=>assert_true(
+      act = lcl_sql_set_expression=>contains_union(
+              `SELECT carrid FROM scarr UNION ALL SELECT carrid FROM sflight` )
+      msg = 'The generator sink must recognize a structural UNION ALL' ).
+    cl_abap_unit_assert=>assert_false(
+      act = lcl_sql_set_expression=>contains_union(
+              `SELECT carrid FROM scarr` )
+      msg = 'A simple structural query must not select the cursor path' ).
   ENDMETHOD.
 ENDCLASS.
 
