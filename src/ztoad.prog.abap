@@ -518,6 +518,27 @@ CLASS lcl_sql_clause_scanner DEFINITION FINAL.
 ENDCLASS.
 
 *----------------------------------------------------------------------*
+*       CLASS lcl_sql_set_expression DEFINITION
+*----------------------------------------------------------------------*
+*       Keep set parsing and execution representations synchronized
+*----------------------------------------------------------------------*
+CLASS lcl_sql_set_expression DEFINITION FINAL.
+  PUBLIC SECTION.
+    CONSTANTS union_pattern TYPE string VALUE
+      '(^| +)(UNION)( +(ALL|DISTINCT))? +(SELECT) +'.
+    CLASS-METHODS attach_suffix
+      IMPORTING branch_tail TYPE string
+                set_suffix TYPE string
+      RETURNING VALUE(query_tail) TYPE string.
+    CLASS-METHODS join_sources
+      IMPORTING sources TYPE ty_table_names
+      RETURNING VALUE(from_clause) TYPE string.
+    CLASS-METHODS contains_union
+      IMPORTING top_level_query TYPE string
+      RETURNING VALUE(result) TYPE abap_bool.
+ENDCLASS.
+
+*----------------------------------------------------------------------*
 *       CLASS lcl_generated_line_splitter DEFINITION
 *----------------------------------------------------------------------*
 *       Preserve source semantics while enforcing the 255-char limit
@@ -1240,6 +1261,46 @@ CLASS lcl_sql_clause_scanner IMPLEMENTATION.
       ENDIF.
       result_offset = previous_offset.
     ENDWHILE.
+  ENDMETHOD.
+ENDCLASS.
+
+CLASS lcl_sql_set_expression IMPLEMENTATION.
+  METHOD attach_suffix.
+    query_tail = branch_tail.
+    IF set_suffix IS INITIAL.
+      RETURN.
+    ELSEIF query_tail IS INITIAL.
+      query_tail = set_suffix.
+    ELSE.
+      CONCATENATE query_tail set_suffix
+                  INTO query_tail SEPARATED BY space.
+    ENDIF.
+  ENDMETHOD.
+
+  METHOD join_sources.
+    DATA table TYPE tabname.
+
+    LOOP AT sources INTO table.
+      IF from_clause IS INITIAL.
+        from_clause = table.
+      ELSE.
+        CONCATENATE from_clause 'JOIN' table
+                    INTO from_clause SEPARATED BY space.
+      ENDIF.
+    ENDLOOP.
+  ENDMETHOD.
+
+  METHOD contains_union.
+    DATA padded_query TYPE string.
+
+    CONCATENATE top_level_query space
+                INTO padded_query RESPECTING BLANKS.
+    TRANSLATE padded_query TO UPPER CASE.
+    CONDENSE padded_query.
+    result = xsdbool(
+      padded_query CS ' UNION SELECT '
+      OR padded_query CS ' UNION ALL SELECT '
+      OR padded_query CS ' UNION DISTINCT SELECT ' ).
   ENDMETHOD.
 ENDCLASS.
 
@@ -2589,29 +2650,24 @@ FORM query_process USING fw_display TYPE c
          lw_from          TYPE string,
          lw_where         TYPE string,
          lw_union         TYPE string,
-         lw_query2        TYPE string,
          lw_command       TYPE string,
          lw_rows(6)       TYPE n,
          lw_program       TYPE sy-repid,
          lo_result        TYPE REF TO data,
-         lo_result2       TYPE REF TO data,
          lt_fieldlist     TYPE ty_fieldlist_table,
-         lt_fieldlist2    TYPE ty_fieldlist_table,
+         lt_sources       TYPE ty_table_names,
          lw_count_only(1) TYPE c,
          lw_time          TYPE p LENGTH 8 DECIMALS 2,
-         lw_time2         LIKE lw_time,
          lw_count         TYPE i,
-         lw_count2        LIKE lw_count,
          lw_charnumb(12)  TYPE c,
          lw_msg           TYPE string,
          lw_noauth(1)     TYPE c,
          lw_newsyntax(1)  TYPE c,
          lw_answer(1)     TYPE c,
          lw_from_concat   LIKE lw_from,
+         lw_set_from      LIKE lw_from,
+         lw_invalid       TYPE abap_bool,
          lw_error(1)      TYPE c.
-
-  FIELD-SYMBOLS : <lft_data>  TYPE STANDARD TABLE,
-                  <lft_data2> TYPE STANDARD TABLE.
 
 * Get only usefull code for current query
   PERFORM editor_get_query USING space CHANGING lw_query.
@@ -2623,6 +2679,22 @@ FORM query_process USING fw_display TYPE c
                                lw_newsyntax lw_error.
   IF lw_error NE space.
     MESSAGE 'Cannot parse the query'(m07) TYPE c_msg_error.
+  ENDIF.
+
+* Execute a set as one SAP SQL expression. Keep a source-only representation
+* for the DDIC tree before attaching the preserved set suffix to the query.
+  IF NOT lw_union IS INITIAL.
+    lcl_sql_source_scanner=>scan(
+      EXPORTING query = lw_query
+      IMPORTING sources = lt_sources
+                invalid = lw_invalid ).
+    IF lw_invalid = abap_true OR lt_sources IS INITIAL.
+      RETURN.
+    ENDIF.
+    lw_set_from = lcl_sql_set_expression=>join_sources( lt_sources ).
+    lw_where = lcl_sql_set_expression=>attach_suffix(
+      branch_tail = lw_where set_suffix = lw_union ).
+    CLEAR lw_union.
   ENDIF.
 
 * Not a select query
@@ -2702,52 +2774,9 @@ FORM query_process USING fw_display TYPE c
     PERFORM run_sql IN PROGRAM (lw_program)
                     CHANGING lo_result lw_time lw_count.
     lw_from_concat = lw_from.
-* For union, process second (and further) query
-    WHILE NOT lw_union IS INITIAL.
-* Parse Query
-      lw_query2 = lw_union.
-      PERFORM query_parse USING lw_query2
-                          CHANGING lw_select lw_from lw_where
-                                   lw_union lw_rows lw_noauth
-                                   lw_newsyntax lw_error.
-      CONCATENATE lw_from_concat 'JOIN' lw_from INTO lw_from_concat.
-      IF lw_noauth NE space.
-        PERFORM ddic_set_tree USING lw_from_concat.
-        RETURN.
-      ELSEIF lw_select IS INITIAL OR lw_from IS INITIAL
-      OR lw_error = abap_true.
-        PERFORM ddic_set_tree USING lw_from_concat.
-        MESSAGE 'Cannot parse the unioned query'(m08) TYPE c_msg_error.
-        EXIT. "exit while
-      ENDIF.
-* Generate subroutine
-      IF w_run LT c_query_max_exec.
-        PERFORM query_generate USING lw_select lw_from
-                                     lw_where fw_display
-                                     lw_newsyntax
-                               CHANGING lw_program lw_rows
-                                        lt_fieldlist2 lw_count_only.
-        IF lw_program IS INITIAL.
-          PERFORM ddic_set_tree USING lw_from_concat.
-          RETURN.
-        ENDIF.
-        w_run = w_run + 1.
-      ELSE.
-        MESSAGE 'No more run available. Please restart program'(m50)
-                TYPE c_msg_error.
-      ENDIF.
-* Call the generated subroutine
-      PERFORM run_sql IN PROGRAM (lw_program)
-                      CHANGING lo_result2 lw_time2 lw_count2.
-
-* Append lines of the further queries to the first query
-      ASSIGN lo_result->* TO <lft_data>.
-      ASSIGN lo_result2->* TO <lft_data2>.
-      APPEND LINES OF <lft_data2> TO <lft_data>.
-      REFRESH <lft_data2>.
-      lw_time = lw_time + lw_time2.
-      lw_count = lw_count + lw_count2.
-    ENDWHILE.
+    IF NOT lw_set_from IS INITIAL.
+      lw_from_concat = lw_set_from.
+    ENDIF.
 
     PERFORM ddic_set_tree USING lw_from_concat.
 
@@ -2987,11 +3016,14 @@ FORM query_parse  USING    fw_query TYPE string
          lw_offset      TYPE i,
          lw_length      TYPE i,
          lw_query       TYPE string,
+         lw_full_query  TYPE string,
          lw_top_level   TYPE string,
          lw_suffix      TYPE string,
          lo_regex       TYPE REF TO cl_abap_regex,
+         lo_union_regex TYPE REF TO cl_abap_regex,
          lt_sources     TYPE ty_table_names,
          lw_string      TYPE string,
+         lw_first_token TYPE c LENGTH 7,
          lw_invalid     TYPE abap_bool,
          lw_tail_found  TYPE abap_bool,
          lw_table       TYPE tabname.
@@ -3016,38 +3048,11 @@ FORM query_parse  USING    fw_query TYPE string
     RETURN.
   ENDIF.
 
-* Search union
-  CREATE OBJECT lo_regex
+* Recognize top-level set operators before removing the global row cap.
+  CREATE OBJECT lo_union_regex
     EXPORTING
-      pattern     = '(^| +)(UNION) +(SELECT) +'
+      pattern     = lcl_sql_set_expression=>union_pattern
       ignore_case = abap_true.
-  FIND FIRST OCCURRENCE OF REGEX lo_regex IN lw_top_level
-       RESULTS ls_find_select.
-  IF sy-subrc = 0.
-    READ TABLE ls_find_select-submatches INTO ls_sub INDEX 2.
-    IF sy-subrc <> 0.
-      fw_error = abap_true.
-      RETURN.
-    ENDIF.
-    lw_offset = lcl_sql_clause_scanner=>separator_start(
-      query = lw_query keyword_offset = ls_sub-offset ).
-    READ TABLE ls_find_select-submatches INTO ls_sub INDEX 3.
-    IF sy-subrc <> 0.
-      fw_error = abap_true.
-      RETURN.
-    ENDIF.
-    fw_union = lw_query+ls_sub-offset.
-    lw_query = lw_query(lw_offset).
-    lcl_sql_clause_scanner=>mask_top_level(
-      EXPORTING query = lw_query
-      IMPORTING top_level = lw_top_level
-                invalid = lw_invalid ).
-    IF lw_invalid = abap_true.
-      CLEAR fw_union.
-      fw_error = abap_true.
-      RETURN.
-    ENDIF.
-  ENDIF.
 
 * Search UP TO xxx ROWS.
 * Catch the number of rows, delete command in query
@@ -3069,6 +3074,13 @@ FORM query_parse  USING    fw_query TYPE string
     ENDIF.
     lw_offset = lcl_sql_clause_scanner=>separator_start(
       query = lw_query keyword_offset = ls_sub-offset ).
+    FIND FIRST OCCURRENCE OF REGEX lo_union_regex
+         IN SECTION OFFSET lw_offset OF lw_top_level
+         RESULTS ls_find_where.
+    IF sy-subrc = 0.
+      fw_error = abap_true.
+      RETURN.
+    ENDIF.
     READ TABLE ls_find_select-submatches INTO ls_sub INDEX 4.
     IF sy-subrc <> 0.
       fw_error = abap_true.
@@ -3135,6 +3147,35 @@ FORM query_parse  USING    fw_query TYPE string
     ENDIF.
   ENDIF.
 
+  lw_full_query = lw_query.
+
+* Keep the complete set suffix, including UNION and its optional modifier.
+* SAP must compile and execute the branches as one set expression.
+  FIND FIRST OCCURRENCE OF REGEX lo_union_regex IN lw_top_level
+       RESULTS ls_find_select.
+  IF sy-subrc = 0.
+    READ TABLE ls_find_select-submatches INTO ls_sub INDEX 2.
+    IF sy-subrc <> 0.
+      fw_error = abap_true.
+      RETURN.
+    ENDIF.
+    lw_length = ls_sub-offset.
+    lw_offset = lcl_sql_clause_scanner=>separator_start(
+      query = lw_query keyword_offset = ls_sub-offset ).
+    fw_union = lw_query+lw_length.
+    lw_query = lw_query(lw_offset).
+    fw_newsyntax = abap_true.
+    lcl_sql_clause_scanner=>mask_top_level(
+      EXPORTING query = lw_query
+      IMPORTING top_level = lw_top_level
+                invalid = lw_invalid ).
+    IF lw_invalid = abap_true.
+      CLEAR fw_union.
+      fw_error = abap_true.
+      RETURN.
+    ENDIF.
+  ENDIF.
+
 * Search SELECT
   CREATE OBJECT lo_regex
     EXPORTING
@@ -3179,6 +3220,20 @@ FORM query_parse  USING    fw_query TYPE string
   ENDIF.
   fw_select = lw_query+lw_offset(lw_length).
 
+* SINGLE is not valid for a tabular set result. Reject it before the generator
+* can reinterpret it as a one-row package size.
+  IF NOT fw_union IS INITIAL.
+    lw_string = fw_select.
+    TRANSLATE lw_string TO UPPER CASE.
+    IF strlen( lw_string ) GE 7.
+      lw_first_token = lw_string(7).
+    ENDIF.
+    IF lw_first_token = 'SINGLE'.
+      fw_error = abap_true.
+      RETURN.
+    ENDIF.
+  ENDIF.
+
 * Detect strict syntax from a result separator or a 7.50 SQL function.
   IF fw_select CS ','
       OR lcl_select_list_scanner=>contains_v750_function( fw_select ) = abap_true.
@@ -3217,7 +3272,7 @@ FORM query_parse  USING    fw_query TYPE string
 
 * Collect every physical source, including nested subqueries.
   lcl_sql_source_scanner=>scan(
-    EXPORTING query = lw_query
+    EXPORTING query = lw_full_query
     IMPORTING sources = lt_sources
               invalid = lw_invalid ).
   IF lw_invalid = abap_true OR lt_sources IS INITIAL.
@@ -3311,6 +3366,10 @@ FORM query_generate  USING    fw_select TYPE string
          lw_case_aggregate   TYPE abap_bool.
   DATA security_input TYPE string.
   DATA line_layout_safe TYPE abap_bool.
+  DATA set_query TYPE abap_bool.
+  DATA use_newsyntax TYPE abap_bool.
+  DATA top_level_query TYPE string.
+  DATA top_level_invalid TYPE abap_bool.
   DATA normalized_select TYPE string.
   DATA select_invalid TYPE abap_bool.
   DATA(function_type) = ``.
@@ -3319,12 +3378,25 @@ FORM query_generate  USING    fw_select TYPE string
   DATA function_invalid TYPE abap_bool.
 
   CLEAR fw_program.
+  use_newsyntax = fw_newsyntax.
   CONCATENATE 'SELECT' fw_select 'FROM' fw_from fw_where
               INTO security_input SEPARATED BY space.
   IF lcl_query_input_validator=>is_safe( security_input ) = abap_false.
     MESSAGE 'Cannot parse the query'(m07)
             TYPE c_msg_success DISPLAY LIKE c_msg_error.
     RETURN.
+  ENDIF.
+
+  lcl_sql_clause_scanner=>mask_top_level(
+    EXPORTING query = security_input
+    IMPORTING top_level = top_level_query
+              invalid = top_level_invalid ).
+  IF top_level_invalid = abap_true.
+    RETURN.
+  ENDIF.
+  set_query = lcl_sql_set_expression=>contains_union( top_level_query ).
+  IF set_query = abap_true.
+    use_newsyntax = abap_true.
   ENDIF.
 
   line_layout_safe = abap_true.
@@ -3356,6 +3428,9 @@ FORM query_generate  USING    fw_select TYPE string
   IF lw_select_length GE 7.
     lw_char_10 = lw_select(7).
     IF lw_char_10 = 'SINGLE'.
+      IF set_query = abap_true.
+        RETURN.
+      ENDIF.
 * Force rows number = 1 for select single
       fw_rows = 1.
       lw_select = lw_select+7.
@@ -3371,8 +3446,9 @@ FORM query_generate  USING    fw_select TYPE string
     ENDIF.
   ENDIF.
 
-* Search for special syntax "count( * )"
-  IF lw_select = 'COUNT( * )'.
+* A set of aggregates is still a tabular result; only a standalone count can
+* use the legacy SELECT SINGLE shortcut.
+  IF lw_select = 'COUNT( * )' AND set_query = abap_false.
     fw_count = abap_true.
   ENDIF.
 
@@ -3416,7 +3492,7 @@ FORM query_generate  USING    fw_select TYPE string
   lw_field_number = 1.
 
   lw_string = lw_select.
-  IF fw_newsyntax = abap_true.
+  IF use_newsyntax = abap_true.
     lcl_select_list_scanner=>normalize_for_inference(
       EXPORTING select_list = lw_string
       IMPORTING normalized  = normalized_select
@@ -3448,7 +3524,7 @@ FORM query_generate  USING    fw_select TYPE string
     ls_fieldlist-ref_field = lw_string.
 
 * Manage new syntax "Case"
-    IF fw_newsyntax = abap_true AND lw_string = 'CASE'.
+    IF use_newsyntax = abap_true AND lw_string = 'CASE'.
       lw_index = lw_current_line.
       DO.
         lw_index = lw_index + 1.
@@ -3766,6 +3842,9 @@ FORM query_generate  USING    fw_select TYPE string
   c ', t_result like table of s_result'.                    "#EC NOTEXT
   c ', w_timestart type timestampl'.                        "#EC NOTEXT
   c ', w_timeend type timestampl.'.                         "#EC NOTEXT
+  IF set_query = abap_true.
+    c 'DATA dbcur TYPE cursor.'.                            "#EC NOTEXT
+  ENDIF.
 
 * Write the dynamic subroutine that run the SELECT
   c 'FORM run_sql CHANGING fo_result TYPE REF TO data'.     "#EC NOTEXT
@@ -3776,11 +3855,14 @@ FORM query_generate  USING    fw_select TYPE string
   c '*            Begin of query           *'.              "#EC NOTEXT
   c '***************************************'.              "#EC NOTEXT
   c 'get TIME STAMP FIELD w_timestart.'.                    "#EC NOTEXT
+  IF set_query = abap_true.
+    c 'OPEN CURSOR @dbcur FOR'.                             "#EC NOTEXT
+  ENDIF.
   IF fw_count = abap_true.
     CONCATENATE 'SELECT SINGLE' lw_select                   "#EC NOTEXT
                 INTO lw_select SEPARATED BY space.
     c lw_select.
-    IF fw_newsyntax = abap_true.
+    IF use_newsyntax = abap_true.
       c 'INTO @s_result-f000001'.                           "#EC NOTEXT
     ELSE.
       c 'INTO s_result-f000001'.                            "#EC NOTEXT
@@ -3795,7 +3877,7 @@ FORM query_generate  USING    fw_select TYPE string
     ENDIF.
     c lw_select.
 * Keep legacy INTO and UP TO before FROM for compatibility.
-    IF fw_newsyntax IS INITIAL.
+    IF use_newsyntax IS INITIAL AND set_query = abap_false.
       c 'INTO TABLE t_result'.                              "#EC NOTEXT
 
       IF NOT fw_rows IS INITIAL.
@@ -3814,9 +3896,20 @@ FORM query_generate  USING    fw_select TYPE string
     c fw_where.
   ENDIF.
 
-* New-syntax table queries can activate strict ABAP SQL. Use its valid
-* clause order: INTO follows the data-source clauses, then UP TO.
-  IF fw_newsyntax = abap_true AND fw_count IS INITIAL.
+* A set query has no target or row limit in OPEN CURSOR. FETCH applies ZTOAD's
+* cap to the merged result. Other strict queries keep the standalone order.
+  IF set_query = abap_true.
+    c '.'.
+    c 'FETCH NEXT CURSOR @dbcur'.                           "#EC NOTEXT
+    c 'INTO TABLE @t_result'.                               "#EC NOTEXT
+    IF NOT fw_rows IS INITIAL.
+      c 'PACKAGE SIZE'.                                    "#EC NOTEXT
+      c fw_rows.
+    ENDIF.
+    c '.'.
+    c 'fw_count = sy-dbcnt.'.                              "#EC NOTEXT
+    c 'CLOSE CURSOR @dbcur.'.                              "#EC NOTEXT
+  ELSEIF use_newsyntax = abap_true AND fw_count IS INITIAL.
     c 'INTO TABLE @t_result'.                               "#EC NOTEXT
     IF NOT fw_rows IS INITIAL.
       c 'UP TO'.                                            "#EC NOTEXT
@@ -3824,12 +3917,16 @@ FORM query_generate  USING    fw_select TYPE string
       c 'ROWS'.                                             "#EC NOTEXT
     ENDIF.
   ENDIF.
-  c '.'.
+  IF set_query = abap_false.
+    c '.'.
+  ENDIF.
 
 * Display query execution time
   c 'get TIME STAMP FIELD w_timeend.'.                      "#EC NOTEXT
   c 'fw_time = w_timeend - w_timestart.'.                   "#EC NOTEXT
-  c 'fw_count = sy-dbcnt.'.                                 "#EC NOTEXT
+  IF set_query = abap_false.
+    c 'fw_count = sy-dbcnt.'.                               "#EC NOTEXT
+  ENDIF.
 
 * If select count( * ), display number of results
   IF fw_count NE space.
@@ -5645,16 +5742,17 @@ ENDFORM.                    "options_save
 *----------------------------------------------------------------------*
 FORM ddic_refresh_tree.
   DATA : lw_query        TYPE string,
-         lw_query2       TYPE string,
          lw_select       TYPE string,
          lw_from         TYPE string,
-         lw_from2        TYPE string,
          lw_where        TYPE string,
          lw_union        TYPE string,
          lw_rows(6)      TYPE n,
          lw_noauth(1)    TYPE c,
          lw_newsyntax(1) TYPE c,
          lw_error(1)     TYPE c.
+  DATA lt_sources TYPE ty_table_names.
+  DATA lw_set_from TYPE string.
+  DATA lw_invalid TYPE abap_bool.
   DATA capabilities TYPE lcl_editor_configuration=>ty_capabilities.
 
   capabilities = lcl_editor_configuration=>get_runtime_capabilities( ).
@@ -5681,22 +5779,19 @@ FORM ddic_refresh_tree.
       RETURN.
     ENDIF.
   ENDIF.
-* Manage unioned queries
-  WHILE NOT lw_union IS INITIAL.
-* Parse Query
-    lw_query2 = lw_union.
-    PERFORM query_parse USING lw_query2
-                        CHANGING lw_select lw_from2 lw_where
-                                 lw_union lw_rows lw_noauth
-                                 lw_newsyntax lw_error.
-    IF NOT lw_from2 IS INITIAL.
-      CONCATENATE lw_from 'JOIN' lw_from2
-                  INTO lw_from SEPARATED BY space.
-    ENDIF.
-    IF lw_noauth NE space OR lw_error NE space.
+* Preserve every physical set source in the DDIC tree without executing or
+* reparsing individual branches.
+  IF NOT lw_union IS INITIAL.
+    lcl_sql_source_scanner=>scan(
+      EXPORTING query = lw_query
+      IMPORTING sources = lt_sources
+                invalid = lw_invalid ).
+    IF lw_invalid = abap_true OR lt_sources IS INITIAL.
       RETURN.
     ENDIF.
-  ENDWHILE.
+    lw_set_from = lcl_sql_set_expression=>join_sources( lt_sources ).
+    lw_from = lw_set_from.
+  ENDIF.
 
   PERFORM tab_update_title USING lw_query.
 
@@ -6596,6 +6691,16 @@ CLASS ltcl_sql_clause_scanner DEFINITION FINAL
     METHODS rejects_non_sql_literals FOR TESTING.
 ENDCLASS.
 
+CLASS ltcl_sql_set_expression DEFINITION FINAL
+  FOR TESTING
+  DURATION SHORT
+  RISK LEVEL HARMLESS.
+  PRIVATE SECTION.
+    METHODS attaches_suffix FOR TESTING.
+    METHODS joins_sources FOR TESTING.
+    METHODS detects_union FOR TESTING.
+ENDCLASS.
+
 CLASS ltc_query_parser DEFINITION FINAL
   FOR TESTING
   DURATION SHORT
@@ -6613,6 +6718,10 @@ CLASS ltc_query_parser DEFINITION FINAL
     METHODS keeps_tail_clauses FOR TESTING.
     METHODS separates_union FOR TESTING.
     METHODS separates_union_expression FOR TESTING.
+    METHODS separates_union_all FOR TESTING.
+    METHODS separates_union_distinct FOR TESTING.
+    METHODS rejects_union_branch_limit FOR TESTING.
+    METHODS rejects_union_single FOR TESTING.
     METHODS detects_comma_syntax FOR TESTING.
     METHODS strips_into_target FOR TESTING.
     METHODS ignores_literal_from_keyword FOR TESTING.
@@ -6747,6 +6856,42 @@ CLASS ltcl_sql_clause_scanner IMPLEMENTATION.
     cl_abap_unit_assert=>assert_true(
       act = invalid
       msg = 'String templates are outside the accepted input grammar' ).
+  ENDMETHOD.
+ENDCLASS.
+
+CLASS ltcl_sql_set_expression IMPLEMENTATION.
+  METHOD attaches_suffix.
+    cl_abap_unit_assert=>assert_equals(
+      act = lcl_sql_set_expression=>attach_suffix(
+              branch_tail = ` WHERE carrid = 'LH'`
+              set_suffix = `UNION ALL SELECT carrid FROM sflight` )
+      exp = ` WHERE carrid = 'LH' UNION ALL SELECT carrid FROM sflight`
+      msg = 'The execution representation must keep the set operator' ).
+  ENDMETHOD.
+
+  METHOD joins_sources.
+    DATA sources TYPE ty_table_names.
+    DATA table_name TYPE tabname.
+
+    table_name = 'SCARR'.
+    INSERT table_name INTO TABLE sources.
+    table_name = 'SFLIGHT'.
+    INSERT table_name INTO TABLE sources.
+    cl_abap_unit_assert=>assert_equals(
+      act = lcl_sql_set_expression=>join_sources( sources )
+      exp = `SCARR JOIN SFLIGHT`
+      msg = 'The DDIC representation must retain every set source' ).
+  ENDMETHOD.
+
+  METHOD detects_union.
+    cl_abap_unit_assert=>assert_true(
+      act = lcl_sql_set_expression=>contains_union(
+              `SELECT carrid FROM scarr UNION ALL SELECT carrid FROM sflight` )
+      msg = 'The generator sink must recognize a structural UNION ALL' ).
+    cl_abap_unit_assert=>assert_false(
+      act = lcl_sql_set_expression=>contains_union(
+              `SELECT carrid FROM scarr` )
+      msg = 'A simple structural query must not select the cursor path' ).
   ENDMETHOD.
 ENDCLASS.
 
@@ -7000,8 +7145,8 @@ CLASS ltc_query_parser IMPLEMENTATION.
 
     cl_abap_unit_assert=>assert_equals(
       act = union_part
-      exp = 'SELECT carrid FROM sflight'
-      msg = 'UNION remainder must be returned for the next parse pass' ).
+      exp = 'UNION SELECT carrid FROM sflight'
+      msg = 'The set operator must remain attached to its right branch' ).
     cl_abap_unit_assert=>assert_equals(
       act = from_part
       exp = 'scarr'
@@ -7027,9 +7172,78 @@ CLASS ltc_query_parser IMPLEMENTATION.
       msg = 'Masked expression content before UNION must not be truncated' ).
     cl_abap_unit_assert=>assert_equals(
       act = union_part
-      exp = 'SELECT carrname FROM scarr'
-      msg = 'The top-level UNION branch must still be separated' ).
+      exp = 'UNION SELECT carrname FROM scarr'
+      msg = 'The top-level set expression must preserve its operator' ).
     cl_abap_unit_assert=>assert_initial( act = parse_error ).
+  ENDMETHOD.
+
+  METHOD separates_union_all.
+    DATA union_part TYPE string.
+    DATA parse_error TYPE abap_bool.
+
+    parse_select(
+      EXPORTING
+        query = `SELECT carrid FROM scarr`
+             && cl_abap_char_utilities=>newline
+             && `UNION   ALL`
+             && cl_abap_char_utilities=>newline
+             && `SELECT carrid FROM sflight`
+      IMPORTING union_part = union_part
+                parse_error = parse_error ).
+
+    cl_abap_unit_assert=>assert_equals(
+      act = union_part
+      exp = `UNION   ALL`
+         && cl_abap_char_utilities=>newline
+         && `SELECT carrid FROM sflight`
+      msg = 'UNION ALL must follow the same top-level set path' ).
+    cl_abap_unit_assert=>assert_initial( act = parse_error ).
+  ENDMETHOD.
+
+  METHOD separates_union_distinct.
+    DATA union_part TYPE string.
+    DATA parse_error TYPE abap_bool.
+
+    parse_select(
+      EXPORTING
+        query = `SELECT carrid FROM scarr`
+             && ` UNION DISTINCT SELECT carrid FROM sflight`
+      IMPORTING union_part = union_part
+                parse_error = parse_error ).
+
+    cl_abap_unit_assert=>assert_equals(
+      act = union_part
+      exp = `UNION DISTINCT SELECT carrid FROM sflight`
+      msg = 'An explicit DISTINCT modifier must reach SAP unchanged' ).
+    cl_abap_unit_assert=>assert_initial( act = parse_error ).
+  ENDMETHOD.
+
+  METHOD rejects_union_branch_limit.
+    DATA parse_error TYPE abap_bool.
+
+    parse_select(
+      EXPORTING
+        query = `SELECT carrid FROM scarr UP TO 1 ROWS`
+             && ` UNION ALL SELECT carrid FROM sflight`
+      IMPORTING parse_error = parse_error ).
+
+    cl_abap_unit_assert=>assert_true(
+      act = parse_error
+      msg = 'A row limit before another set branch is not a global cap' ).
+  ENDMETHOD.
+
+  METHOD rejects_union_single.
+    DATA parse_error TYPE abap_bool.
+
+    parse_select(
+      EXPORTING
+        query = `SELECT SINGLE mandt FROM T000`
+             && ` UNION SELECT mandt FROM T000`
+      IMPORTING parse_error = parse_error ).
+
+    cl_abap_unit_assert=>assert_true(
+      act = parse_error
+      msg = 'SINGLE must not be silently rewritten as a set result cap' ).
   ENDMETHOD.
 
   METHOD detects_comma_syntax.
@@ -7518,7 +7732,6 @@ CLASS ltc_query_parser IMPLEMENTATION.
   ENDMETHOD.
 
   METHOD rejects_unauthorized_union.
-    DATA union_part TYPE string.
     DATA no_authority TYPE abap_bool.
     DATA parse_error TYPE abap_bool.
 
@@ -7527,21 +7740,12 @@ CLASS ltc_query_parser IMPLEMENTATION.
     parse_select(
       EXPORTING
         query = `SELECT carrid FROM scarr UNION SELECT carrid FROM sflight`
-      IMPORTING union_part = union_part
-                no_authority = no_authority
-                parse_error = parse_error ).
-
-    cl_abap_unit_assert=>assert_initial( act = no_authority ).
-    cl_abap_unit_assert=>assert_initial( act = parse_error ).
-
-    parse_select(
-      EXPORTING query = union_part
       IMPORTING no_authority = no_authority
                 parse_error = parse_error ).
 
     cl_abap_unit_assert=>assert_true(
       act = no_authority
-      msg = 'A later UNION branch must use the same source policy' ).
+      msg = 'The complete UNION must authorize every source before execution' ).
     cl_abap_unit_assert=>assert_initial( act = parse_error ).
   ENDMETHOD.
 
@@ -7916,6 +8120,14 @@ CLASS ltc_query_generator DEFINITION FINAL
     METHODS generates_length_function FOR TESTING.
     METHODS rejects_statement_injection FOR TESTING.
     METHODS rejects_wrapped_quote_boundary FOR TESTING.
+    METHODS generates_union_distinct FOR TESTING.
+    METHODS generates_explicit_distinct FOR TESTING.
+    METHODS generates_union_all FOR TESTING.
+    METHODS rejects_union_layout_mismatch FOR TESTING.
+    METHODS rejects_union_type_mismatch FOR TESTING.
+    METHODS generates_three_union_branches FOR TESTING.
+    METHODS limits_union_result FOR TESTING.
+    METHODS keeps_unlimited_union FOR TESTING.
 
     METHODS generate_query
       IMPORTING query TYPE string
@@ -7957,6 +8169,9 @@ CLASS ltc_query_generator IMPLEMENTATION.
 
     cl_abap_unit_assert=>assert_initial( act = no_authority ).
     cl_abap_unit_assert=>assert_initial( act = parse_error ).
+
+    tail_part = lcl_sql_set_expression=>attach_suffix(
+      branch_tail = tail_part set_suffix = union_part ).
 
     PERFORM query_generate USING select_part
                                  from_part
@@ -8233,6 +8448,198 @@ CLASS ltc_query_generator IMPLEMENTATION.
     cl_abap_unit_assert=>assert_initial(
       act = generated_program
       msg = 'A wrapped doubled quote must not produce executable source' ).
+  ENDMETHOD.
+
+  METHOD generates_union_distinct.
+    DATA generated_program TYPE sy-repid.
+    DATA new_syntax TYPE abap_bool.
+    DATA count_query TYPE abap_bool.
+    DATA result TYPE REF TO data.
+    DATA runtime TYPE p LENGTH 8 DECIMALS 2.
+    DATA row_count TYPE i.
+    FIELD-SYMBOLS <result> TYPE STANDARD TABLE.
+
+    generate_query(
+      EXPORTING
+        query = `SELECT COUNT( * ) FROM T000`
+             && ` UNION SELECT COUNT( * ) FROM T000`
+      IMPORTING generated_program = generated_program
+                new_syntax = new_syntax
+                count_query = count_query ).
+
+    cl_abap_unit_assert=>assert_not_initial(
+      act = generated_program
+      msg = 'A valid UNION must compile as one set expression' ).
+    PERFORM run_sql IN PROGRAM (generated_program)
+            CHANGING result runtime row_count.
+    ASSIGN result->* TO <result>.
+    DESCRIBE TABLE <result> LINES row_count.
+    cl_abap_unit_assert=>assert_equals(
+      act = row_count
+      exp = 1
+      msg = 'Implicit UNION DISTINCT must remove duplicate rows' ).
+    cl_abap_unit_assert=>assert_initial(
+      act = count_query
+      msg = 'A set of aggregates is a tabular result, not SELECT SINGLE' ).
+  ENDMETHOD.
+
+  METHOD generates_explicit_distinct.
+    DATA generated_program TYPE sy-repid.
+    DATA result TYPE REF TO data.
+    DATA runtime TYPE p LENGTH 8 DECIMALS 2.
+    DATA row_count TYPE i.
+    FIELD-SYMBOLS <result> TYPE STANDARD TABLE.
+
+    generate_query(
+      EXPORTING
+        query = `SELECT COUNT( * ) FROM T000`
+             && ` UNION DISTINCT SELECT COUNT( * ) FROM T000`
+      IMPORTING generated_program = generated_program ).
+
+    cl_abap_unit_assert=>assert_not_initial( act = generated_program ).
+    PERFORM run_sql IN PROGRAM (generated_program)
+            CHANGING result runtime row_count.
+    ASSIGN result->* TO <result>.
+    DESCRIBE TABLE <result> LINES row_count.
+    cl_abap_unit_assert=>assert_equals(
+      act = row_count
+      exp = 1
+      msg = 'Explicit UNION DISTINCT must remove duplicate rows' ).
+  ENDMETHOD.
+
+  METHOD generates_union_all.
+    DATA generated_program TYPE sy-repid.
+    DATA new_syntax TYPE abap_bool.
+    DATA count_query TYPE abap_bool.
+    DATA result TYPE REF TO data.
+    DATA runtime TYPE p LENGTH 8 DECIMALS 2.
+    DATA row_count TYPE i.
+    FIELD-SYMBOLS <result> TYPE STANDARD TABLE.
+
+    generate_query(
+      EXPORTING
+        query = `SELECT COUNT( * ) FROM T000`
+             && cl_abap_char_utilities=>newline
+             && `UNION   ALL`
+             && cl_abap_char_utilities=>newline
+             && `SELECT COUNT( * ) FROM T000`
+      IMPORTING generated_program = generated_program
+                new_syntax = new_syntax
+                count_query = count_query ).
+
+    cl_abap_unit_assert=>assert_not_initial(
+      act = generated_program
+      msg = 'UNION ALL must compile as one set expression' ).
+    PERFORM run_sql IN PROGRAM (generated_program)
+            CHANGING result runtime row_count.
+    ASSIGN result->* TO <result>.
+    DESCRIBE TABLE <result> LINES row_count.
+    cl_abap_unit_assert=>assert_equals(
+      act = row_count
+      exp = 2
+      msg = 'UNION ALL must preserve duplicate rows' ).
+    cl_abap_unit_assert=>assert_initial( act = count_query ).
+  ENDMETHOD.
+
+  METHOD rejects_union_layout_mismatch.
+    DATA generated_program TYPE sy-repid.
+
+    generate_query(
+      EXPORTING
+        query = `SELECT mandt FROM T000`
+             && ` UNION SELECT tabname, tabclass FROM DD02L`
+      IMPORTING generated_program = generated_program ).
+
+    cl_abap_unit_assert=>assert_initial(
+      act = generated_program
+      msg = 'SAP syntax must reject incompatible set branch layouts' ).
+  ENDMETHOD.
+
+  METHOD rejects_union_type_mismatch.
+    DATA generated_program TYPE sy-repid.
+
+    generate_query(
+      EXPORTING
+        query = `SELECT mandt FROM T000`
+             && ` UNION SELECT as4date FROM DD02L`
+      IMPORTING generated_program = generated_program ).
+
+    cl_abap_unit_assert=>assert_initial(
+      act = generated_program
+      msg = 'SAP syntax must reject incompatible set branch types' ).
+  ENDMETHOD.
+
+  METHOD generates_three_union_branches.
+    DATA generated_program TYPE sy-repid.
+    DATA result TYPE REF TO data.
+    DATA runtime TYPE p LENGTH 8 DECIMALS 2.
+    DATA row_count TYPE i.
+    FIELD-SYMBOLS <result> TYPE STANDARD TABLE.
+
+    generate_query(
+      EXPORTING
+        query = `SELECT COUNT( * ) FROM T000`
+             && ` UNION ALL SELECT COUNT( * ) FROM T000`
+             && ` UNION ALL SELECT COUNT( * ) FROM T000`
+      IMPORTING generated_program = generated_program ).
+
+    cl_abap_unit_assert=>assert_not_initial( act = generated_program ).
+    PERFORM run_sql IN PROGRAM (generated_program)
+            CHANGING result runtime row_count.
+    ASSIGN result->* TO <result>.
+    DESCRIBE TABLE <result> LINES row_count.
+    cl_abap_unit_assert=>assert_equals(
+      act = row_count
+      exp = 3
+      msg = 'All set branches must execute in the same cursor' ).
+  ENDMETHOD.
+
+  METHOD limits_union_result.
+    DATA generated_program TYPE sy-repid.
+    DATA result TYPE REF TO data.
+    DATA runtime TYPE p LENGTH 8 DECIMALS 2.
+    DATA row_count TYPE i.
+    FIELD-SYMBOLS <result> TYPE STANDARD TABLE.
+
+    generate_query(
+      EXPORTING
+        query = `SELECT COUNT( * ) FROM T000`
+             && ` UNION ALL SELECT COUNT( * ) FROM T000 UP TO 1 ROWS`
+      IMPORTING generated_program = generated_program ).
+
+    cl_abap_unit_assert=>assert_not_initial( act = generated_program ).
+    PERFORM run_sql IN PROGRAM (generated_program)
+            CHANGING result runtime row_count.
+    ASSIGN result->* TO <result>.
+    DESCRIBE TABLE <result> LINES row_count.
+    cl_abap_unit_assert=>assert_equals(
+      act = row_count
+      exp = 1
+      msg = 'The final ZTOAD row cap must bound the merged result' ).
+  ENDMETHOD.
+
+  METHOD keeps_unlimited_union.
+    DATA generated_program TYPE sy-repid.
+    DATA result TYPE REF TO data.
+    DATA runtime TYPE p LENGTH 8 DECIMALS 2.
+    DATA row_count TYPE i.
+    FIELD-SYMBOLS <result> TYPE STANDARD TABLE.
+
+    generate_query(
+      EXPORTING
+        query = `SELECT COUNT( * ) FROM T000`
+             && ` UNION ALL SELECT COUNT( * ) FROM T000 UP TO 0 ROWS`
+      IMPORTING generated_program = generated_program ).
+
+    cl_abap_unit_assert=>assert_not_initial( act = generated_program ).
+    PERFORM run_sql IN PROGRAM (generated_program)
+            CHANGING result runtime row_count.
+    ASSIGN result->* TO <result>.
+    DESCRIBE TABLE <result> LINES row_count.
+    cl_abap_unit_assert=>assert_equals(
+      act = row_count
+      exp = 2
+      msg = 'UP TO 0 must retain the existing explicit unlimited contract' ).
   ENDMETHOD.
 ENDCLASS.
 

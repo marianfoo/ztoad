@@ -41,6 +41,7 @@ For every bug or feature:
 - Inject authorization, database, editor, generator, and executor collaborators through narrow interfaces as each path is changed.
 - Test valid, invalid, boundary, and hostile input. ZTOAD's parser is an authorization and injection boundary, not only a formatter.
 - For character-by-character tokenizers and literal maskers, assert that spaces and other separators survive the emitted ABAP string. Fixed-length character-to-string conversion can trim blanks and must be verified by live ABAP Unit, not inferred from abaplint.
+- If a grammar feature is detected again after parsing (authorization, generation, or execution), centralize the structural predicate/normalization where practical and run a full-path test through every detector. Include tabs, line breaks, and repeated spaces; a green parser-only case does not prove that the generator takes the same branch.
 - Keep generated-source fixtures within the SAP_BASIS 750 grammar floor. When a fixture fails compilation before reaching the behavior under test, use isolated dry-run compiler probes to separate fixture compatibility from a production defect.
 - Never weaken a test merely to accommodate current behavior. If the current behavior is deliberately preserved, document why in the finding.
 
