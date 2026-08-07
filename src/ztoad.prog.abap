@@ -448,6 +448,29 @@ CLASS lcl_query_input_validator DEFINITION FINAL.
 ENDCLASS.
 
 *----------------------------------------------------------------------*
+*       CLASS lcl_select_list_scanner DEFINITION
+*----------------------------------------------------------------------*
+*       Preserve nested SQL expressions while inferring result fields
+*----------------------------------------------------------------------*
+CLASS lcl_select_list_scanner DEFINITION FINAL.
+  PUBLIC SECTION.
+    CLASS-METHODS normalize_for_inference
+      IMPORTING select_list TYPE string
+      EXPORTING normalized  TYPE string
+                invalid     TYPE abap_bool.
+    CLASS-METHODS contains_v750_function
+      IMPORTING select_list   TYPE string
+      RETURNING VALUE(result) TYPE abap_bool.
+    CLASS-METHODS get_function_result_type
+      IMPORTING expression         TYPE string
+      RETURNING VALUE(result_type) TYPE string.
+    CLASS-METHODS get_expression_state
+      IMPORTING expression TYPE string
+      EXPORTING complete   TYPE abap_bool
+                invalid    TYPE abap_bool.
+ENDCLASS.
+
+*----------------------------------------------------------------------*
 *       CLASS lcl_select_expression_analyzer DEFINITION
 *----------------------------------------------------------------------*
 *       Resolve safe type references for supported SQL expressions
@@ -755,6 +778,231 @@ CLASS lcl_query_input_validator IMPLEMENTATION.
       OR character = cl_abap_char_utilities=>horizontal_tab
       OR character = cl_abap_char_utilities=>newline
       OR character = cl_abap_char_utilities=>cr_lf(1) ).
+  ENDMETHOD.
+ENDCLASS.
+
+CLASS lcl_select_list_scanner IMPLEMENTATION.
+  METHOD normalize_for_inference.
+    DATA index TYPE i.
+    DATA(next_index) = 0.
+    DATA depth TYPE i.
+    DATA(character) = space.
+    DATA(next_character) = space.
+    DATA in_literal TYPE abap_bool.
+    DATA last_was_space TYPE abap_bool.
+
+    CLEAR normalized.
+    CLEAR invalid.
+    DATA(select_length) = strlen( select_list ).
+
+    WHILE index < select_length.
+      character = select_list+index(1).
+
+      IF in_literal = abap_true.
+        CONCATENATE normalized character INTO normalized
+                    RESPECTING BLANKS.
+        IF character = ''''.
+          next_index = index + 1.
+          IF next_index < select_length.
+            next_character = select_list+next_index(1).
+            IF next_character = ''''.
+              CONCATENATE normalized next_character INTO normalized
+                          RESPECTING BLANKS.
+              index = index + 2.
+              CONTINUE.
+            ENDIF.
+          ENDIF.
+          CLEAR in_literal.
+        ENDIF.
+        index = index + 1.
+        CONTINUE.
+      ENDIF.
+
+      CASE character.
+        WHEN ''''.
+          in_literal = abap_true.
+          CLEAR last_was_space.
+          CONCATENATE normalized character INTO normalized
+                      RESPECTING BLANKS.
+        WHEN '('.
+          depth = depth + 1.
+          CLEAR last_was_space.
+          CONCATENATE normalized character INTO normalized
+                      RESPECTING BLANKS.
+        WHEN ')'.
+          IF depth = 0.
+            invalid = abap_true.
+            RETURN.
+          ENDIF.
+          depth = depth - 1.
+          CLEAR last_was_space.
+          CONCATENATE normalized character INTO normalized
+                      RESPECTING BLANKS.
+        WHEN ','.
+          IF depth = 0.
+            IF last_was_space = abap_false.
+              CONCATENATE normalized space INTO normalized
+                          RESPECTING BLANKS.
+              last_was_space = abap_true.
+            ENDIF.
+          ELSE.
+            CLEAR last_was_space.
+            CONCATENATE normalized character INTO normalized
+                        RESPECTING BLANKS.
+          ENDIF.
+        WHEN space.
+          IF last_was_space = abap_false.
+            CONCATENATE normalized space INTO normalized
+                        RESPECTING BLANKS.
+            last_was_space = abap_true.
+          ENDIF.
+        WHEN OTHERS.
+          CLEAR last_was_space.
+          CONCATENATE normalized character INTO normalized
+                      RESPECTING BLANKS.
+      ENDCASE.
+
+      index = index + 1.
+    ENDWHILE.
+
+    IF in_literal = abap_true OR depth <> 0.
+      invalid = abap_true.
+    ENDIF.
+  ENDMETHOD.
+
+  METHOD contains_v750_function.
+    DATA index TYPE i.
+    DATA(next_index) = 0.
+    DATA(character) = space.
+    DATA(next_character) = space.
+    DATA token TYPE string.
+    DATA in_literal TYPE abap_bool.
+
+    result = abap_false.
+    DATA(select_length) = strlen( select_list ).
+
+    WHILE index < select_length.
+      character = select_list+index(1).
+      IF in_literal = abap_true.
+        IF character = ''''.
+          next_index = index + 1.
+          IF next_index < select_length.
+            next_character = select_list+next_index(1).
+            IF next_character = ''''.
+              index = index + 2.
+              CONTINUE.
+            ENDIF.
+          ENDIF.
+          CLEAR in_literal.
+        ENDIF.
+        index = index + 1.
+        CONTINUE.
+      ENDIF.
+
+      IF character = ''''.
+        CLEAR token.
+        in_literal = abap_true.
+      ELSEIF character CO 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789_'.
+        CONCATENATE token character INTO token IN CHARACTER MODE.
+      ELSEIF character = '('.
+        CONCATENATE token character INTO token IN CHARACTER MODE.
+        IF get_function_result_type( token ) IS NOT INITIAL.
+          result = abap_true.
+          RETURN.
+        ENDIF.
+        CLEAR token.
+      ELSE.
+        CLEAR token.
+      ENDIF.
+      index = index + 1.
+    ENDWHILE.
+  ENDMETHOD.
+
+  METHOD get_function_result_type.
+    DATA(opening_offset) = find(
+      val = expression
+      sub = '(' ).
+    IF opening_offset <= 0.
+      RETURN.
+    ENDIF.
+
+    DATA(function_name) = expression(opening_offset).
+    CONDENSE function_name NO-GAPS.
+    TRANSLATE function_name TO UPPER CASE.
+
+    CASE function_name.
+      WHEN 'CONCAT' OR 'LPAD' OR 'LTRIM' OR 'REPLACE'
+          OR 'RIGHT' OR 'RTRIM' OR 'SUBSTRING'.
+        result_type = 'string'.
+      WHEN 'LENGTH'.
+        result_type = 'i'.
+    ENDCASE.
+  ENDMETHOD.
+
+  METHOD get_expression_state.
+    DATA index TYPE i.
+    DATA(next_index) = 0.
+    DATA depth TYPE i.
+    DATA(character) = space.
+    DATA(next_character) = space.
+    DATA in_literal TYPE abap_bool.
+    DATA(saw_opening) = abap_false.
+    DATA root_closed TYPE abap_bool.
+
+    CLEAR complete.
+    CLEAR invalid.
+    DATA(expression_length) = strlen( expression ).
+
+    WHILE index < expression_length.
+      character = expression+index(1).
+      IF root_closed = abap_true.
+        IF character <> space.
+          invalid = abap_true.
+          RETURN.
+        ENDIF.
+        index = index + 1.
+        CONTINUE.
+      ENDIF.
+
+      IF in_literal = abap_true.
+        IF character = ''''.
+          next_index = index + 1.
+          IF next_index < expression_length.
+            next_character = expression+next_index(1).
+            IF next_character = ''''.
+              index = index + 2.
+              CONTINUE.
+            ENDIF.
+          ENDIF.
+          CLEAR in_literal.
+        ENDIF.
+        index = index + 1.
+        CONTINUE.
+      ENDIF.
+
+      CASE character.
+        WHEN ''''.
+          in_literal = abap_true.
+        WHEN '('.
+          depth = depth + 1.
+          saw_opening = abap_true.
+        WHEN ')'.
+          IF depth = 0.
+            invalid = abap_true.
+            RETURN.
+          ENDIF.
+          depth = depth - 1.
+          IF depth = 0.
+            root_closed = abap_true.
+          ENDIF.
+      ENDCASE.
+      index = index + 1.
+    ENDWHILE.
+
+    complete = xsdbool(
+      saw_opening = abap_true
+      AND root_closed = abap_true
+      AND in_literal = abap_false ).
   ENDMETHOD.
 ENDCLASS.
 
@@ -2716,8 +2964,9 @@ FORM query_parse  USING    fw_query TYPE string
   ENDIF.
   fw_select = lw_query+lw_offset(lw_length).
 
-* Detect new syntax in comma field select separator
-  IF fw_select CS ','.
+* Detect strict syntax from a result separator or a 7.50 SQL function.
+  IF fw_select CS ','
+      OR lcl_select_list_scanner=>contains_v750_function( fw_select ) = abap_true.
     fw_newsyntax = abap_true.
   ENDIF.
 
@@ -2828,6 +3077,12 @@ FORM query_generate  USING    fw_select TYPE string
          lw_case_aggregate   TYPE abap_bool.
   DATA security_input TYPE string.
   DATA line_layout_safe TYPE abap_bool.
+  DATA normalized_select TYPE string.
+  DATA select_invalid TYPE abap_bool.
+  DATA(function_type) = ``.
+  DATA(function_expression) = ``.
+  DATA function_complete TYPE abap_bool.
+  DATA function_invalid TYPE abap_bool.
 
   CLEAR fw_program.
   CONCATENATE 'SELECT' fw_select 'FROM' fw_from fw_where
@@ -2928,8 +3183,15 @@ FORM query_generate  USING    fw_select TYPE string
 
   lw_string = lw_select.
   IF fw_newsyntax = abap_true.
-    TRANSLATE lw_string USING ', '.
-    CONDENSE lw_string.
+    lcl_select_list_scanner=>normalize_for_inference(
+      EXPORTING select_list = lw_string
+      IMPORTING normalized  = normalized_select
+                invalid     = select_invalid ).
+    IF select_invalid = abap_true.
+      line_layout_safe = abap_false.
+      CLEAR normalized_select.
+    ENDIF.
+    lw_string = normalized_select.
   ENDIF.
   SPLIT lw_string AT space INTO TABLE lt_split.
 
@@ -2990,6 +3252,64 @@ FORM query_generate  USING    fw_select TYPE string
           EXIT.
         ENDIF.
       ENDDO.
+      CONTINUE.
+    ENDIF.
+
+* Manage the ABAP 7.50 string-function family. The scanner keeps nested
+* arguments together; the original SELECT text remains unchanged.
+    function_type =
+      lcl_select_list_scanner=>get_function_result_type( lw_string ).
+    IF function_type IS NOT INITIAL.
+      function_expression = lw_string.
+      lcl_select_list_scanner=>get_expression_state(
+        EXPORTING expression = function_expression
+        IMPORTING complete   = function_complete
+                  invalid    = function_invalid ).
+      lw_index = lw_current_line + 1.
+
+      WHILE function_complete = abap_false
+          AND function_invalid = abap_false.
+        IF lines( lt_split ) < lw_index.
+          function_invalid = abap_true.
+          EXIT.
+        ENDIF.
+        lw_string = lt_split[ lw_index ].
+        CONCATENATE function_expression lw_string
+                    INTO function_expression SEPARATED BY space.
+        DELETE lt_split INDEX lw_index.
+        lcl_select_list_scanner=>get_expression_state(
+          EXPORTING expression = function_expression
+          IMPORTING complete   = function_complete
+                    invalid    = function_invalid ).
+      ENDWHILE.
+
+      IF function_invalid = abap_true
+          OR function_complete = abap_false.
+        line_layout_safe = abap_false.
+        EXIT.
+      ENDIF.
+
+      CONCATENATE 'F' lw_field_number INTO ls_fieldlist-field.
+      CONCATENATE ',' ls_fieldlist-field INTO lw_struct_line.
+      CONCATENATE lw_struct_line 'TYPE' function_type
+                  INTO lw_struct_line SEPARATED BY space.
+      c lw_struct_line.
+
+      CLEAR ls_fieldlist-ref_table.
+      ls_fieldlist-ref_field = function_expression.
+      IF lines( lt_split ) >= lw_index.
+        lw_string = lt_split[ lw_index ].
+        IF lw_string = 'AS'.
+          DELETE lt_split INDEX lw_index.
+          IF lines( lt_split ) >= lw_index.
+            lw_string = lt_split[ lw_index ].
+            ls_fieldlist-ref_field = lw_string.
+            DELETE lt_split INDEX lw_index.
+          ENDIF.
+        ENDIF.
+      ENDIF.
+      APPEND ls_fieldlist TO ft_fieldlist.
+      lw_field_number = lw_field_number + 1.
       CONTINUE.
     ENDIF.
 
@@ -6843,6 +7163,134 @@ CLASS ltcl_select_expr_analyzer IMPLEMENTATION.
 ENDCLASS.
 
 
+CLASS ltcl_select_list_scanner DEFINITION FINAL
+  FOR TESTING
+  DURATION SHORT
+  RISK LEVEL HARMLESS.
+  PRIVATE SECTION.
+    METHODS normalizes_nested_commas FOR TESTING.
+    METHODS preserves_doubled_quotes FOR TESTING.
+    METHODS recognizes_v750_family FOR TESTING.
+    METHODS ignores_literal_lookalike FOR TESTING.
+    METHODS tracks_nested_expression FOR TESTING.
+    METHODS rejects_unbalanced_list FOR TESTING.
+    METHODS rejects_trailing_expression FOR TESTING.
+ENDCLASS.
+
+CLASS ltcl_select_list_scanner IMPLEMENTATION.
+  METHOD normalizes_nested_commas.
+    DATA normalized TYPE string.
+    DATA invalid TYPE abap_bool.
+
+    lcl_select_list_scanner=>normalize_for_inference(
+      EXPORTING
+        select_list        = `TABNAME,SUBSTRING( FIELDNAME, 1, 3 ),`
+                          && `CONCAT( TABNAME, ', ' )`
+      IMPORTING normalized = normalized
+                invalid    = invalid ).
+
+    cl_abap_unit_assert=>assert_initial( act = invalid ).
+    cl_abap_unit_assert=>assert_equals(
+      act = normalized
+      exp = `TABNAME SUBSTRING( FIELDNAME, 1, 3 ) `
+         && `CONCAT( TABNAME, ', ' )`
+      msg = 'Only top-level result commas may become spaces' ).
+  ENDMETHOD.
+
+  METHOD preserves_doubled_quotes.
+    DATA normalized TYPE string.
+    DATA invalid TYPE abap_bool.
+
+    lcl_select_list_scanner=>normalize_for_inference(
+      EXPORTING
+        select_list        = `CONCAT( TABNAME, 'O''HARE, ' ),FIELDNAME`
+      IMPORTING normalized = normalized
+                invalid    = invalid ).
+
+    cl_abap_unit_assert=>assert_initial( act = invalid ).
+    cl_abap_unit_assert=>assert_equals(
+      act = normalized
+      exp = `CONCAT( TABNAME, 'O''HARE, ' ) FIELDNAME`
+      msg = 'Doubled quotes and literal commas must remain data' ).
+  ENDMETHOD.
+
+  METHOD recognizes_v750_family.
+    DATA functions TYPE string_table.
+    DATA function TYPE string.
+
+    APPEND 'CONCAT(' TO functions.
+    APPEND 'LPAD(' TO functions.
+    APPEND 'LTRIM(' TO functions.
+    APPEND 'REPLACE(' TO functions.
+    APPEND 'RIGHT(' TO functions.
+    APPEND 'RTRIM(' TO functions.
+    APPEND 'SUBSTRING(' TO functions.
+
+    LOOP AT functions INTO function.
+      cl_abap_unit_assert=>assert_equals(
+        act = lcl_select_list_scanner=>get_function_result_type( function )
+        exp = 'string'
+        msg = 'A 7.50 character function needs a string component' ).
+    ENDLOOP.
+
+    cl_abap_unit_assert=>assert_equals(
+      act = lcl_select_list_scanner=>get_function_result_type( 'LENGTH(' )
+      exp = 'i'
+      msg = 'LENGTH needs an integer component' ).
+  ENDMETHOD.
+
+  METHOD ignores_literal_lookalike.
+    cl_abap_unit_assert=>assert_false(
+      act = lcl_select_list_scanner=>contains_v750_function(
+        `'CONCAT(' AS TEXT` )
+      msg = 'Function-like literal data must not activate strict mode' ).
+  ENDMETHOD.
+
+  METHOD tracks_nested_expression.
+    DATA complete TYPE abap_bool.
+    DATA invalid TYPE abap_bool.
+
+    lcl_select_list_scanner=>get_expression_state(
+      EXPORTING
+        expression       = `CONCAT( TABNAME, SUBSTRING( FIELDNAME, 1, 3 ) )`
+      IMPORTING complete = complete
+                invalid  = invalid ).
+
+    cl_abap_unit_assert=>assert_true( act = complete ).
+    cl_abap_unit_assert=>assert_initial( act = invalid ).
+  ENDMETHOD.
+
+  METHOD rejects_unbalanced_list.
+    DATA normalized TYPE string.
+    DATA invalid TYPE abap_bool.
+
+    lcl_select_list_scanner=>normalize_for_inference(
+      EXPORTING select_list = `SUBSTRING( FIELDNAME, 1, 3`
+      IMPORTING normalized  = normalized
+                invalid     = invalid ).
+
+    cl_abap_unit_assert=>assert_true(
+      act = invalid
+      msg = 'Unbalanced select-list expressions must fail closed' ).
+  ENDMETHOD.
+
+  METHOD rejects_trailing_expression.
+    DATA complete TYPE abap_bool.
+    DATA invalid TYPE abap_bool.
+
+    lcl_select_list_scanner=>get_expression_state(
+      EXPORTING expression = `LENGTH( FIELDNAME ) + 1`
+      IMPORTING complete   = complete
+                invalid    = invalid ).
+
+    cl_abap_unit_assert=>assert_initial( act = complete ).
+    cl_abap_unit_assert=>assert_true(
+      act = invalid
+      msg = 'Unsupported trailing expression syntax must fail closed' ).
+  ENDMETHOD.
+ENDCLASS.
+
+
 CLASS ltc_query_generator DEFINITION FINAL
   FOR TESTING
   DURATION SHORT
@@ -6860,6 +7308,10 @@ CLASS ltc_query_generator DEFINITION FINAL
     METHODS generates_strict_aggregate FOR TESTING.
     METHODS keeps_escaped_count_valid FOR TESTING.
     METHODS keeps_legacy_select_valid FOR TESTING.
+    METHODS generates_substring_function FOR TESTING.
+    METHODS generates_nested_functions FOR TESTING.
+    METHODS preserves_function_literal FOR TESTING.
+    METHODS generates_length_function FOR TESTING.
     METHODS rejects_statement_injection FOR TESTING.
     METHODS rejects_wrapped_quote_boundary FOR TESTING.
 
@@ -7056,6 +7508,83 @@ CLASS ltc_query_generator IMPLEMENTATION.
     cl_abap_unit_assert=>assert_not_initial(
       act = generated_program
       msg = 'Legacy SELECT query must remain valid' ).
+  ENDMETHOD.
+
+  METHOD generates_substring_function.
+    DATA generated_program TYPE c LENGTH 40.
+    DATA new_syntax TYPE abap_bool.
+    DATA field_list TYPE ty_fieldlist_table.
+
+    generate_query(
+      EXPORTING
+        query                     = `SELECT SUBSTRING( DD03L~FIELDNAME, 1, 3 ) AS PREFIX,`
+                                 && ` DD03L~TABNAME FROM DD03L`
+      IMPORTING generated_program = generated_program
+                new_syntax        = new_syntax
+                field_list        = field_list ).
+
+    cl_abap_unit_assert=>assert_true(
+      act = new_syntax
+      msg = 'SUBSTRING argument commas require strict SQL generation' ).
+    cl_abap_unit_assert=>assert_not_initial(
+      act = generated_program
+      msg = 'SUBSTRING must produce a valid generated program' ).
+    IF field_list IS INITIAL.
+      cl_abap_unit_assert=>fail( msg = 'Function result metadata must exist' ).
+    ENDIF.
+    DATA(first_field) = field_list[ 1 ].
+    cl_abap_unit_assert=>assert_equals(
+      act = first_field-ref_field
+      exp = 'PREFIX'
+      msg = 'Function result metadata must preserve its explicit alias' ).
+    cl_abap_unit_assert=>assert_initial(
+      act = first_field-ref_table
+      msg = 'Computed function results must not claim DDIC table metadata' ).
+  ENDMETHOD.
+
+  METHOD generates_nested_functions.
+    DATA generated_program TYPE c LENGTH 40.
+
+    generate_query(
+      EXPORTING
+        query                     = `SELECT CONCAT( DD03L~TABNAME,`
+                                 && ` SUBSTRING( DD03L~FIELDNAME, 1, 3 ) ) AS LABEL`
+                                 && ` FROM DD03L`
+      IMPORTING generated_program = generated_program ).
+
+    cl_abap_unit_assert=>assert_not_initial(
+      act = generated_program
+      msg = 'Nested 7.50 string functions must remain one select item' ).
+  ENDMETHOD.
+
+  METHOD preserves_function_literal.
+    DATA generated_program TYPE c LENGTH 40.
+
+    generate_query(
+      EXPORTING
+        query                     = `SELECT CONCAT( DD03L~TABNAME, ', ' ) AS LABEL FROM DD03L`
+      IMPORTING generated_program = generated_program ).
+
+    cl_abap_unit_assert=>assert_not_initial(
+      act = generated_program
+      msg = 'A comma and space inside a literal must remain function data' ).
+  ENDMETHOD.
+
+  METHOD generates_length_function.
+    DATA generated_program TYPE c LENGTH 40.
+    DATA new_syntax TYPE abap_bool.
+
+    generate_query(
+      EXPORTING query             = `SELECT LENGTH( DD03L~FIELDNAME ) AS NAME_LENGTH FROM DD03L`
+      IMPORTING generated_program = generated_program
+                new_syntax        = new_syntax ).
+
+    cl_abap_unit_assert=>assert_true(
+      act = new_syntax
+      msg = 'A 7.50 string function must activate strict SQL generation' ).
+    cl_abap_unit_assert=>assert_not_initial(
+      act = generated_program
+      msg = 'LENGTH must produce a valid generated program' ).
   ENDMETHOD.
 
   METHOD rejects_statement_injection.
