@@ -119,10 +119,18 @@ green.
 ## Final verification
 
 The exact candidate is commit
-`58aed8d443d3837bdc94b579e0b4f6b5bfba96df`, local source SHA-256
-`9848ace8fadb61ef72a0a28a7ee011e72d8e58ebebad4514d3268eafcb940a2e`.
+`680d0514461d70fbc58dac2f432485c0afec8eda`, local source SHA-256
+`f10cbc6505e3a3df59a4c72df8486dedbba51f8d7eaa9d2f67c5a9d4f698e5b2`.
 Both systems normalized the active and inactive source to SHA-256
-`7ab32de5518a77c996e6dc1341618df4480c928ebd6529c63a918ab199e54d63`.
+`202d9d40626428ab051a36de70180985da4e845a67e237d43e1036060db9ed4e`.
+
+The final diff review found that `CONTAINS_UNION` still compared a
+single-space spelling even though the parser accepted multi-space and
+multiline operators. Test-only commit `8ff0d99` replayed the complete generator
+path on NPL: 105/106 passed, with only `GENERATES_UNION_ALL` failing because no
+pool was generated. The production fix condenses the already quote/parenthesis-
+masked structural copy before matching. It does not change or normalize the
+SQL sent to SAP. All live evidence below was discarded and rerun afterward.
 
 - Local configured abaplint, repository contract, installation contract, and
   complete test command passed.
@@ -134,10 +142,10 @@ Both systems normalized the active and inactive source to SHA-256
   The delta is report-local test code and remains tracked by the planned global
   class/test-include extraction. The S/4HANA readiness variant returned no
   rows but remains prerequisite-incomplete.
-- A fresh WebGUI session executed a real user-typed read-only two-branch
-  `UNION ALL` aggregate with a final cap of one. The success state reported one
-  result row, and a client-side comparison of the complete ST22 result sets
-  found no new dump.
+- A fresh WebGUI session executed a real user-typed, multiline/multi-space,
+  read-only two-branch `UNION ALL` aggregate with a final cap of one. The
+  success state reported one result row, and a client-side comparison of the
+  complete ST22 result sets found no new dump.
 - Both targets were then restored and explicitly activated to released master
   `15e6258`; each passed 91/91 Unit tests, active and inactive source matched
   server SHA-256

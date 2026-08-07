@@ -99,11 +99,11 @@ tests exercise that boundary directly on both compilers.
 
 ## Completed candidate evidence
 
-- Frozen candidate: `58aed8d443d3837bdc94b579e0b4f6b5bfba96df`.
+- Frozen candidate: `680d0514461d70fbc58dac2f432485c0afec8eda`.
 - Local source SHA-256:
-  `9848ace8fadb61ef72a0a28a7ee011e72d8e58ebebad4514d3268eafcb940a2e`.
+  `f10cbc6505e3a3df59a4c72df8486dedbba51f8d7eaa9d2f67c5a9d4f698e5b2`.
 - Server-normalized source SHA-256 on both targets:
-  `7ab32de5518a77c996e6dc1341618df4480c928ebd6529c63a918ab199e54d63`.
+  `202d9d40626428ab051a36de70180985da4e845a67e237d43e1036060db9ed4e`.
 - Local: `npm ci`, `npm test`, and `git diff --check` passed; configured
   abaplint has zero findings and all repository/installation contracts passed.
 - NPL/SAP_BASIS 750: explicit activation, zero syntax errors or warnings,
@@ -117,11 +117,18 @@ tests exercise that boundary directly on both compilers.
   retained as architectural debt under `BASE-ARCH-003`; it does not establish
   a Clean Core claim. `S4HANA_READINESS_2023` returned zero rows but remains
   prerequisite-incomplete.
-- Fresh A4H WebGUI smoke: a real user-typed, read-only `UNION ALL` aggregate
-  with a final one-row cap executed successfully and returned exactly one ALV
-  row. Comparing the complete 50-entry ST22 sets before and after found no new
-  dump.
+- Fresh A4H WebGUI smoke: a real user-typed, multiline/multi-space, read-only
+  `UNION ALL` aggregate with a final one-row cap executed successfully and
+  returned exactly one ALV row. Comparing the complete 50-entry ST22 sets
+  before and after found no new dump.
 - After evidence collection, both shared systems were restored and explicitly
   activated to released master `15e6258`: 91/91 Unit, equal active/inactive
   server SHA-256 `fa0332e5679236d636bece64cbb3e28b3dccf2e8b21112c69efadd550ea78d0b`,
   and no inactive ZTOAD part.
+
+Final review found that the generator sink's structural check still assumed
+single spaces even though the parser accepted arbitrary supported whitespace.
+Test-only commit `8ff0d99` produced exactly one NPL failure
+(`GENERATES_UNION_ALL`, 105/106 passed). Candidate `680d051` condenses only the
+already-masked structural representation before matching; all local and live
+gates above were rerun from scratch after that production change.
