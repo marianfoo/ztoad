@@ -2,6 +2,8 @@
 
 _Date: 2026-08-07 · branch: `codex/fix-base-bug-004`_
 
+_Completed after first green PR run `31176176420`; final run is recorded on PR #28 without changing the checked head._
+
 ## Goal
 
 Make `QUERY_PARSE` identify only top-level `SELECT`, `FROM`, tail, `UNION SELECT`, caller-target, and row-limit clauses while preserving literal data, nested parenthesized content, multiline input, authorization coverage, and the exact executable SQL representation.
@@ -64,6 +66,14 @@ Make `QUERY_PARSE` identify only top-level `SELECT`, `FROM`, tail, `UNION SELECT
 - The unchanged full-query source scanner remains after clause extraction, so nested and UNION sources still pass through the existing authorization policy. Every inherited authorization and generator regression remains green.
 - Invalid quote/parenthesis state, surviving comments, backticks, and templates fail before branch splitting or generation. Re-scanning after each removal prevents stale offsets crossing a representation boundary.
 - The seven new A4H syntax warnings are not hidden as green findings: they are an explicit 7.50-versus-758 API compatibility limitation and do not change either target's complete ATC baseline.
+
+## Post-green process audit
+
+- GitHub checked the synthetic merge commit with Node 24, a clean `npm ci`, pinned abaplint, the repository contract, and the installation contract; every step passed in run `31176176420`.
+- The branch diff contains the expected ABAP source plus its research, plan, and finding evidence; `src/ztoad.prog.abap` was explicitly included in the security/authorization worklist instead of relying on a generic source-extension classifier.
+- No CI workflow change is needed: the existing required job exercised the same local gate and the external abaplint check also passed.
+- Live evidence remained bound to source commit `1b76755`; later commits changed documentation only, so syntax, Unit, ATC, browser, and ST22 evidence remained valid.
+- The live deployment process exposed an ARC-1 automation ambiguity: a tool-level error envelope can coexist with process exit status 0, and an already-running connector keeps stale allowlist configuration. `AGENTS.md` and `docs/development.md` now require parsing `isError`, use the canonical `SAP_ALLOWED_PACKAGES` variable, and require a fresh process plus target verification after configuration changes.
 
 ## Rollback
 
