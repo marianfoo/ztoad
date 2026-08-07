@@ -9131,3 +9131,25 @@ CLASS ltc_command_parser IMPLEMENTATION.
       msg = 'A valid authorized DML fragment must still generate safely' ).
   ENDMETHOD.
 ENDCLASS.
+
+CLASS ltcl_subroutine_pool_budget DEFINITION FINAL
+  FOR TESTING
+  RISK LEVEL HARMLESS
+  DURATION SHORT.
+  PRIVATE SECTION.
+    METHODS stays_below_system_limit FOR TESTING.
+ENDCLASS.
+
+CLASS ltcl_subroutine_pool_budget IMPLEMENTATION.
+  METHOD stays_below_system_limit.
+    DATA within_system_limit TYPE abap_bool.
+
+    IF c_query_max_exec LE 36.
+      within_system_limit = abap_true.
+    ENDIF.
+
+    cl_abap_unit_assert=>assert_true(
+      act = within_system_limit
+      msg = 'ZTOAD must stop before SAP exhausts the 36-pool session limit' ).
+  ENDMETHOD.
+ENDCLASS.
