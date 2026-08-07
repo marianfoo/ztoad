@@ -7511,7 +7511,7 @@ CLASS ltc_query_generator IMPLEMENTATION.
   ENDMETHOD.
 
   METHOD generates_substring_function.
-    DATA generated_program TYPE sy-repid.
+    DATA generated_program TYPE c LENGTH 40.
     DATA new_syntax TYPE abap_bool.
     DATA field_list TYPE ty_fieldlist_table.
 
@@ -7543,7 +7543,7 @@ CLASS ltc_query_generator IMPLEMENTATION.
   ENDMETHOD.
 
   METHOD generates_nested_functions.
-    DATA generated_program TYPE sy-repid.
+    DATA generated_program TYPE c LENGTH 40.
 
     generate_query(
       EXPORTING
@@ -7558,7 +7558,7 @@ CLASS ltc_query_generator IMPLEMENTATION.
   ENDMETHOD.
 
   METHOD preserves_function_literal.
-    DATA generated_program TYPE sy-repid.
+    DATA generated_program TYPE c LENGTH 40.
 
     generate_query(
       EXPORTING
@@ -7571,7 +7571,7 @@ CLASS ltc_query_generator IMPLEMENTATION.
   ENDMETHOD.
 
   METHOD generates_length_function.
-    DATA generated_program TYPE sy-repid.
+    DATA generated_program TYPE c LENGTH 40.
     DATA new_syntax TYPE abap_bool.
 
     generate_query(
