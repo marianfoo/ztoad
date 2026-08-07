@@ -1,6 +1,6 @@
 # ZTOAD baseline findings
 
-_Snapshot: 2026-08-07 · branch `codex/fix-base-run-006` from released `master` 5.0.0 · live system A4H client 001, SAP_BASIS 758 SP02 · secondary target NPL client 001, SAP_BASIS 750 SP02_
+_Snapshot: 2026-08-07 · branch `codex/fix-base-bug-002` from merged master `5218476` · live system A4H client 001, SAP_BASIS 758 SP02 · secondary target NPL client 001, SAP_BASIS 750 SP02_
 
 This is the ordered work list for incremental TDD. It records observed defects separately from broad style debt so a new failure cannot disappear inside the legacy backlog. A finding is closed only after its regression test is green locally where possible, green on A4H, and green on the SAP_BASIS 750 target.
 
@@ -9,15 +9,15 @@ This is the ordered work list for incremental TDD. It records observed defects s
 | Gate | Result | Interpretation |
 |---|---|---|
 | Repository `npm test` | Passed, 0 configured abaplint findings | Fast compatibility/XML gate is green |
-| Full abaplint quality profile | 2,109 findings across 61 rules | Configured abaplint remains at zero and is the merge gate; the full profile is a diagnostic debt inventory |
-| A4H SAP syntax | 0 errors, 2 POSIX warnings | Exact `BASE-RUN-006` commit `31eca99` activated successfully; both warnings are pre-existing compatibility findings |
-| A4H ABAP Unit | 57 passed, 0 failed | The combined suite adds WebGUI/desktop capability regressions to the three P0 security fixes |
+| Full abaplint quality profile | 2,169 findings across 63 rules | Configured abaplint remains at zero and is the merge gate; the full profile is a diagnostic debt inventory |
+| A4H SAP syntax | 0 errors, 2 POSIX warnings | Exact BASE-BUG-002 source commit `3657984` activated successfully; both warnings are pre-existing compatibility findings |
+| A4H ABAP Unit | 67 passed, 0 failed | The suite adds seven pure CASE-analyzer tests and three CASE-generator tests to merged master |
 | A4H ATC `S4HANA_READINESS_2023` | Initial run displayed 0 finding rows | Later evidence shows missing prerequisites; this is not an authoritative zero gate |
-| A4H ATC `ABAP_CLOUD_READINESS` | 682 findings: 474 P1, 208 P2 | Complete exact-candidate run; +14 classic frontend/API findings versus master's 668, retained as an architectural burn-down signal rather than a zero gate |
-| A4H WebGUI smoke | Fresh empty editor, two sanitized statements, deterministic last-statement execution, ALV row `000 / 1`, clean F3 exit | Exact `BASE-RUN-006` candidate is green; no ST22 entry appeared after the 06:26:10 UTC marker |
+| A4H ATC `ABAP_CLOUD_READINESS` | 682 findings: 474 P1, 208 P2 | Complete exact-candidate run; unchanged from merged master and retained as an architectural burn-down signal rather than a zero gate |
+| A4H WebGUI smoke | Fresh editor executed the sanitized SFLIGHT CASE aggregate, returned eight grouped rows with `NET_PRICE`, and exited cleanly with F3 | Exact BASE-BUG-002 candidate is green; no ST22 entry appeared after the 06:26:10 UTC marker |
 | ABAP 7.50 live gate | ARC-1 lifecycle passed; ZTOAD blocked | `arc-1-750` can create/activate/syntax/unit/delete, but ZTOAD's transparent table is absent and SAP_BASIS 750 cannot create it over ADT |
 
-All three P0 security fixes are merged and their complete production/test corpus is preserved in this candidate. Exact `BASE-RUN-006` commit `31eca9936202b63874ba089e3744fe9971dfa0e4` has local source SHA-256 `4b4823a5db169697696d71edf42b432ca66db0d8585c36066a3bd3817f61a2e5`; its explicitly activated A4H active/inactive source was equal at server-normalized SHA-256 `138d7cf38e68649abb7d714093afc809a27f7a26ca98b511d15dec4ef68d9e36`. After live evidence, A4H was restored and activated to exact `origin/master` server SHA-256 `21ef81d0b925bca71182822a0e9650cb80b32c6e3fd3ae4d1d73576011cb74b7`. `S4HANA_READINESS_2023` returned no rows but remains incomplete because its prerequisite checks are unavailable. See the [finished BASE-SEC-003 plan](plans/finished/base-sec-003.md), [finished BASE-SEC-001 plan](plans/finished/base-sec-001.md), and [BASE-SEC-002 research](research/2026-08-06-base-sec-002-native-sql.md).
+All three P0 security fixes, the installation closure, and the WebGUI capability adapter are merged and preserved in this candidate. Exact BASE-BUG-002 source commit `36579848804e822f0863827479e221e3000231b5` has local SHA-256 `8ac6f8ddc965c08d53f87995403c8271d4d95542d73d567387a222389a65283e`; its explicitly activated A4H active/inactive source was equal at server-normalized SHA-256 `e32d7d3b8bebdb38457cd81f52e90a3b00dc0e830ac537b7690b70cee4544897`. After live evidence, A4H was restored and activated to exact `origin/master` `5218476`, server SHA-256 `138d7cf38e68649abb7d714093afc809a27f7a26ca98b511d15dec4ef68d9e36`, with 57/57 master tests and a clean native-abapGit check. `S4HANA_READINESS_2023` returned no rows but remains incomplete because its prerequisite checks are unavailable.
 
 ## Ordered findings register
 
@@ -30,7 +30,7 @@ Priority meanings: **P0** blocks the requested test workflow or is an immediate 
 | BASE-SEC-002 | P0 | Native SQL used unsupported kernel call `C_DB_EXECUTE`. It was a high-impact arbitrary database-command path and produced a live compiler warning. | Default rejection, rejection despite the deprecated enable flag, preserved UPDATE/DELETE parsing, and a no-kernel-call repository contract. | Fixed and merged in PR #18; inherited by this candidate |
 | BASE-SEC-003 | P0 | SELECT authorization extraction tokenized top-level `FROM`/`JOIN` text and could miss nested subqueries/CTEs or concealed data sources. A quote-aware scanner now applies the existing policy to every provable physical source and rejects unprovable dynamic/CTE/comment/path/hierarchy syntax, including attached path tokens. | Multi-table joins, nested subqueries, aliases, literal keywords, scanner-level comment rejection, `UNION`/`UNION ALL` sources, attached/detached paths, hierarchy/keyword lookalikes, and unauthorized inner-table cases. | Fixed candidate: exact integrated source is 57/57 green on A4H; parenthesized joins deliberately fail closed |
 | BASE-BUG-001 | P1 | [Issue #6](https://github.com/marianfoo/ztoad/issues/6): a reported `SELECT DISTINCT ... COUNT ... MAX ... GROUP BY ... HAVING` query produces “The INTO/APPENDING clause must be at the end of the SELECT.” | Sanitized `DD03L` reproduction; check exact generated ordering around `HAVING`, `ORDER BY`, `UP TO`, and `INTO TABLE`. | Fixed and 17/17 green on A4H; live 7.50 pending |
-| BASE-BUG-002 | P1 | [Issue #7](https://github.com/marianfoo/ztoad/issues/7): a reported `SUM( CASE ... END ) AS ...` over `EKBE` produces “No component exists with the name CASE.” The expression is split into false result components. | Sanitized aggregate with multi-line `CASE`, qualified fields, multiplication, alias, WHERE, and GROUP BY; assert one aggregate expression and the expected generated row type. | Open |
+| BASE-BUG-002 | P1 | [Issue #7](https://github.com/marianfoo/ztoad/issues/7): a reported `SUM( CASE ... END ) AS ...` over `EKBE` produces “No component exists with the name CASE.” The expression is split into false result components. | Sanitized aggregate with multi-line `CASE`, qualified fields, multiplication, alias, WHERE, and GROUP BY; assert one aggregate expression and the expected generated row type. | Fixed candidate: 67/67 Unit, exact activation/state and sanitized CASE WebGUI/ST22 green; Cloud ATC unchanged, S/4 ATC incomplete, NPL prerequisite blocked |
 | BASE-BUG-003 | P1 | [Issue #4](https://github.com/marianfoo/ztoad/issues/4): `SUBSTRING`/`CONCAT` produce “No component exists with the name SUBSTRING(”, exposing naïve select-list tokenization. | Nested function arguments, commas inside functions, aliases, literals containing spaces/commas, and function composition. | Open |
 | BASE-BUG-004 | P1 | Keyword detection uses string searches and space splitting rather than quote/parenthesis-aware lexical tokens. Keywords in literals, comments, functions, or subqueries can move clause boundaries. | Quoted `FROM`, `WHERE`, `UNION`, `UP TO`; escaped quotes; comments; nested parentheses; multiline queries. | Open |
 | BASE-BUG-005 | P1 | `UNION` splitting is whitespace-sensitive and does not model `UNION ALL`; branches are appended while assuming compatible result layouts. | `UNION`, `UNION ALL`, mismatched branch types/columns, per-branch limits, and keywords in literals/subqueries. | Open |
@@ -59,11 +59,12 @@ This diagnostic profile is intentionally not the merge gate yet. Run `npm run li
 
 ## Initial executable tests
 
-The program now ends with six harmless, short ABAP Unit classes:
+The program now ends with seven harmless, short ABAP Unit classes:
 
 - `LTC_QUERY_PARSER`: 23 tests for the original SELECT contract plus authorized/unauthorized nested sources, two-level nesting, ordinary and parenthesized joins, literal/identifier keyword lookalikes, scanner-level comment rejection, later `UNION`/`UNION ALL` sources, and fail-closed dynamic/CTE/attached-path/detached-path/hierarchy sources.
 - `LTC_QUERY_INPUT_VALIDATOR`: 12 tests for the supported SQL-fragment alphabet, literal state, decimals/minus, and source-boundary rejection.
-- `LTC_QUERY_GENERATOR`: 5 tests for strict aggregate clause ordering, escaped-count and legacy-select compatibility, statement-injection rejection, and doubled-quote wrapping rejection.
+- `LTCL_SELECT_EXPR_ANALYZER`: 7 tests for simple/searched CASE result references, qualified/unqualified columns, quoted `THEN` lookalikes, and fail-closed literal-only results.
+- `LTC_QUERY_GENERATOR`: 8 tests for CASE aggregate generation/metadata/fail-closed typing, strict aggregate clause ordering, escaped-count and legacy-select compatibility, statement-injection rejection, and doubled-quote wrapping rejection.
 - `LTC_LINE_SPLITTER`: 6 tests for short/exact/long safe lines, unsafe hard-cut and literal-space rejection, and column-one comment prevention.
 - `LTC_COMMAND_PARSER`: 7 tests for UPDATE, DELETE FROM, default/legacy-flag Native SQL rejection, DML statement-injection rejection, invalid-syntax return semantics, and preserved valid DML generation.
 - `LTCL_EDITOR_CONFIGURATION`: 4 tests selecting the supported editor and proving the restricted WebGUI capability profile plus the unchanged desktop profile.

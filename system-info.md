@@ -48,7 +48,7 @@ The first request created during setup, `A4HK906377`, is an empty local request 
 - **ARC-1 rule inventory**: 158 enabled, 25 disabled
 - **Repository gate**: pinned `@abaplint/cli` with the compatibility-focused rules in `abaplint.json`
 - **Compatibility floor**: SAP_BASIS 750; the separate 7.50 system is still required for the authoritative downport gate
-- **Full quality inventory**: 2,051 findings across 61 rules on exact integrated master `2360fe4`; 2,109 across the same 61 rules on `BASE-RUN-006`; diagnostic only until the zero-findings plan is complete
+- **Full quality inventory**: 2,109 findings across 61 rules on exact merged master `5218476`; 2,169 across 63 rules on BASE-BUG-002; diagnostic only until the zero-findings plan is complete
 
 ## RAP Constraints Snapshot
 
@@ -64,17 +64,17 @@ The first request created during setup, `A4HK906377`, is an empty local request 
 
 | Check | Result on A4H |
 |---|---|
-| Candidate branch / exact tested commit | `codex/fix-base-run-006` / `31eca9936202b63874ba089e3744fe9971dfa0e4` |
+| Candidate branch / exact tested commit | `codex/fix-base-bug-002` / source commit `36579848804e822f0863827479e221e3000231b5` |
 | Package / transport | `ZTOAD` / `A4HK906379` |
 | Repository objects | PROG `ZTOAD`, TABL `ZTOAD`, SUSO `ZTOAD_AUTH`, TRAN `ZTOAD` |
-| Active/inactive state | Candidate main source was equal at server SHA-256 `138d7cf38e68649abb7d714093afc809a27f7a26ca98b511d15dec4ef68d9e36`; global inactive inventory contained no ZTOAD child part |
+| Active/inactive state | Candidate main source was equal at server SHA-256 `e32d7d3b8bebdb38457cd81f52e90a3b00dc0e830ac537b7690b70cee4544897`; global inactive inventory contained no ZTOAD child part |
 | SAP syntax | 0 errors; 2 pre-existing POSIX warnings |
-| ABAP Unit | 57 passed, 0 failed |
+| ABAP Unit | 67 passed, 0 failed; 26.98% statements / 26.31% branches / 20.45% procedures |
 | ATC `S4HANA_READINESS_2023` | 0 rows returned; non-authoritative because known prerequisites are unavailable |
 | ATC `ABAP_CLOUD_READINESS` | Complete candidate run: 682 findings (474 P1, 208 P2); classic Dynpro/GUI design is not ABAP Cloud compatible |
-| WebGUI smoke | Fresh empty editor accepted `T002` then `T000`; the last statement executed, ALV showed `000 / 1`, F3 exited cleanly, and ST22 stayed unchanged after 06:26:10 UTC |
+| WebGUI smoke | Fresh editor executed the sanitized SFLIGHT CASE aggregate; ALV returned eight grouped rows with `NET_PRICE`, F3 exited cleanly, and ST22 stayed unchanged after 06:26:10 UTC |
 | Transaction launch | Standalone WebGUI and FLP `Shell-startGUI` intent both reach the complete ZTOAD transaction closure |
-| Shared target after evidence | Restored and explicitly activated to `origin/master` `2360fe4`; active/inactive server SHA-256 `21ef81d0b925bca71182822a0e9650cb80b32c6e3fd3ae4d1d73576011cb74b7`, no inactive ZTOAD part |
+| Shared target after evidence | Restored and explicitly activated to `origin/master` `5218476`; active/inactive server SHA-256 `138d7cf38e68649abb7d714093afc809a27f7a26ca98b511d15dec4ef68d9e36`, 57/57 master Unit, no inactive ZTOAD part, native-abapGit check clean |
 
 ## Coding Guidance
 
