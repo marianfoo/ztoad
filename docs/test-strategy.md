@@ -65,10 +65,11 @@ Each parser/generator change should select relevant cases from this matrix:
 
 NPL/SAP_BASIS 750 validation is ARC-1/ADT-only. Run activation, syntax, ABAP Unit, ATC, and inactive-object checks there; do not use FLP, WebGUI, SAP GUI, or browser automation for test execution. The complete object set was provisioned once by the maintainer through native abapGit's offline ZIP workflow because the real transparent table cannot be created through the 7.50 ADT surface. Future source candidates use ARC-1; future structural refreshes require another reviewed native-abapGit import rather than an unfaithful substitute.
 
-For A4H, use only the HTTPS reverse proxy:
+For A4H, load the private HTTPS reverse-proxy base URL from the ignored `.env`
+file as `SAP_URL`. Never commit a live SAP hostname. Build the access paths as:
 
-- FLP: `https://a4h.marianzeis.de/sap/bc/ui2/flp?sap-client=001#Shell-startGUI?sap-ui2-tcode=<TCODE>`
-- WebGUI: `https://a4h.marianzeis.de/sap/bc/gui/sap/its/webgui?sap-client=001&~transaction=<TCODE>`
+- FLP: `${SAP_URL}/sap/bc/ui2/flp?sap-client=001#Shell-startGUI?sap-ui2-tcode=<TCODE>`
+- WebGUI: `${SAP_URL}/sap/bc/gui/sap/its/webgui?sap-client=001&~transaction=<TCODE>`
 
 Do not use ports 50000 or 50001. Credentials stay in the ignored `.env` file and must never appear in test output or screenshots.
 

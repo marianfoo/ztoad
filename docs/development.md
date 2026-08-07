@@ -59,9 +59,10 @@ Setup procedure:
 
 If the ARC-1 abapGit bridge is used to restore the shared branch after a coordinated round trip, pass `refs/heads/master`, not only `master`, and verify the selected branch with a fresh `list_repos` call. On the current A4H bridge the short value returned success without changing the repository, while the full ref switched it correctly. Re-run the inactive-child contract after restoration.
 
-On A4H, the Fiori-shell URL for the transaction is:
+On A4H, load the private system base URL from the ignored `.env` file as
+`SAP_URL`. The Fiori-shell URL for the transaction is:
 
-`https://a4h.marianzeis.de/sap/bc/ui2/flp?sap-client=001#Shell-startGUI?sap-ui2-tcode=ZABAPGIT`
+`${SAP_URL}/sap/bc/ui2/flp?sap-client=001#Shell-startGUI?sap-ui2-tcode=ZABAPGIT`
 
 Do not manually install only the report source. That omits the dynpros, table, authorization object, and transaction and cannot reproduce a supported installation. The repository-managed launcher is report transaction `ZTOAD` for program `ZTOAD`; use `#Shell-startGUI?sap-ui2-tcode=ZTOAD` or standalone `~transaction=ZTOAD` for its A4H smoke test.
 
