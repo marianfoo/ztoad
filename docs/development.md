@@ -79,6 +79,12 @@ Current ARC-1 TABL `dryRun` requests can still create an inactive draft. After a
 3. Add the smallest test, replay the original production code, and record the intended red failure.
 4. Write and review a plan under `docs/plans/` covering implementation, ABAP 7.50, Clean ABAP/Clean Core, local/live tests, rollback, browser smoke, and ST22. A security plan must separately state actor prerequisites, proven entry-point reachability, demonstrated sink behavior, and the invariant enforced by the patch so a sink-level proof is not presented as an end-to-end exploit without evidence.
 5. Edit source locally and make the smallest production change that turns the test green. For a frontend or other environment-dependent assumption, keep the candidate classified as a spike until live integration evidence accepts it. Keep serializer XML unchanged for a source-only fix. At any external-text-to-code boundary, state the representation invariant explicitly. Treat every allow-list exception as grammar: prove its context, add an adversarial lookalike regression, and fail closed when the parser cannot distinguish data from source syntax.
+
+   When zero or an initial value has product meaning, do not also use it as an
+   "omit the policy" sentinel. Validate explicit input and persisted/default
+   configuration separately, normalize invalid stored values at their boundary,
+   and test every downstream representation so later generation cannot silently
+   restore the bypass.
 6. Run `npm ci`, `npm test`, `git diff --check`, and the final local/security review. Reconcile the review inventory with `git diff --name-only`; generic extension classifiers can omit `.abap`, so every changed ABAP source must be added explicitly and reviewed. For generated or otherwise transformed input, compare pre- and post-transformation semantics, especially comments, quoting, escaping, length limits, and inserted line/token boundaries. Commit and freeze the exact source/object candidate before the expensive live gates, and record its commit plus source hash. Any later `src/` or serialized-object change invalidates the affected live evidence and must be redeployed and rechecked.
 7. Deploy the exact candidate source to SAP_BASIS 750 first through ARC-1/ADT when its real dependencies exist; record any missing ADT prerequisite as blocked. Keep the A4H native-abapGit link on `master` and record an unmerged candidate as a direct deployment. Follow every write with an explicit activation call, active/inactive main-object comparison, and an inactive-child-part query for affected composite objects; a write response, activation option, or equal main-source hash alone does not prove that screens, statuses, texts, and includes are active.
 8. On NPL, activate only the intended object and run active syntax, all ABAP Unit tests, and complete ATC variants through ARC-1. On A4H/SAP_BASIS 758, repeat those checks and additionally start a fresh browser session for safe smoke and ST22 delta. Verify required dynpros/GUI statuses before attributing an end-to-end failure to the source candidate.
@@ -208,7 +214,9 @@ For every relevant change, verify:
 - values are bound or safely quoted instead of concatenated where possible;
 - comments, aliases, nested expressions, subqueries, and unions cannot hide additional statements;
 - wrapping, splitting, generated-source layout, or other representation changes do not alter comment/quote boundaries or resume hidden input as executable code; generated lines split only at a grammar-safe boundary, and a hard length cut, split inside a literal, or continuation that moves `*` into ABAP source column one must fail closed;
-- row limits remain enforced unless the user explicitly requests the documented override;
+- every executable multirow SELECT keeps a positive bounded row limit; zero,
+  invalid, overflowed, saved-default, and transformed representations cannot
+  turn the limit into an omitted clause;
 - Native SQL remains unconditionally rejected and forbidden sinks such as `C_DB_EXECUTE` do not return;
 - error/generated-code displays do not leak credentials or confidential values.
 

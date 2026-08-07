@@ -56,7 +56,7 @@ Each parser/generator change should select relevant cases from this matrix:
 | Sources | one table, namespace and keyword-shaped names, alias, multiple joins, parenthesized-join policy, subquery, nested subquery, UNION branch, unauthorized inner table, attached/detached path expressions, hierarchy constructor |
 | Clauses | WHERE, GROUP BY, HAVING, ORDER BY, UP TO, INTO/APPENDING, strict-syntax ordering |
 | Set operations | UNION, UNION ALL, branch layout mismatch, limits/order in branches |
-| Limits | default, explicit positive, zero/unlimited, invalid/overflow, policy maximum |
+| Limits | default, explicit positive, zero rejection, invalid/overflow, exact and above policy maximum, invalid saved-default recovery |
 | DML | INSERT values/set, UPDATE, DELETE, conversion errors, authorization denial; disposable Z table only |
 | Native SQL | rejected by default, cannot be re-enabled by legacy configuration, forbidden executor absent |
 | Error handling | parse rejection, compile rejection, runtime exception, sanitized message, no unexpected ST22 dump |

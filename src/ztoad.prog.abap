@@ -60,7 +60,7 @@
 *& [UNION SELECT...]
 *&
 *& UP TO (Default max rows) ROWS added at end of query if omitted
-*& You could force select without limits by adding UP TO 0 ROWS
+*& Every SELECT is limited to 1-10000 rows; zero is rejected
 *&
 *& COUNT, AVG, MAX, MIN, SUM are managed
 *& DO NOT FORGET SPACE in ( ) of aggregat
@@ -200,7 +200,7 @@ TYPE-POOLS abap.
 DATA : BEGIN OF s_customize,                                "#EC NEEDED
 * Default number of lines to return for SELECT if no "up to xxx rows"
 * defined in the query.
-* Set to 0 if you dont want default limit.
+* Zero or a negative saved value restores the safe default of 100.
          default_rows    TYPE i VALUE 100,
 
 * When you dblclic on a field in the ddic tree, field is pasted to
@@ -436,6 +436,23 @@ CLASS lcl_query_error_contract DEFINITION FINAL.
     CLASS-METHODS to_user_message
       IMPORTING technical_detail TYPE string
       RETURNING VALUE(user_message) TYPE string.
+ENDCLASS.
+
+*----------------------------------------------------------------------*
+*       CLASS lcl_query_row_policy DEFINITION
+*----------------------------------------------------------------------*
+*       Resolve every SELECT to a positive, bounded result size
+*----------------------------------------------------------------------*
+CLASS lcl_query_row_policy DEFINITION FINAL.
+  PUBLIC SECTION.
+    CONSTANTS c_fallback_rows TYPE i VALUE 100.
+    CONSTANTS c_max_rows TYPE i VALUE 10000.
+
+    CLASS-METHODS resolve
+      IMPORTING requested      TYPE string
+                explicit_limit TYPE abap_bool
+      EXPORTING rows           TYPE i
+                invalid        TYPE abap_bool.
 ENDCLASS.
 
 *----------------------------------------------------------------------*
@@ -751,6 +768,60 @@ CLASS lcl_query_error_contract IMPLEMENTATION.
   METHOD to_user_message.
 * The technical detail is deliberately accepted but never exposed.
     user_message = 'Cannot parse the query'(m07).
+  ENDMETHOD.
+ENDCLASS.
+
+CLASS lcl_query_row_policy IMPLEMENTATION.
+  METHOD resolve.
+    DATA row_text TYPE string.
+    DATA max_text TYPE string.
+    DATA row_value TYPE i.
+
+    CLEAR: rows, invalid.
+    row_text = requested.
+    CONDENSE row_text NO-GAPS.
+
+    IF row_text IS INITIAL OR row_text CN '0123456789'.
+      IF explicit_limit = abap_true.
+        invalid = abap_true.
+      ELSE.
+        rows = c_fallback_rows.
+      ENDIF.
+      RETURN.
+    ENDIF.
+
+    SHIFT row_text LEFT DELETING LEADING '0'.
+    IF row_text IS INITIAL.
+      IF explicit_limit = abap_true.
+        invalid = abap_true.
+      ELSE.
+        rows = c_fallback_rows.
+      ENDIF.
+      RETURN.
+    ENDIF.
+
+    max_text = c_max_rows.
+    CONDENSE max_text NO-GAPS.
+    IF strlen( row_text ) > strlen( max_text ).
+      IF explicit_limit = abap_true.
+        invalid = abap_true.
+      ELSE.
+        rows = c_max_rows.
+      ENDIF.
+      RETURN.
+    ENDIF.
+
+    row_value = row_text.
+    IF row_value > c_max_rows.
+      IF explicit_limit = abap_true.
+        invalid = abap_true.
+      ELSE.
+        rows = c_max_rows.
+      ENDIF.
+      RETURN.
+    ENDIF.
+
+    rows = row_value.
   ENDMETHOD.
 ENDCLASS.
 
@@ -3103,6 +3174,8 @@ FORM query_parse  USING    fw_query TYPE string
          lo_union_regex TYPE REF TO cl_abap_regex,
          lt_sources     TYPE ty_table_names,
          lw_string      TYPE string,
+         lw_row_limit   TYPE i,
+         lw_row_invalid TYPE abap_bool,
          lw_first_token TYPE c LENGTH 7,
          lw_invalid     TYPE abap_bool,
          lw_tail_found  TYPE abap_bool,
@@ -3138,14 +3211,24 @@ FORM query_parse  USING    fw_query TYPE string
 * Catch the number of rows, delete command in query
   CREATE OBJECT lo_regex
     EXPORTING
-      pattern     = '(^| +)(UP) +TO +([0-9]+) +(ROWS)'
+      pattern     = '(^| +)(UP) +TO +([^ ]+) +(ROWS)'
       ignore_case = abap_true.
   FIND FIRST OCCURRENCE OF REGEX lo_regex
        IN lw_top_level RESULTS ls_find_select.
   IF sy-subrc = 0.
     READ TABLE ls_find_select-submatches INTO ls_sub INDEX 3.
     IF sy-subrc = 0.
-      fw_rows = lw_query+ls_sub-offset(ls_sub-length).
+      lw_string = lw_query+ls_sub-offset(ls_sub-length).
+      lcl_query_row_policy=>resolve(
+        EXPORTING requested = lw_string
+                  explicit_limit = abap_true
+        IMPORTING rows = lw_row_limit
+                  invalid = lw_row_invalid ).
+      IF lw_row_invalid = abap_true.
+        fw_error = abap_true.
+        RETURN.
+      ENDIF.
+      fw_rows = lw_row_limit.
     ENDIF.
     READ TABLE ls_find_select-submatches INTO ls_sub INDEX 2.
     IF sy-subrc <> 0.
@@ -3180,7 +3263,14 @@ FORM query_parse  USING    fw_query TYPE string
     ENDIF.
   ELSE.
 * Set default number of rows
-    fw_rows = s_customize-default_rows.
+    lw_string = s_customize-default_rows.
+    CONDENSE lw_string NO-GAPS.
+    lcl_query_row_policy=>resolve(
+      EXPORTING requested = lw_string
+                explicit_limit = abap_false
+      IMPORTING rows = lw_row_limit
+                invalid = lw_row_invalid ).
+    fw_rows = lw_row_limit.
   ENDIF.
 
 * Remove unused INTO (CORRESPONDING FIELDS OF)(TABLE)
@@ -6838,7 +6928,14 @@ CLASS ltc_query_parser DEFINITION FINAL
     METHODS teardown.
     METHODS parses_simple_select FOR TESTING.
     METHODS honors_explicit_limit FOR TESTING.
-    METHODS zero_limit_means_unlimited FOR TESTING.
+    METHODS rejects_zero_limit FOR TESTING.
+    METHODS accepts_policy_maximum FOR TESTING.
+    METHODS rejects_above_maximum FOR TESTING.
+    METHODS rejects_invalid_limit FOR TESTING.
+    METHODS rejects_overflow_limit FOR TESTING.
+    METHODS accepts_leading_zero_limit FOR TESTING.
+    METHODS normalizes_invalid_defaults FOR TESTING.
+    METHODS caps_oversized_default FOR TESTING.
     METHODS keeps_tail_clauses FOR TESTING.
     METHODS separates_union FOR TESTING.
     METHODS separates_union_expression FOR TESTING.
@@ -6882,6 +6979,11 @@ CLASS ltc_query_parser DEFINITION FINAL
                 no_authority TYPE abap_bool
                 new_syntax TYPE abap_bool
                 parse_error TYPE abap_bool.
+    METHODS assert_limit_policy
+      IMPORTING query TYPE string
+                configured_default TYPE i
+                expected_rows TYPE i
+                expected_error TYPE abap_bool.
 ENDCLASS.
 
 CLASS ltcl_sql_clause_scanner IMPLEMENTATION.
@@ -7113,6 +7215,38 @@ CLASS ltc_query_parser IMPLEMENTATION.
                                  parse_error.
   ENDMETHOD.
 
+  METHOD assert_limit_policy.
+    DATA select_part TYPE string.
+    DATA from_part TYPE string.
+    DATA tail_part TYPE string.
+    DATA union_part TYPE string.
+    DATA rows TYPE ty_rows.
+    DATA no_authority TYPE abap_bool.
+    DATA new_syntax TYPE abap_bool.
+    DATA parse_error TYPE abap_bool.
+
+    s_customize-default_rows = configured_default.
+    parse_select(
+      EXPORTING query = query
+      IMPORTING select_part = select_part
+                from_part = from_part
+                tail_part = tail_part
+                union_part = union_part
+                rows = rows
+                no_authority = no_authority
+                new_syntax = new_syntax
+                parse_error = parse_error ).
+
+    cl_abap_unit_assert=>assert_equals(
+      act = parse_error
+      exp = expected_error
+      msg = 'The parser must apply the row-limit policy before generation' ).
+    cl_abap_unit_assert=>assert_equals(
+      act = rows
+      exp = expected_rows
+      msg = 'The resolved row limit must match the bounded policy' ).
+  ENDMETHOD.
+
   METHOD parses_simple_select.
     DATA select_part TYPE string.
     DATA from_part TYPE string.
@@ -7191,30 +7325,78 @@ CLASS ltc_query_parser IMPLEMENTATION.
       msg = 'UP TO clause must be removed before generation' ).
   ENDMETHOD.
 
-  METHOD zero_limit_means_unlimited.
-    DATA select_part TYPE string.
-    DATA from_part TYPE string.
-    DATA tail_part TYPE string.
-    DATA union_part TYPE string.
-    DATA rows TYPE ty_rows.
-    DATA no_authority TYPE abap_bool.
-    DATA new_syntax TYPE abap_bool.
-    DATA parse_error TYPE abap_bool.
+  METHOD rejects_zero_limit.
+    assert_limit_policy(
+      query = 'SELECT carrid FROM scarr UP TO 0 ROWS'
+      configured_default = 100
+      expected_rows = 0
+      expected_error = abap_true ).
+  ENDMETHOD.
 
-    parse_select(
-      EXPORTING query = 'SELECT carrid FROM scarr UP TO 0 ROWS'
-      IMPORTING select_part = select_part
-                from_part = from_part
-                tail_part = tail_part
-                union_part = union_part
-                rows = rows
-                no_authority = no_authority
-                new_syntax = new_syntax
-                parse_error = parse_error ).
+  METHOD accepts_policy_maximum.
+    assert_limit_policy(
+      query = 'SELECT carrid FROM scarr UP TO 10000 ROWS'
+      configured_default = 100
+      expected_rows = lcl_query_row_policy=>c_max_rows
+      expected_error = abap_false ).
+  ENDMETHOD.
 
-    cl_abap_unit_assert=>assert_initial(
-      act = rows
-      msg = 'UP TO 0 ROWS intentionally disables the generated limit' ).
+  METHOD rejects_above_maximum.
+    assert_limit_policy(
+      query = 'SELECT carrid FROM scarr UP TO 10001 ROWS'
+      configured_default = 100
+      expected_rows = 0
+      expected_error = abap_true ).
+  ENDMETHOD.
+
+  METHOD rejects_invalid_limit.
+    assert_limit_policy(
+      query = 'SELECT carrid FROM scarr UP TO -1 ROWS'
+      configured_default = 100
+      expected_rows = 0
+      expected_error = abap_true ).
+    assert_limit_policy(
+      query = 'SELECT carrid FROM scarr UP TO MANY ROWS'
+      configured_default = 100
+      expected_rows = 0
+      expected_error = abap_true ).
+  ENDMETHOD.
+
+  METHOD rejects_overflow_limit.
+    assert_limit_policy(
+      query = 'SELECT carrid FROM scarr UP TO 2147483648 ROWS'
+      configured_default = 100
+      expected_rows = 0
+      expected_error = abap_true ).
+  ENDMETHOD.
+
+  METHOD accepts_leading_zero_limit.
+    assert_limit_policy(
+      query = 'SELECT carrid FROM scarr UP TO 000025 ROWS'
+      configured_default = 100
+      expected_rows = 25
+      expected_error = abap_false ).
+  ENDMETHOD.
+
+  METHOD normalizes_invalid_defaults.
+    assert_limit_policy(
+      query = 'SELECT carrid FROM scarr'
+      configured_default = 0
+      expected_rows = lcl_query_row_policy=>c_fallback_rows
+      expected_error = abap_false ).
+    assert_limit_policy(
+      query = 'SELECT carrid FROM scarr'
+      configured_default = -1
+      expected_rows = lcl_query_row_policy=>c_fallback_rows
+      expected_error = abap_false ).
+  ENDMETHOD.
+
+  METHOD caps_oversized_default.
+    assert_limit_policy(
+      query = 'SELECT carrid FROM scarr'
+      configured_default = 50000
+      expected_rows = lcl_query_row_policy=>c_max_rows
+      expected_error = abap_false ).
   ENDMETHOD.
 
   METHOD keeps_tail_clauses.
@@ -8251,10 +8433,11 @@ CLASS ltc_query_generator DEFINITION FINAL
     METHODS rejects_union_type_mismatch FOR TESTING.
     METHODS generates_three_union_branches FOR TESTING.
     METHODS limits_union_result FOR TESTING.
-    METHODS keeps_unlimited_union FOR TESTING.
+    METHODS rejects_zero_union_limit FOR TESTING.
 
     METHODS generate_query
       IMPORTING query TYPE string
+                expect_parse_error TYPE abap_bool DEFAULT abap_false
       EXPORTING generated_program TYPE sy-repid
                 new_syntax TYPE abap_bool
                 count_query TYPE abap_bool
@@ -8292,7 +8475,13 @@ CLASS ltc_query_generator IMPLEMENTATION.
                                  parse_error.
 
     cl_abap_unit_assert=>assert_initial( act = no_authority ).
-    cl_abap_unit_assert=>assert_initial( act = parse_error ).
+    cl_abap_unit_assert=>assert_equals(
+      act = parse_error
+      exp = expect_parse_error ).
+    IF parse_error = abap_true.
+      CLEAR generated_program.
+      RETURN.
+    ENDIF.
 
     tail_part = lcl_sql_set_expression=>attach_suffix(
       branch_tail = tail_part set_suffix = union_part ).
@@ -8742,28 +8931,19 @@ CLASS ltc_query_generator IMPLEMENTATION.
       msg = 'The final ZTOAD row cap must bound the merged result' ).
   ENDMETHOD.
 
-  METHOD keeps_unlimited_union.
+  METHOD rejects_zero_union_limit.
     DATA generated_program TYPE sy-repid.
-    DATA result TYPE REF TO data.
-    DATA runtime TYPE p LENGTH 8 DECIMALS 2.
-    DATA row_count TYPE i.
-    FIELD-SYMBOLS <result> TYPE STANDARD TABLE.
 
     generate_query(
       EXPORTING
         query = `SELECT COUNT( * ) FROM T000`
              && ` UNION ALL SELECT COUNT( * ) FROM T000 UP TO 0 ROWS`
+        expect_parse_error = abap_true
       IMPORTING generated_program = generated_program ).
 
-    cl_abap_unit_assert=>assert_not_initial( act = generated_program ).
-    PERFORM run_sql IN PROGRAM (generated_program)
-            CHANGING result runtime row_count.
-    ASSIGN result->* TO <result>.
-    DESCRIBE TABLE <result> LINES row_count.
-    cl_abap_unit_assert=>assert_equals(
-      act = row_count
-      exp = 2
-      msg = 'UP TO 0 must retain the existing explicit unlimited contract' ).
+    cl_abap_unit_assert=>assert_initial(
+      act = generated_program
+      msg = 'A zero-limit set query must stop before pool generation' ).
   ENDMETHOD.
 ENDCLASS.
 
