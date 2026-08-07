@@ -61,6 +61,14 @@ The selected scanner uses local classes, strings, offsets, internal tables, and 
 
 This change does not make dynamic subroutine generation clean-core compliant. It only makes the existing on-premise behavior correct and safer to maintain.
 
+## Implemented boundary and final validation
+
+The implementation adds a pure local select-list scanner and leaves the executable SELECT fragment unchanged. It replaces only top-level inference commas, recognizes the eight 7.50 functions outside literals, proves nested-expression closure, and rejects unbalanced or trailing expression syntax. The generator gives `LENGTH` an integer receiving component and the character-like family a string component while preserving an explicit SQL alias as ALV metadata.
+
+The first green implementation added four `ABAP_CLOUD_READINESS` warnings through new test-local `SY-REPID` types. Replacing those test variables with compatible built-in character types removed the entire delta. The final candidate therefore remains exactly at master's 682 readiness findings instead of accepting avoidable test-code debt.
+
+Final candidate `6a2971bded5ff273b82b1db4c4b15b84485612b6` passed 78/78 Unit tests, activation, syntax, object-state and inactive-part checks on both SAP_BASIS 750 and 758. NPL `DEFAULT` ATC remained 88 findings; A4H `ABAP_CLOUD_READINESS` remained 682. Fresh A4H WebGUI sessions returned five rows for both `SUBSTRING` and nested `CONCAT`/`SUBSTRING`, with the expected `PREFIX` and `LABEL` metadata and no new ST22 dump.
+
 ## Sources
 
 - [ABAP 7.50 SQL changes](https://help.sap.com/doc/abapdocu_latest_index_htm/latest/en-US/ABENNEWS-750-ABAP_SQL.html)
