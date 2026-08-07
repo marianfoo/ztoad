@@ -407,9 +407,22 @@ ENDCLASS."lcl_drag_object DEFINITION
 *----------------------------------------------------------------------*
 CLASS lcl_editor_configuration DEFINITION FINAL.
   PUBLIC SECTION.
+    TYPES:
+      BEGIN OF ty_capabilities,
+        full_workspace    TYPE abap_bool,
+        preload_editor    TYPE abap_bool,
+        selected_statement TYPE abap_bool,
+        stream_input      TYPE abap_bool,
+        resize_result     TYPE abap_bool,
+        persist_history   TYPE abap_bool,
+      END OF ty_capabilities.
+
     CLASS-METHODS get_editor_type
       IMPORTING i_webgui             TYPE abap_bool
       RETURNING VALUE(r_editor_type) TYPE string.
+    CLASS-METHODS get_capabilities
+      IMPORTING i_webgui              TYPE abap_bool
+      RETURNING VALUE(r_capabilities) TYPE ty_capabilities.
 ENDCLASS.
 
 *----------------------------------------------------------------------*
@@ -589,6 +602,19 @@ CLASS lcl_editor_configuration IMPLEMENTATION.
     ELSE.
       r_editor_type = 'ABAP'.
     ENDIF.
+  ENDMETHOD.
+
+  METHOD get_capabilities.
+    IF i_webgui = abap_true.
+      r_capabilities-stream_input = abap_true.
+      RETURN.
+    ENDIF.
+
+    r_capabilities-full_workspace = abap_true.
+    r_capabilities-preload_editor = abap_true.
+    r_capabilities-selected_statement = abap_true.
+    r_capabilities-resize_result = abap_true.
+    r_capabilities-persist_history = abap_true.
   ENDMETHOD.
 ENDCLASS.
 
@@ -1037,12 +1063,24 @@ CLASS lcl_editor IMPLEMENTATION.
   ENDMETHOD.
 
   METHOD get_text.
+    DATA capabilities TYPE lcl_editor_configuration=>ty_capabilities.
+
     IF text_editor IS BOUND.
-      text_editor->get_text_as_r3table(
-        IMPORTING
-          table  = e_table
-        EXCEPTIONS
-          OTHERS = 1 ).
+      capabilities = lcl_editor_configuration=>get_capabilities(
+        i_webgui = abap_true ).
+      IF capabilities-stream_input = abap_true.
+        text_editor->get_text_as_stream(
+          IMPORTING
+            text   = e_table
+          EXCEPTIONS
+            OTHERS = 1 ).
+      ELSE.
+        text_editor->get_text_as_r3table(
+          IMPORTING
+            table  = e_table
+          EXCEPTIONS
+            OTHERS = 1 ).
+      ENDIF.
     ELSE.
       abap_editor->get_text(
         IMPORTING
@@ -1414,6 +1452,13 @@ CLASS lcl_application IMPLEMENTATION.
 *----------------------------------------------------------------------*
   METHOD hnd_result_toolbar.
     DATA: ls_toolbar  TYPE stb_button.
+    DATA capabilities TYPE lcl_editor_configuration=>ty_capabilities.
+
+    capabilities = lcl_editor_configuration=>get_capabilities(
+      i_webgui = xsdbool( cl_gui_control=>www_active IS NOT INITIAL ) ).
+    IF capabilities-resize_result = abap_false.
+      RETURN.
+    ENDIF.
 
 * Add Separator
     CLEAR ls_toolbar.
@@ -1440,7 +1485,12 @@ CLASS lcl_application IMPLEMENTATION.
 *       (menus & toolbar)
 *----------------------------------------------------------------------*
   METHOD hnd_result_user_command.
-    IF e_ucomm = 'CLOSE_GRID'.
+    DATA capabilities TYPE lcl_editor_configuration=>ty_capabilities.
+
+    capabilities = lcl_editor_configuration=>get_capabilities(
+      i_webgui = xsdbool( cl_gui_control=>www_active IS NOT INITIAL ) ).
+    IF e_ucomm = 'CLOSE_GRID'
+    AND capabilities-resize_result = abap_true.
       CALL METHOD o_splitter->set_row_height
         EXPORTING
           id     = 1
@@ -1679,6 +1729,8 @@ ENDMODULE.                 " USER_COMMAND_0200  INPUT
 *       Initialize all objects on the screen
 *----------------------------------------------------------------------*
 FORM screen_init.
+  DATA capabilities TYPE lcl_editor_configuration=>ty_capabilities.
+
 * Get user default values
   PERFORM options_load.
 
@@ -1687,6 +1739,23 @@ FORM screen_init.
 
 * Split the screen into 4 parts
   PERFORM screen_init_splitter.
+
+  capabilities = lcl_editor_configuration=>get_capabilities(
+    i_webgui = xsdbool( cl_gui_control=>www_active IS NOT INITIAL ) ).
+
+  IF capabilities-full_workspace = abap_false
+  AND capabilities-preload_editor = abap_false.
+    CREATE OBJECT s_tab_active-o_textedit
+      EXPORTING
+        i_parent = o_container_query
+        i_webgui = abap_true.
+    IF s_tab_active-o_textedit->is_ready( ) = abap_false.
+      MESSAGE 'The query editor cannot be created' TYPE c_msg_error.
+      RETURN.
+    ENDIF.
+    PERFORM result_init.
+    RETURN.
+  ENDIF.
 
 * Init History Tree
   PERFORM repo_init.
@@ -1713,6 +1782,7 @@ ENDFORM.                    " SCREEN_INIT
 * 1 line with ALV result
 *----------------------------------------------------------------------*
 FORM screen_init_splitter.
+  DATA capabilities TYPE lcl_editor_configuration=>ty_capabilities.
 
 * Create the custom container
   CREATE OBJECT o_container
@@ -1725,6 +1795,26 @@ FORM screen_init_splitter.
       parent  = o_container
       rows    = 2
       columns = 1.
+
+  capabilities = lcl_editor_configuration=>get_capabilities(
+    i_webgui = xsdbool( cl_gui_control=>www_active IS NOT INITIAL ) ).
+
+  IF capabilities-full_workspace = abap_false.
+    CALL METHOD o_splitter->get_container
+      EXPORTING
+        row       = 1
+        column    = 1
+      RECEIVING
+        container = o_container_query.
+
+    CALL METHOD o_splitter->get_container
+      EXPORTING
+        row       = 2
+        column    = 1
+      RECEIVING
+        container = o_container_result.
+    RETURN.
+  ENDIF.
 
 * Get the first row of the main splitter
   CALL METHOD o_splitter->get_container
@@ -2205,13 +2295,19 @@ FORM editor_get_query USING fw_force_last TYPE c
          lw_delto_pos     TYPE i,
          lw_cursor_offset TYPE i,
          lw_last          TYPE c.
+  DATA capabilities TYPE lcl_editor_configuration=>ty_capabilities.
 
   CLEAR fw_query.
 
+  capabilities = lcl_editor_configuration=>get_capabilities(
+    i_webgui = xsdbool( cl_gui_control=>www_active IS NOT INITIAL ) ).
+
 * Get selected content
-  CALL METHOD s_tab_active-o_textedit->get_selected_text_as_table
-    IMPORTING
-      e_table = lt_query[].
+  IF capabilities-selected_statement = abap_true.
+    CALL METHOD s_tab_active-o_textedit->get_selected_text_as_table
+      IMPORTING
+        e_table = lt_query[].
+  ENDIF.
 
 * if no selected content, get complete content of abap edit box
   IF lt_query[] IS INITIAL.
@@ -2258,10 +2354,18 @@ FORM editor_get_query USING fw_force_last TYPE c
   ENDLOOP.
 
 * Find active query
-  CALL METHOD s_tab_active-o_textedit->get_selection_pos
-    IMPORTING
-      e_from_line = lw_cursor_line
-      e_from_pos  = lw_cursor_pos.
+  IF capabilities-selected_statement = abap_true.
+    CALL METHOD s_tab_active-o_textedit->get_selection_pos
+      IMPORTING
+        e_from_line = lw_cursor_line
+        e_from_pos  = lw_cursor_pos.
+  ELSE.
+    DESCRIBE TABLE lt_query LINES lw_cursor_line.
+    READ TABLE lt_query INTO ls_query INDEX lw_cursor_line.
+    IF sy-subrc = 0.
+      lw_cursor_pos = strlen( ls_query-line ) + 1.
+    ENDIF.
+  ENDIF.
   lw_cursor_offset = lw_cursor_pos - 1.
 
   FIND ALL OCCURRENCES OF '.' IN TABLE lt_query RESULTS lt_find.
@@ -3074,6 +3178,7 @@ FORM result_display  USING fo_result TYPE REF TO data
          lo_descr_line  TYPE REF TO cl_abap_structdescr,
          ls_compx       TYPE abap_compdescr,
          lw_height      TYPE i.
+  DATA capabilities TYPE lcl_editor_configuration=>ty_capabilities.
 
   FIELD-SYMBOLS: <lft_data> TYPE ANY TABLE.
 
@@ -3127,6 +3232,12 @@ FORM result_display  USING fo_result TYPE REF TO data
     CHANGING
       it_outtab       = <lft_data>
       it_fieldcatalog = lt_fieldcat.
+
+  capabilities = lcl_editor_configuration=>get_capabilities(
+    i_webgui = xsdbool( cl_gui_control=>www_active IS NOT INITIAL ) ).
+  IF capabilities-resize_result = abap_false.
+    RETURN.
+  ENDIF.
 
 * Search if grid is currently displayed
   CALL METHOD o_splitter->get_row_height
@@ -3263,6 +3374,13 @@ FORM ddic_set_tree USING fw_from TYPE string.
            ddtext2   TYPE dd04t-ddtext,
          END OF ls_ddic_fields,
          lt_ddic_fields LIKE TABLE OF ls_ddic_fields.
+  DATA capabilities TYPE lcl_editor_configuration=>ty_capabilities.
+
+  capabilities = lcl_editor_configuration=>get_capabilities(
+    i_webgui = xsdbool( cl_gui_control=>www_active IS NOT INITIAL ) ).
+  IF capabilities-full_workspace = abap_false.
+    RETURN.
+  ENDIF.
 
   CONCATENATE 'FROM' fw_from INTO lw_from SEPARATED BY space.
 
@@ -3599,6 +3717,13 @@ FORM repo_fill.
          lw_node_key(6)  TYPE n,
          lw_queryid      TYPE ztoad-queryid,
          lw_dummy(1)     TYPE c.                            "#EC NEEDED
+  DATA capabilities TYPE lcl_editor_configuration=>ty_capabilities.
+
+  capabilities = lcl_editor_configuration=>get_capabilities(
+    i_webgui = xsdbool( cl_gui_control=>www_active IS NOT INITIAL ) ).
+  IF capabilities-full_workspace = abap_false.
+    RETURN.
+  ENDIF.
 
 * Get usergroup
   SELECT SINGLE class INTO lw_usergroup
@@ -3730,6 +3855,13 @@ FORM repo_save_current_query.
          lw_date(10)      TYPE c,
          lw_time(8)       TYPE c,
          lw_dummy_date    TYPE timestamp.                   "#EC NEEDED
+  DATA capabilities TYPE lcl_editor_configuration=>ty_capabilities.
+
+  capabilities = lcl_editor_configuration=>get_capabilities(
+    i_webgui = xsdbool( cl_gui_control=>www_active IS NOT INITIAL ) ).
+  IF capabilities-persist_history = abap_false.
+    RETURN.
+  ENDIF.
 
 * Get content of abap edit box
   CALL METHOD s_tab_active-o_textedit->get_text
@@ -3911,6 +4043,13 @@ FORM screen_exit.
          lw_answer(1) TYPE c,
          lw_size      TYPE i,
          lw_string    TYPE string.
+  DATA capabilities TYPE lcl_editor_configuration=>ty_capabilities.
+
+  capabilities = lcl_editor_configuration=>get_capabilities(
+    i_webgui = xsdbool( cl_gui_control=>www_active IS NOT INITIAL ) ).
+  IF capabilities-full_workspace = abap_false.
+    LEAVE TO SCREEN 0.
+  ENDIF.
 
 * Check if grid is displayed
   CALL METHOD o_splitter->get_row_height
@@ -4804,6 +4943,13 @@ FORM ddic_refresh_tree.
          lw_noauth(1)    TYPE c,
          lw_newsyntax(1) TYPE c,
          lw_error(1)     TYPE c.
+  DATA capabilities TYPE lcl_editor_configuration=>ty_capabilities.
+
+  capabilities = lcl_editor_configuration=>get_capabilities(
+    i_webgui = xsdbool( cl_gui_control=>www_active IS NOT INITIAL ) ).
+  IF capabilities-full_workspace = abap_false.
+    RETURN.
+  ENDIF.
 
 * Get only usefull code for current query
   PERFORM editor_get_query USING space CHANGING lw_query.
@@ -5287,6 +5433,15 @@ ENDFORM.                    " EDITOR_GET_DEFAULT_QUERY
 FORM tab_new.
   DATA : l_numb TYPE i,
          l_tab TYPE string.
+  DATA capabilities TYPE lcl_editor_configuration=>ty_capabilities.
+
+  capabilities = lcl_editor_configuration=>get_capabilities(
+    i_webgui = xsdbool( cl_gui_control=>www_active IS NOT INITIAL ) ).
+  IF capabilities-full_workspace = abap_false.
+    MESSAGE 'Multiple tabs are available in desktop SAP GUI only'
+            TYPE c_msg_success DISPLAY LIKE c_msg_error.
+    RETURN.
+  ENDIF.
 
   DESCRIBE TABLE t_tabs LINES l_numb.
   IF l_numb GE 30.
@@ -5666,19 +5821,34 @@ ENDFORM.                    "import_xml
 FORM SET_STATUS_010 .
   DATA : lw_numb TYPE i,
          lw_max TYPE i.
+  DATA capabilities TYPE lcl_editor_configuration=>ty_capabilities.
+  DATA lt_exclude TYPE STANDARD TABLE OF sy-ucomm.
+
+  capabilities = lcl_editor_configuration=>get_capabilities(
+    i_webgui = xsdbool( cl_gui_control=>www_active IS NOT INITIAL ) ).
+  IF capabilities-full_workspace = abap_false.
+    APPEND 'DOWNLOAD' TO lt_exclude.
+    APPEND 'NEW' TO lt_exclude.
+    APPEND 'OPTIONS' TO lt_exclude.
+    APPEND 'SAVE' TO lt_exclude.
+    APPEND 'SHOWCODE' TO lt_exclude.
+    APPEND 'XML' TO lt_exclude.
+    APPEND 'XMLI' TO lt_exclude.
+  ENDIF.
 
   AUTHORITY-CHECK OBJECT 'S_DEVELOP' ID 'ACTVT' FIELD '03'
                                      ID 'DEVCLASS' DUMMY
                                      ID 'OBJTYPE' DUMMY
                                      ID 'OBJNAME' DUMMY
                                      ID 'P_GROUP' DUMMY.
-  IF sy-subrc = 0.
-    SET PF-STATUS 'STATUS010'.
-  ELSE.
+  IF sy-subrc <> 0.
 * If you dont have S_DEVELOP access in display, you probably dont
 * understand the code generated => do not display the button
-    SET PF-STATUS 'STATUS010' EXCLUDING 'SHOWCODE'.
+    APPEND 'SHOWCODE' TO lt_exclude.
   ENDIF.
+  SORT lt_exclude.
+  DELETE ADJACENT DUPLICATES FROM lt_exclude.
+  SET PF-STATUS 'STATUS010' EXCLUDING lt_exclude.
   SET TITLEBAR 'STATUS010'.
 
   DESCRIBE TABLE t_tabs LINES lw_max.
@@ -5760,6 +5930,8 @@ CLASS ltcl_editor_configuration DEFINITION FINAL
   PRIVATE SECTION.
     METHODS uses_text_editor_in_webgui FOR TESTING.
     METHODS keeps_abap_mode_elsewhere FOR TESTING.
+    METHODS limits_webgui_capabilities FOR TESTING.
+    METHODS keeps_desktop_capabilities FOR TESTING.
 ENDCLASS.
 
 CLASS ltcl_editor_configuration IMPLEMENTATION.
@@ -5777,6 +5949,46 @@ CLASS ltcl_editor_configuration IMPLEMENTATION.
               i_webgui = abap_false )
       exp = 'ABAP'
       msg = 'Desktop GUI must retain ABAP editor behavior' ).
+  ENDMETHOD.
+
+  METHOD limits_webgui_capabilities.
+    DATA capabilities TYPE lcl_editor_configuration=>ty_capabilities.
+
+    capabilities = lcl_editor_configuration=>get_capabilities(
+      i_webgui = abap_true ).
+
+    cl_abap_unit_assert=>assert_false(
+      act = capabilities-full_workspace
+      msg = 'WebGUI must not queue the desktop workspace controls' ).
+    cl_abap_unit_assert=>assert_false(
+      act = capabilities-preload_editor
+      msg = 'WebGUI must not populate TextEdit during initial PBO' ).
+    cl_abap_unit_assert=>assert_false(
+      act = capabilities-selected_statement
+      msg = 'WebGUI selects the last statement without cursor access' ).
+    cl_abap_unit_assert=>assert_true(
+      act = capabilities-stream_input
+      msg = 'WebGUI must read the editor through the stream API' ).
+    cl_abap_unit_assert=>assert_false(
+      act = capabilities-resize_result
+      msg = 'WebGUI must not read or set frontend splitter state' ).
+    cl_abap_unit_assert=>assert_false(
+      act = capabilities-persist_history
+      msg = 'WebGUI must not refresh the desktop history tree' ).
+  ENDMETHOD.
+
+  METHOD keeps_desktop_capabilities.
+    DATA capabilities TYPE lcl_editor_configuration=>ty_capabilities.
+
+    capabilities = lcl_editor_configuration=>get_capabilities(
+      i_webgui = abap_false ).
+
+    cl_abap_unit_assert=>assert_true( act = capabilities-full_workspace ).
+    cl_abap_unit_assert=>assert_true( act = capabilities-preload_editor ).
+    cl_abap_unit_assert=>assert_true( act = capabilities-selected_statement ).
+    cl_abap_unit_assert=>assert_false( act = capabilities-stream_input ).
+    cl_abap_unit_assert=>assert_true( act = capabilities-resize_result ).
+    cl_abap_unit_assert=>assert_true( act = capabilities-persist_history ).
   ENDMETHOD.
 ENDCLASS.
 

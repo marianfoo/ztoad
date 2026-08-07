@@ -59,6 +59,10 @@ Synergy with ZSPRO program : display tables defined in ZSPRO in the
 ddic tree
 Tips : You can search a table in the tree using header clic
 
+### Frontend support
+
+The complete saved-query/DDIC/multi-tab workspace is available in desktop SAP GUI. SAP GUI for HTML uses a deliberately smaller, tested mode: an initially empty query editor, stream transfer with deterministic execution of the last statement, ALV results, Help, and Exit. Initial templates, cursor/selection execution, saved-query and DDIC trees, automatic history, generated-code display, downloads, options, import/export, and multiple tabs remain desktop-only until each frontend operation has its own WebGUI integration test.
+
 Managed queries  
 SELECT, INSERT, UPDATE, DELETE
 
