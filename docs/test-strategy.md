@@ -40,6 +40,7 @@ For every bug or feature:
 - Do not access frontend controls, user files, business data, commits, or persistent customizing from ABAP Unit.
 - Inject authorization, database, editor, generator, and executor collaborators through narrow interfaces as each path is changed.
 - Test valid, invalid, boundary, and hostile input. ZTOAD's parser is an authorization and injection boundary, not only a formatter.
+- For character-by-character tokenizers and literal maskers, assert that spaces and other separators survive the emitted ABAP string. Fixed-length character-to-string conversion can trim blanks and must be verified by live ABAP Unit, not inferred from abaplint.
 - Never weaken a test merely to accommodate current behavior. If the current behavior is deliberately preserved, document why in the finding.
 
 ## Parser regression matrix
@@ -48,7 +49,7 @@ Each parser/generator change should select relevant cases from this matrix:
 
 | Area | Required cases |
 |---|---|
-| Lexing | upper/lower case, tabs/multiple spaces, multiline input, comments, escaped quotes, quoted dots/keywords |
+| Lexing | upper/lower case, tabs/multiple spaces, multiline input, comments, escaped quotes, quoted dots/keywords, fixed-length character blank preservation |
 | Select list | simple fields, qualified fields, aliases, `*`, aggregate, nested function, nested `CASE`, comma and old syntax |
 | Sources | one table, namespace and keyword-shaped names, alias, multiple joins, parenthesized-join policy, subquery, nested subquery, UNION branch, unauthorized inner table, attached/detached path expressions, hierarchy constructor |
 | Clauses | WHERE, GROUP BY, HAVING, ORDER BY, UP TO, INTO/APPENDING, strict-syntax ordering |
