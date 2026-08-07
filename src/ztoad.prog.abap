@@ -6368,6 +6368,12 @@ CLASS ltc_query_parser DEFINITION FINAL
     METHODS separates_union FOR TESTING.
     METHODS detects_comma_syntax FOR TESTING.
     METHODS strips_into_target FOR TESTING.
+    METHODS ignores_literal_from_keyword FOR TESTING.
+    METHODS ignores_literal_union_keyword FOR TESTING.
+    METHODS keeps_literal_row_limit FOR TESTING.
+    METHODS ignores_literal_tail_keyword FOR TESTING.
+    METHODS accepts_multiline_clauses FOR TESTING.
+    METHODS rejects_comment_union_keyword FOR TESTING.
     METHODS rejects_missing_from FOR TESTING.
     METHODS rejects_unauthorized_subquery FOR TESTING.
     METHODS accepts_authorized_subquery FOR TESTING.
@@ -6713,6 +6719,150 @@ CLASS ltc_query_parser IMPLEMENTATION.
       act = new_syntax
       exp = abap_true
       msg = 'Escaped INTO target must select new syntax' ).
+  ENDMETHOD.
+
+  METHOD ignores_literal_from_keyword.
+    DATA select_part TYPE string.
+    DATA from_part TYPE string.
+    DATA parse_error TYPE abap_bool.
+
+    parse_select(
+      EXPORTING
+        query = `SELECT CONCAT( 'A'' FROM ''B', carrname ) AS label FROM scarr`
+      IMPORTING select_part = select_part
+                from_part = from_part
+                parse_error = parse_error ).
+
+    cl_abap_unit_assert=>assert_equals(
+      act = select_part
+      exp = `CONCAT( 'A'' FROM ''B', carrname ) AS label`
+      msg = 'FROM inside a doubled-quote literal is not a clause' ).
+    cl_abap_unit_assert=>assert_equals(
+      act = from_part
+      exp = 'scarr'
+      msg = 'The first top-level FROM must delimit the select list' ).
+    cl_abap_unit_assert=>assert_initial( act = parse_error ).
+  ENDMETHOD.
+
+  METHOD ignores_literal_union_keyword.
+    DATA tail_part TYPE string.
+    DATA union_part TYPE string.
+    DATA parse_error TYPE abap_bool.
+
+    parse_select(
+      EXPORTING
+        query = `SELECT carrid FROM scarr WHERE carrid = ' UNION SELECT '`
+      IMPORTING tail_part = tail_part
+                union_part = union_part
+                parse_error = parse_error ).
+
+    cl_abap_unit_assert=>assert_equals(
+      act = tail_part
+      exp = ` WHERE carrid = ' UNION SELECT '`
+      msg = 'UNION SELECT inside a literal must remain data' ).
+    cl_abap_unit_assert=>assert_initial(
+      act = union_part
+      msg = 'A literal must not create another query branch' ).
+    cl_abap_unit_assert=>assert_initial( act = parse_error ).
+  ENDMETHOD.
+
+  METHOD keeps_literal_row_limit.
+    DATA tail_part TYPE string.
+    DATA rows TYPE ty_rows.
+    DATA expected_rows TYPE ty_rows.
+    DATA parse_error TYPE abap_bool.
+
+    expected_rows = 100.
+    parse_select(
+      EXPORTING
+        query = `SELECT carrid FROM scarr WHERE carrid = 'UP TO 5 ROWS'`
+      IMPORTING tail_part = tail_part
+                rows = rows
+                parse_error = parse_error ).
+
+    cl_abap_unit_assert=>assert_equals(
+      act = tail_part
+      exp = ` WHERE carrid = 'UP TO 5 ROWS'`
+      msg = 'A row-limit lookalike inside a literal must be preserved' ).
+    cl_abap_unit_assert=>assert_equals(
+      act = rows
+      exp = expected_rows
+      msg = 'A literal must not override the default row limit' ).
+    cl_abap_unit_assert=>assert_initial( act = parse_error ).
+  ENDMETHOD.
+
+  METHOD ignores_literal_tail_keyword.
+    DATA from_part TYPE string.
+    DATA tail_part TYPE string.
+    DATA parse_error TYPE abap_bool.
+
+    parse_select(
+      EXPORTING
+        query = `SELECT a~carrid FROM scarr AS a INNER JOIN spfli AS b`
+             && ` ON b~carrid = a~carrid AND b~cityfrom = ' ORDER BY '`
+             && ` ORDER BY a~carrid`
+      IMPORTING from_part = from_part
+                tail_part = tail_part
+                parse_error = parse_error ).
+
+    cl_abap_unit_assert=>assert_equals(
+      act = from_part
+      exp = `scarr AS a INNER JOIN spfli AS b`
+         && ` ON b~carrid = a~carrid AND b~cityfrom = ' ORDER BY '`
+      msg = 'A literal in JOIN ON must remain in the FROM clause' ).
+    cl_abap_unit_assert=>assert_equals(
+      act = tail_part
+      exp = ` ORDER BY a~carrid`
+      msg = 'Only the top-level ORDER BY can start the query tail' ).
+    cl_abap_unit_assert=>assert_initial( act = parse_error ).
+  ENDMETHOD.
+
+  METHOD accepts_multiline_clauses.
+    DATA select_part TYPE string.
+    DATA from_part TYPE string.
+    DATA tail_part TYPE string.
+    DATA parse_error TYPE abap_bool.
+    DATA(query) = `SELECT carrid`
+               && cl_abap_char_utilities=>newline
+               && `FROM scarr`
+               && cl_abap_char_utilities=>newline
+               && `WHERE carrid = 'LH'`.
+
+    parse_select(
+      EXPORTING query = query
+      IMPORTING select_part = select_part
+                from_part = from_part
+                tail_part = tail_part
+                parse_error = parse_error ).
+
+    CONDENSE select_part.
+    CONDENSE from_part.
+    CONDENSE tail_part.
+    cl_abap_unit_assert=>assert_equals( act = select_part exp = 'carrid' ).
+    cl_abap_unit_assert=>assert_equals( act = from_part exp = 'scarr' ).
+    cl_abap_unit_assert=>assert_equals(
+      act = tail_part
+      exp = `WHERE carrid = 'LH'`
+      msg = 'Clause whitespace can include a line break' ).
+    cl_abap_unit_assert=>assert_initial( act = parse_error ).
+  ENDMETHOD.
+
+  METHOD rejects_comment_union_keyword.
+    DATA union_part TYPE string.
+    DATA parse_error TYPE abap_bool.
+
+    parse_select(
+      EXPORTING
+        query = `SELECT carrid FROM scarr " UNION SELECT carrid FROM sflight`
+      IMPORTING union_part = union_part
+                parse_error = parse_error ).
+
+    cl_abap_unit_assert=>assert_true(
+      act = parse_error
+      msg = 'A surviving comment must fail before structural splitting' ).
+    cl_abap_unit_assert=>assert_initial(
+      act = union_part
+      msg = 'Comment text must not create an executable UNION branch' ).
   ENDMETHOD.
 
   METHOD rejects_missing_from.
