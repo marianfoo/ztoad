@@ -69,7 +69,7 @@ research note.
     this plan under `docs/plans/finished/`, wait for green CI again, then squash
     merge and synchronize local master.
 
-## Pre-PR execution record
+## Execution record
 
 - Steps 1–11 through shared-system restoration are complete for frozen source
   commit `832d057656dc2923e79b87eff5016b718dad42fe`; local source
@@ -106,8 +106,20 @@ research note.
   inactive SHA-256
   `736c93b341c8a14cd40f88522b6b542fa14b82bceaea5a34b0bedcfdab2699b8`,
   and zero inactive ZTOAD part.
-- The PR, first green CI run, and post-green audit remain to complete step 11
-  and step 12.
+- Draft PR #33 opened from the recorded candidate and its first Quality run
+  `31196346909` passed `npm ci`, configured abaplint with zero findings, the
+  repository contract, and the installation contract. The external abaplint
+  observation check was neutral by design; both required checks passed.
+- The post-green audit reconciled all six changed files with the PR diff,
+  reviewed the complete CI log, found no review comments or unresolved threads,
+  and confirmed the PR was cleanly mergeable. It found one stale security-
+  checklist reference to a documented unlimited override; the checklist now
+  states the bounded invariant instead.
+- The workflow now explicitly requires separate validation of explicit input
+  and persisted/default configuration whenever zero or initial values could
+  act as an omit-policy sentinel. This plan is archived after that durable
+  improvement; the second green run and merge are recorded on the PR so they do
+  not require an evidence-only commit.
 
 ## Plan review
 
@@ -132,6 +144,6 @@ research note.
 
 ## References
 
-- [Root-cause research](../research/2026-08-07-base-run-004-row-limit-policy.md)
-- [Development playbook](../development.md)
-- [Test strategy](../test-strategy.md)
+- [Root-cause research](../../research/2026-08-07-base-run-004-row-limit-policy.md)
+- [Development playbook](../../development.md)
+- [Test strategy](../../test-strategy.md)
