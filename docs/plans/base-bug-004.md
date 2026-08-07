@@ -48,6 +48,23 @@ Make `QUERY_PARSE` identify only top-level `SELECT`, `FROM`, tail, `UNION SELECT
 - Preserved security: unauthorized nested source, UNION source, comments, dynamic/path/hierarchy/CTE sources, statement injection, wrapped literals, and every generated-line boundary test.
 - Live: 84+ Unit tests on both releases, syntax/activation/state, ATC delta, fresh A4H read-only WebGUI result, and ST22 delta.
 
+## Exact-candidate evidence
+
+- Frozen source commit: `1b76755c1af07325ff50f76ffa12661bc45213d1`; local source SHA-256: `8897954b5235e9c88c7e4bcd9653eccdd9f4b5235958792fe2c7e5b40cfbec1f`.
+- Red proof: NPL activated the original production code with 78 inherited tests green and exactly six focused parser regressions red. The implementation and expanded corpus then produced 91/91 green tests on both supported releases.
+- Local gates: `npm ci`, `npm test`, and `git diff --check` passed. Configured abaplint remains at zero. The diagnostic profile is 2,355 findings across 62 rules versus master at 2,230; no increase occurred in `dangerous_statement`, `ambiguous_statement`, `sql_escape_host_variables`, or `strict_sql`.
+- NPL/SAP_BASIS 750: explicit activation, zero syntax errors, 91/91 Unit, equal active/inactive source at server SHA-256 `fa0332e5679236d636bece64cbb3e28b3dccf2e8b21112c69efadd550ea78d0b`, no inactive ZTOAD part, and complete unchanged DEFAULT ATC of 88 findings (3 P1, 4 P2, 81 P3).
+- A4H/SAP_BASIS 758: explicit activation, zero syntax errors, 91/91 Unit, equal active/inactive source at the same server hash, and no inactive ZTOAD part. Seven POSIX-regex deprecation warnings document the compatibility tradeoff for using the 7.50-supported regex API. ABAP_CLOUD_READINESS stayed unchanged at 682 findings (474 P1, 208 P2); S4HANA_READINESS_2023 returned zero rows but remains prerequisite-incomplete.
+- A4H WebGUI: a fresh session received `SELECT CONCAT( 'FROM', TABNAME ) AS LABEL` / `FROM DD02L` / `UP TO 5 ROWS` via real typing and blur. The grid returned five `FROM...` values and the backend reported five entries. The full post-smoke dump set contained no ID newer than the `2026-08-07T06:26:10Z` marker.
+- Shared-system restoration: NPL and A4H were restored to exact master `0f056e8`; both report server SHA-256 `36ebfcba68733ff91655ec552298af8ec5d19a203767aa88f34dedc67d7e6f83`, zero active syntax errors, 78/78 Unit, active/inactive equality, and no inactive ZTOAD part.
+
+## Implementation and security review
+
+- The same-length structural view is never executed. All SELECT/FROM/tail/UNION slices come from the original query by scanner-proven offsets.
+- The unchanged full-query source scanner remains after clause extraction, so nested and UNION sources still pass through the existing authorization policy. Every inherited authorization and generator regression remains green.
+- Invalid quote/parenthesis state, surviving comments, backticks, and templates fail before branch splitting or generation. Re-scanning after each removal prevents stale offsets crossing a representation boundary.
+- The seven new A4H syntax warnings are not hidden as green findings: they are an explicit 7.50-versus-758 API compatibility limitation and do not change either target's complete ATC baseline.
+
 ## Rollback
 
 Revert the scanner integration commit, deploy exact `master` report source through ARC-1, activate explicitly, verify active/inactive equality and inactive child parts, then rerun syntax and all ABAP Unit tests. No table data, DDIC metadata, customizing, transaction, screen, or authorization object is changed.
