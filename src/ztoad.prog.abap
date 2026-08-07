@@ -492,6 +492,32 @@ CLASS lcl_select_expression_analyzer DEFINITION FINAL.
 ENDCLASS.
 
 *----------------------------------------------------------------------*
+*       CLASS lcl_sql_clause_scanner DEFINITION
+*----------------------------------------------------------------------*
+*       Expose only top-level SQL text while preserving source offsets
+*----------------------------------------------------------------------*
+CLASS lcl_sql_clause_scanner DEFINITION FINAL.
+  PUBLIC SECTION.
+    CLASS-METHODS mask_top_level
+      IMPORTING query TYPE string
+      EXPORTING top_level TYPE string
+                invalid TYPE abap_bool.
+    CLASS-METHODS skip_whitespace
+      IMPORTING query TYPE string
+                offset TYPE i
+      RETURNING VALUE(result_offset) TYPE i.
+    CLASS-METHODS separator_start
+      IMPORTING query TYPE string
+                keyword_offset TYPE i
+      RETURNING VALUE(result_offset) TYPE i.
+
+  PRIVATE SECTION.
+    CLASS-METHODS is_whitespace
+      IMPORTING character TYPE c
+      RETURNING VALUE(result) TYPE abap_bool.
+ENDCLASS.
+
+*----------------------------------------------------------------------*
 *       CLASS lcl_generated_line_splitter DEFINITION
 *----------------------------------------------------------------------*
 *       Preserve source semantics while enforcing the 255-char limit
@@ -779,6 +805,7 @@ CLASS lcl_query_input_validator IMPLEMENTATION.
       OR character = cl_abap_char_utilities=>newline
       OR character = cl_abap_char_utilities=>cr_lf(1) ).
   ENDMETHOD.
+
 ENDCLASS.
 
 CLASS lcl_select_list_scanner IMPLEMENTATION.
@@ -1111,6 +1138,108 @@ CLASS lcl_select_expression_analyzer IMPLEMENTATION.
     ENDIF.
 
     result = abap_true.
+  ENDMETHOD.
+ENDCLASS.
+
+CLASS lcl_sql_clause_scanner IMPLEMENTATION.
+  METHOD mask_top_level.
+    DATA index TYPE i.
+    DATA next_index TYPE i.
+    DATA depth TYPE i.
+    DATA character TYPE c LENGTH 1.
+    DATA next_character TYPE c LENGTH 1.
+    DATA in_literal TYPE abap_bool.
+
+    CLEAR top_level.
+    CLEAR invalid.
+    DATA(query_length) = strlen( query ).
+
+    WHILE index < query_length.
+      character = query+index(1).
+
+      IF in_literal = abap_true.
+        top_level = top_level && ` `.
+        IF character = ''''.
+          next_index = index + 1.
+          IF next_index < query_length.
+            next_character = query+next_index(1).
+            IF next_character = ''''.
+              top_level = top_level && ` `.
+              index = index + 2.
+              CONTINUE.
+            ENDIF.
+          ENDIF.
+          CLEAR in_literal.
+        ENDIF.
+        index = index + 1.
+        CONTINUE.
+      ENDIF.
+
+      CASE character.
+        WHEN ''''.
+          in_literal = abap_true.
+          top_level = top_level && ` `.
+        WHEN '"' OR '`' OR '|'.
+          invalid = abap_true.
+          RETURN.
+        WHEN '('.
+          depth = depth + 1.
+          top_level = top_level && ` `.
+        WHEN ')'.
+          IF depth = 0.
+            invalid = abap_true.
+            RETURN.
+          ENDIF.
+          depth = depth - 1.
+          top_level = top_level && ` `.
+        WHEN OTHERS.
+          IF depth > 0 OR is_whitespace( character ) = abap_true.
+            top_level = top_level && ` `.
+          ELSE.
+            top_level = top_level && character.
+          ENDIF.
+      ENDCASE.
+      index = index + 1.
+    ENDWHILE.
+
+    invalid = xsdbool( in_literal = abap_true OR depth <> 0 ).
+  ENDMETHOD.
+
+  METHOD is_whitespace.
+    result = xsdbool(
+      character = space
+      OR character = cl_abap_char_utilities=>horizontal_tab
+      OR character = cl_abap_char_utilities=>newline
+      OR character = cl_abap_char_utilities=>cr_lf(1) ).
+  ENDMETHOD.
+
+  METHOD skip_whitespace.
+    DATA character TYPE c LENGTH 1.
+    DATA(query_length) = strlen( query ).
+
+    result_offset = offset.
+    WHILE result_offset < query_length.
+      character = query+result_offset(1).
+      IF is_whitespace( character ) = abap_false.
+        RETURN.
+      ENDIF.
+      result_offset = result_offset + 1.
+    ENDWHILE.
+  ENDMETHOD.
+
+  METHOD separator_start.
+    DATA previous_offset TYPE i.
+    DATA character TYPE c LENGTH 1.
+
+    result_offset = keyword_offset.
+    WHILE result_offset > 0.
+      previous_offset = result_offset - 1.
+      character = query+previous_offset(1).
+      IF is_whitespace( character ) = abap_false.
+        RETURN.
+      ENDIF.
+      result_offset = previous_offset.
+    ENDWHILE.
   ENDMETHOD.
 ENDCLASS.
 
@@ -2858,10 +2987,13 @@ FORM query_parse  USING    fw_query TYPE string
          lw_offset      TYPE i,
          lw_length      TYPE i,
          lw_query       TYPE string,
+         lw_top_level   TYPE string,
+         lw_suffix      TYPE string,
          lo_regex       TYPE REF TO cl_abap_regex,
          lt_sources     TYPE ty_table_names,
          lw_string      TYPE string,
          lw_invalid     TYPE abap_bool,
+         lw_tail_found  TYPE abap_bool,
          lw_table       TYPE tabname.
 
   CLEAR : fw_select,
@@ -2875,29 +3007,85 @@ FORM query_parse  USING    fw_query TYPE string
 
   lw_query = fw_query.
 
+  lcl_sql_clause_scanner=>mask_top_level(
+    EXPORTING query = lw_query
+    IMPORTING top_level = lw_top_level
+              invalid = lw_invalid ).
+  IF lw_invalid = abap_true.
+    fw_error = abap_true.
+    RETURN.
+  ENDIF.
+
 * Search union
-  FIND FIRST OCCURRENCE OF ' UNION SELECT ' IN lw_query
-       RESULTS ls_find_select IGNORING CASE.
+  CREATE OBJECT lo_regex
+    EXPORTING
+      pattern     = '(^| +)(UNION) +(SELECT) +'
+      ignore_case = abap_true.
+  FIND FIRST OCCURRENCE OF REGEX lo_regex IN lw_top_level
+       RESULTS ls_find_select.
   IF sy-subrc = 0.
-    lw_offset = ls_find_select-offset + 7.
-    fw_union = lw_query+lw_offset.
-    lw_query = lw_query(ls_find_select-offset).
+    READ TABLE ls_find_select-submatches INTO ls_sub INDEX 2.
+    IF sy-subrc <> 0.
+      fw_error = abap_true.
+      RETURN.
+    ENDIF.
+    lw_offset = lcl_sql_clause_scanner=>separator_start(
+      query = lw_query keyword_offset = ls_sub-offset ).
+    READ TABLE ls_find_select-submatches INTO ls_sub INDEX 3.
+    IF sy-subrc <> 0.
+      fw_error = abap_true.
+      RETURN.
+    ENDIF.
+    fw_union = lw_query+ls_sub-offset.
+    lw_query = lw_query(lw_offset).
+    lcl_sql_clause_scanner=>mask_top_level(
+      EXPORTING query = lw_query
+      IMPORTING top_level = lw_top_level
+                invalid = lw_invalid ).
+    IF lw_invalid = abap_true.
+      CLEAR fw_union.
+      fw_error = abap_true.
+      RETURN.
+    ENDIF.
   ENDIF.
 
 * Search UP TO xxx ROWS.
 * Catch the number of rows, delete command in query
   CREATE OBJECT lo_regex
     EXPORTING
-      pattern     = 'UP TO ([0-9]+) ROWS'
+      pattern     = '(^| +)(UP) +TO +([0-9]+) +(ROWS)'
       ignore_case = abap_true.
   FIND FIRST OCCURRENCE OF REGEX lo_regex
-       IN lw_query RESULTS ls_find_select.
+       IN lw_top_level RESULTS ls_find_select.
   IF sy-subrc = 0.
-    READ TABLE ls_find_select-submatches INTO ls_sub INDEX 1.
+    READ TABLE ls_find_select-submatches INTO ls_sub INDEX 3.
     IF sy-subrc = 0.
       fw_rows = lw_query+ls_sub-offset(ls_sub-length).
     ENDIF.
-    REPLACE FIRST OCCURRENCE OF REGEX lo_regex IN lw_query WITH ''.
+    READ TABLE ls_find_select-submatches INTO ls_sub INDEX 2.
+    IF sy-subrc <> 0.
+      fw_error = abap_true.
+      RETURN.
+    ENDIF.
+    lw_offset = lcl_sql_clause_scanner=>separator_start(
+      query = lw_query keyword_offset = ls_sub-offset ).
+    READ TABLE ls_find_select-submatches INTO ls_sub INDEX 4.
+    IF sy-subrc <> 0.
+      fw_error = abap_true.
+      RETURN.
+    ENDIF.
+    lw_length = ls_sub-offset + ls_sub-length.
+    lw_suffix = lw_query+lw_length.
+    lw_query = lw_query(lw_offset).
+    CONCATENATE lw_query lw_suffix INTO lw_query RESPECTING BLANKS.
+    lcl_sql_clause_scanner=>mask_top_level(
+      EXPORTING query = lw_query
+      IMPORTING top_level = lw_top_level
+                invalid = lw_invalid ).
+    IF lw_invalid = abap_true.
+      fw_error = abap_true.
+      RETURN.
+    ENDIF.
   ELSE.
 * Set default number of rows
     fw_rows = s_customize-default_rows.
@@ -2905,59 +3093,86 @@ FORM query_parse  USING    fw_query TYPE string
 
 * Remove unused INTO (CORRESPONDING FIELDS OF)(TABLE)
 * Detect new syntax in internal table name
-  CONCATENATE '(INTO|APPENDING)( TABLE'
-              '| CORRESPONDING FIELDS OF TABLE |'
-              'CORRESPONDING FIELDS OF | )(\S*)'
-              INTO lw_string SEPARATED BY space.
   CREATE OBJECT lo_regex
     EXPORTING
-      pattern     = lw_string
+      pattern     = '(^| +)(INTO|APPENDING) +'
       ignore_case = abap_true.
   FIND FIRST OCCURRENCE OF REGEX lo_regex
-       IN lw_query RESULTS ls_find_select.
+       IN lw_top_level RESULTS ls_find_select.
   IF sy-subrc = 0.
-    IF ls_find_select-length NE 0
-    AND fw_query+ls_find_select-offset(ls_find_select-length) CS '@'.
-      fw_newsyntax = abap_true.
+    READ TABLE ls_find_select-submatches INTO ls_sub INDEX 2.
+    IF sy-subrc = 0.
+      lw_offset = ls_sub-offset.
+      lw_string = lw_query+lw_offset.
+      CREATE OBJECT lo_regex
+        EXPORTING
+          pattern = '^(INTO|APPENDING)'
+                 && '(\s+CORRESPONDING\s+FIELDS\s+OF\s+TABLE'
+                 && '|\s+CORRESPONDING\s+FIELDS\s+OF'
+                 && '|\s+TABLE|\s+)\s*(\S+)'
+          ignore_case = abap_true.
+      FIND FIRST OCCURRENCE OF REGEX lo_regex
+           IN lw_string RESULTS ls_find_where.
+      IF sy-subrc = 0 AND ls_find_where-offset = 0.
+        IF lw_string(ls_find_where-length) CS '@'.
+          fw_newsyntax = abap_true.
+        ENDIF.
+        lw_length = lw_offset + ls_find_where-length.
+        lw_suffix = lw_query+lw_length.
+        lw_offset = lcl_sql_clause_scanner=>separator_start(
+          query = lw_query keyword_offset = lw_offset ).
+        lw_query = lw_query(lw_offset).
+        CONCATENATE lw_query lw_suffix INTO lw_query RESPECTING BLANKS.
+        lcl_sql_clause_scanner=>mask_top_level(
+          EXPORTING query = lw_query
+          IMPORTING top_level = lw_top_level
+                    invalid = lw_invalid ).
+        IF lw_invalid = abap_true.
+          fw_error = abap_true.
+          RETURN.
+        ENDIF.
+      ENDIF.
     ENDIF.
-    REPLACE FIRST OCCURRENCE OF REGEX lo_regex IN lw_query WITH ''.
   ENDIF.
 
 * Search SELECT
-  FIND FIRST OCCURRENCE OF 'SELECT ' IN lw_query
-       RESULTS ls_find_select IGNORING CASE.
+  CREATE OBJECT lo_regex
+    EXPORTING
+      pattern     = '(^| +)(SELECT) +'
+      ignore_case = abap_true.
+  FIND FIRST OCCURRENCE OF REGEX lo_regex IN lw_top_level
+       RESULTS ls_find_select.
   IF sy-subrc NE 0.
     RETURN.
   ENDIF.
+  READ TABLE ls_find_select-submatches INTO ls_sub INDEX 2.
+  IF sy-subrc <> 0.
+    fw_error = abap_true.
+    RETURN.
+  ENDIF.
+  lw_offset = lcl_sql_clause_scanner=>skip_whitespace(
+    query = lw_query offset = ls_sub-offset + ls_sub-length ).
 
 * Search FROM
-  FIND FIRST OCCURRENCE OF ' FROM '
-       IN SECTION OFFSET ls_find_select-offset OF lw_query
-       RESULTS ls_find_from IGNORING CASE.
+  CREATE OBJECT lo_regex
+    EXPORTING
+      pattern     = '(^| +)(FROM) +'
+      ignore_case = abap_true.
+  FIND FIRST OCCURRENCE OF REGEX lo_regex
+       IN SECTION OFFSET lw_offset OF lw_top_level
+       RESULTS ls_find_from.
   IF sy-subrc NE 0.
     fw_error = abap_true.
     RETURN.
   ENDIF.
-
-* Search WHERE / GROUP BY / HAVING / ORDER BY
-  FIND FIRST OCCURRENCE OF ' WHERE '
-       IN SECTION OFFSET ls_find_from-offset OF lw_query
-       RESULTS ls_find_where IGNORING CASE.
-  IF sy-subrc NE 0.
-    FIND FIRST OCCURRENCE OF ' GROUP BY ' IN lw_query
-         RESULTS ls_find_where IGNORING CASE.
-  ENDIF.
-  IF sy-subrc NE 0.
-    FIND FIRST OCCURRENCE OF ' HAVING ' IN lw_query
-         RESULTS ls_find_where IGNORING CASE.
-  ENDIF.
-  IF sy-subrc NE 0.
-    FIND FIRST OCCURRENCE OF ' ORDER BY ' IN lw_query
-         RESULTS ls_find_where IGNORING CASE.
+  READ TABLE ls_find_from-submatches INTO ls_sub INDEX 2.
+  IF sy-subrc <> 0.
+    fw_error = abap_true.
+    RETURN.
   ENDIF.
 
-  lw_offset = ls_find_select-offset + 7.
-  lw_length = ls_find_from-offset - ls_find_select-offset - 7.
+  lw_length = lcl_sql_clause_scanner=>separator_start(
+    query = lw_query keyword_offset = ls_sub-offset ) - lw_offset.
   IF lw_length LE 0.
     fw_error = abap_true.
     RETURN.
@@ -2970,14 +3185,33 @@ FORM query_parse  USING    fw_query TYPE string
     fw_newsyntax = abap_true.
   ENDIF.
 
-  lw_offset = ls_find_from-offset + 6.
-  IF ls_find_where IS INITIAL.
+  lw_offset = lcl_sql_clause_scanner=>skip_whitespace(
+    query = lw_query offset = ls_sub-offset + ls_sub-length ).
+
+* Search WHERE / GROUP BY / HAVING / ORDER BY
+  CREATE OBJECT lo_regex
+    EXPORTING
+      pattern     = '(^| +)(WHERE|GROUP +BY|HAVING|ORDER +BY) +'
+      ignore_case = abap_true.
+  FIND FIRST OCCURRENCE OF REGEX lo_regex
+       IN SECTION OFFSET lw_offset OF lw_top_level
+       RESULTS ls_find_where.
+  lw_tail_found = xsdbool( sy-subrc = 0 ).
+
+  IF lw_tail_found = abap_false.
     fw_from = lw_query+lw_offset.
     fw_where = ''.
   ELSE.
-    lw_length = ls_find_where-offset - ls_find_from-offset - 6.
+    READ TABLE ls_find_where-submatches INTO ls_sub INDEX 2.
+    IF sy-subrc <> 0.
+      fw_error = abap_true.
+      RETURN.
+    ENDIF.
+    lw_length = lcl_sql_clause_scanner=>separator_start(
+      query = lw_query keyword_offset = ls_sub-offset ) - lw_offset.
     fw_from = lw_query+lw_offset(lw_length).
-    lw_offset = ls_find_where-offset.
+    lw_offset = lcl_sql_clause_scanner=>separator_start(
+      query = lw_query keyword_offset = ls_sub-offset ).
     fw_where = lw_query+lw_offset.
   ENDIF.
 
@@ -6350,6 +6584,18 @@ ENDFORM.                    " SET_STATUS_010
 " These characterization tests intentionally exercise the existing FORM
 " boundaries. They keep the legacy parser stable while its implementation
 " is moved behind testable classes incrementally.
+CLASS ltcl_sql_clause_scanner DEFINITION FINAL
+  FOR TESTING
+  DURATION SHORT
+  RISK LEVEL HARMLESS.
+  PRIVATE SECTION.
+    METHODS masks_literal_and_nested FOR TESTING.
+    METHODS normalizes_clause_whitespace FOR TESTING.
+    METHODS rejects_unbalanced_state FOR TESTING.
+    METHODS rejects_comment FOR TESTING.
+    METHODS rejects_non_sql_literals FOR TESTING.
+ENDCLASS.
+
 CLASS ltc_query_parser DEFINITION FINAL
   FOR TESTING
   DURATION SHORT
@@ -6366,12 +6612,14 @@ CLASS ltc_query_parser DEFINITION FINAL
     METHODS zero_limit_means_unlimited FOR TESTING.
     METHODS keeps_tail_clauses FOR TESTING.
     METHODS separates_union FOR TESTING.
+    METHODS separates_union_expression FOR TESTING.
     METHODS detects_comma_syntax FOR TESTING.
     METHODS strips_into_target FOR TESTING.
     METHODS ignores_literal_from_keyword FOR TESTING.
     METHODS ignores_literal_union_keyword FOR TESTING.
     METHODS keeps_literal_row_limit FOR TESTING.
     METHODS ignores_literal_tail_keyword FOR TESTING.
+    METHODS ignores_tail_keyword_matrix FOR TESTING.
     METHODS accepts_multiline_clauses FOR TESTING.
     METHODS rejects_comment_union_keyword FOR TESTING.
     METHODS rejects_missing_from FOR TESTING.
@@ -6401,6 +6649,105 @@ CLASS ltc_query_parser DEFINITION FINAL
                 no_authority TYPE abap_bool
                 new_syntax TYPE abap_bool
                 parse_error TYPE abap_bool.
+ENDCLASS.
+
+CLASS ltcl_sql_clause_scanner IMPLEMENTATION.
+  METHOD masks_literal_and_nested.
+    DATA top_level TYPE string.
+    DATA invalid TYPE abap_bool.
+    DATA(query) = `SELECT CONCAT( 'A'' FROM ''B', carrname ) AS label`
+               && ` FROM scarr`.
+
+    lcl_sql_clause_scanner=>mask_top_level(
+      EXPORTING query = query
+      IMPORTING top_level = top_level
+                invalid = invalid ).
+
+    cl_abap_unit_assert=>assert_initial( act = invalid ).
+    cl_abap_unit_assert=>assert_equals(
+      act = strlen( top_level )
+      exp = strlen( query )
+      msg = 'The structural view must preserve every source offset' ).
+    cl_abap_unit_assert=>assert_equals(
+      act = find( val = top_level sub = 'FROM scarr' )
+      exp = find( val = query sub = 'FROM scarr' )
+      msg = 'Only the outer FROM must remain visible' ).
+  ENDMETHOD.
+
+  METHOD normalizes_clause_whitespace.
+    DATA top_level TYPE string.
+    DATA invalid TYPE abap_bool.
+    DATA(query) = `SELECT carrid`
+               && cl_abap_char_utilities=>newline
+               && `FROM scarr`.
+
+    lcl_sql_clause_scanner=>mask_top_level(
+      EXPORTING query = query
+      IMPORTING top_level = top_level
+                invalid = invalid ).
+
+    cl_abap_unit_assert=>assert_initial( act = invalid ).
+    cl_abap_unit_assert=>assert_true(
+      act = xsdbool( top_level CS ' FROM ' )
+      msg = 'All supported SQL whitespace must expose the same boundary' ).
+  ENDMETHOD.
+
+  METHOD rejects_unbalanced_state.
+    DATA top_level TYPE string.
+    DATA invalid TYPE abap_bool.
+
+    lcl_sql_clause_scanner=>mask_top_level(
+      EXPORTING query = `SELECT carrid FROM scarr WHERE carrid = 'LH`
+      IMPORTING top_level = top_level
+                invalid = invalid ).
+    cl_abap_unit_assert=>assert_true(
+      act = invalid
+      msg = 'An unclosed literal must fail before slicing' ).
+
+    lcl_sql_clause_scanner=>mask_top_level(
+      EXPORTING query = `SELECT carrid FROM scarr WHERE ( carrid = 'LH'`
+      IMPORTING top_level = top_level
+                invalid = invalid ).
+    cl_abap_unit_assert=>assert_true(
+      act = invalid
+      msg = 'An unclosed parenthesis must fail before slicing' ).
+  ENDMETHOD.
+
+  METHOD rejects_comment.
+    DATA top_level TYPE string.
+    DATA invalid TYPE abap_bool.
+
+    lcl_sql_clause_scanner=>mask_top_level(
+      EXPORTING
+        query = `SELECT carrid FROM scarr " UNION SELECT carrid FROM sflight`
+      IMPORTING top_level = top_level
+                invalid = invalid ).
+
+    cl_abap_unit_assert=>assert_true(
+      act = invalid
+      msg = 'A surviving comment must fail before branch splitting' ).
+  ENDMETHOD.
+
+  METHOD rejects_non_sql_literals.
+    DATA top_level TYPE string.
+    DATA invalid TYPE abap_bool.
+
+    lcl_sql_clause_scanner=>mask_top_level(
+      EXPORTING query = 'SELECT `FROM` FROM scarr'
+      IMPORTING top_level = top_level
+                invalid = invalid ).
+    cl_abap_unit_assert=>assert_true(
+      act = invalid
+      msg = 'Typed backtick literals are outside the accepted input grammar' ).
+
+    lcl_sql_clause_scanner=>mask_top_level(
+      EXPORTING query = 'SELECT |FROM| FROM scarr'
+      IMPORTING top_level = top_level
+                invalid = invalid ).
+    cl_abap_unit_assert=>assert_true(
+      act = invalid
+      msg = 'String templates are outside the accepted input grammar' ).
+  ENDMETHOD.
 ENDCLASS.
 
 
@@ -6661,6 +7008,30 @@ CLASS ltc_query_parser IMPLEMENTATION.
       msg = 'First UNION branch must remain intact' ).
   ENDMETHOD.
 
+  METHOD separates_union_expression.
+    DATA select_part TYPE string.
+    DATA union_part TYPE string.
+    DATA parse_error TYPE abap_bool.
+
+    parse_select(
+      EXPORTING
+        query = `SELECT CONCAT( 'A UNION B', carrname ) AS label FROM scarr`
+             && ` UNION SELECT carrname FROM scarr`
+      IMPORTING select_part = select_part
+                union_part = union_part
+                parse_error = parse_error ).
+
+    cl_abap_unit_assert=>assert_equals(
+      act = select_part
+      exp = `CONCAT( 'A UNION B', carrname ) AS label`
+      msg = 'Masked expression content before UNION must not be truncated' ).
+    cl_abap_unit_assert=>assert_equals(
+      act = union_part
+      exp = 'SELECT carrname FROM scarr'
+      msg = 'The top-level UNION branch must still be separated' ).
+    cl_abap_unit_assert=>assert_initial( act = parse_error ).
+  ENDMETHOD.
+
   METHOD detects_comma_syntax.
     DATA select_part TYPE string.
     DATA from_part TYPE string.
@@ -6719,6 +7090,24 @@ CLASS ltc_query_parser IMPLEMENTATION.
       act = new_syntax
       exp = abap_true
       msg = 'Escaped INTO target must select new syntax' ).
+
+    parse_select(
+      EXPORTING
+        query = `SELECT carrid FROM scarr`
+             && cl_abap_char_utilities=>newline
+             && `APPENDING CORRESPONDING FIELDS OF TABLE result`
+      IMPORTING from_part = from_part
+                new_syntax = new_syntax
+                parse_error = parse_error ).
+    CONDENSE from_part.
+    cl_abap_unit_assert=>assert_equals(
+      act = from_part
+      exp = 'scarr'
+      msg = 'A multiline legacy APPENDING target must be stripped' ).
+    cl_abap_unit_assert=>assert_initial(
+      act = new_syntax
+      msg = 'A non-escaped target must retain legacy syntax' ).
+    cl_abap_unit_assert=>assert_initial( act = parse_error ).
   ENDMETHOD.
 
   METHOD ignores_literal_from_keyword.
@@ -6789,6 +7178,24 @@ CLASS ltc_query_parser IMPLEMENTATION.
       exp = expected_rows
       msg = 'A literal must not override the default row limit' ).
     cl_abap_unit_assert=>assert_initial( act = parse_error ).
+
+    expected_rows = 7.
+    parse_select(
+      EXPORTING
+        query = `SELECT carrid FROM scarr`
+             && ` WHERE carrid = 'UP TO 5 ROWS' UP TO 7 ROWS`
+      IMPORTING tail_part = tail_part
+                rows = rows
+                parse_error = parse_error ).
+    cl_abap_unit_assert=>assert_equals(
+      act = tail_part
+      exp = ` WHERE carrid = 'UP TO 5 ROWS'`
+      msg = 'Removing the real limit must preserve adjacent literal data' ).
+    cl_abap_unit_assert=>assert_equals(
+      act = rows
+      exp = expected_rows
+      msg = 'Only the top-level row limit can override the default' ).
+    cl_abap_unit_assert=>assert_initial( act = parse_error ).
   ENDMETHOD.
 
   METHOD ignores_literal_tail_keyword.
@@ -6817,6 +7224,49 @@ CLASS ltc_query_parser IMPLEMENTATION.
     cl_abap_unit_assert=>assert_initial( act = parse_error ).
   ENDMETHOD.
 
+  METHOD ignores_tail_keyword_matrix.
+    DATA keywords TYPE string_table.
+    DATA keyword TYPE string.
+    DATA literal TYPE string.
+    DATA query TYPE string.
+    DATA expected_from TYPE string.
+    DATA from_part TYPE string.
+    DATA tail_part TYPE string.
+    DATA parse_error TYPE abap_bool.
+
+    APPEND ' WHERE ' TO keywords.
+    APPEND ' GROUP BY ' TO keywords.
+    APPEND ' HAVING ' TO keywords.
+    APPEND ' ORDER BY ' TO keywords.
+
+    LOOP AT keywords INTO keyword.
+      literal = `'` && keyword && `'`.
+      query = `SELECT a~carrid FROM scarr AS a INNER JOIN spfli AS b`
+           && ` ON b~carrid = a~carrid AND b~cityfrom = `
+           && literal
+           && ` ORDER BY a~carrid`.
+      expected_from = `scarr AS a INNER JOIN spfli AS b`
+                   && ` ON b~carrid = a~carrid AND b~cityfrom = `
+                   && literal.
+
+      parse_select(
+        EXPORTING query = query
+        IMPORTING from_part = from_part
+                  tail_part = tail_part
+                  parse_error = parse_error ).
+
+      cl_abap_unit_assert=>assert_equals(
+        act = from_part
+        exp = expected_from
+        msg = 'A literal tail-keyword lookalike must remain data' ).
+      cl_abap_unit_assert=>assert_equals(
+        act = tail_part
+        exp = ` ORDER BY a~carrid`
+        msg = 'The actual top-level tail must remain visible' ).
+      cl_abap_unit_assert=>assert_initial( act = parse_error ).
+    ENDLOOP.
+  ENDMETHOD.
+
   METHOD accepts_multiline_clauses.
     DATA select_part TYPE string.
     DATA from_part TYPE string.
@@ -6837,6 +7287,8 @@ CLASS ltc_query_parser IMPLEMENTATION.
 
     CONDENSE select_part.
     CONDENSE from_part.
+    REPLACE ALL OCCURRENCES OF cl_abap_char_utilities=>newline
+            IN tail_part WITH space.
     CONDENSE tail_part.
     cl_abap_unit_assert=>assert_equals( act = select_part exp = 'carrid' ).
     cl_abap_unit_assert=>assert_equals( act = from_part exp = 'scarr' ).
