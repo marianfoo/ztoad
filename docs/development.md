@@ -96,6 +96,8 @@ If ARC-1's pre-write linter reports an incorrect ABAP release, do not weaken all
 
 For the large ZTOAD report, an ARC-1 stdin write can fail with `EAGAIN` before SAP receives the source. Retry through a bounded temporary JSON payload file, then require a successful write response and explicit activation. Large ATC result JSON can exceed terminal output limits; capture the complete result first and derive exact finding counts, priority counts, and prerequisite errors from that complete payload rather than parsing truncated console text.
 
+ARC-1 CLI automation must validate both layers of its result. A tool-level failure can be serialized as an MCP JSON envelope with `isError: true` even when the CLI process exits with status 0; treat either signal as failure and do not issue the subsequent activation. Use the canonical `SAP_ALLOWED_PACKAGES` variable for the write allowlist. Because an already-running MCP process keeps the environment it started with, restart it or launch a bounded fresh process after changing an allowlist or target configuration, and verify the intended system before the first write.
+
 ## 5. Structural object changes
 
 Examples include adding issue #2's transaction code, changing the table definition, changing dynpros or text elements, and adding a global class.
