@@ -730,7 +730,8 @@ ENDCLASS.
 
 CLASS lcl_query_error_contract IMPLEMENTATION.
   METHOD to_user_message.
-    user_message = technical_detail.
+* The technical detail is deliberately accepted but never exposed.
+    user_message = 'Cannot parse the query'(m07).
   ENDMETHOD.
 ENDCLASS.
 
@@ -2794,6 +2795,8 @@ FORM query_process USING fw_display TYPE c
                           CHANGING lo_result lw_time lw_count
                                    lw_exec_failed.
     IF lw_exec_failed = abap_true.
+      lw_msg = lcl_query_error_contract=>to_user_message( space ).
+      MESSAGE lw_msg TYPE c_msg_success DISPLAY LIKE c_msg_error.
       RETURN.
     ENDIF.
     lw_from_concat = lw_from.
@@ -2851,8 +2854,15 @@ FORM query_execute USING    fw_program TYPE sy-repid
                             fw_count TYPE i
                             fw_failed TYPE abap_bool.
   CLEAR fw_failed.
-  PERFORM run_sql IN PROGRAM (fw_program)
-                  CHANGING fo_result fw_time fw_count.
+  TRY.
+      PERFORM run_sql IN PROGRAM (fw_program)
+                      CHANGING fo_result fw_time fw_count.
+    CATCH cx_root.
+      CLEAR : fo_result,
+              fw_time,
+              fw_count.
+      fw_failed = abap_true.
+  ENDTRY.
 ENDFORM.                    " QUERY_EXECUTE
 
 *&---------------------------------------------------------------------*
@@ -3426,8 +3436,8 @@ FORM query_generate  USING    fw_select TYPE string
   CONCATENATE 'SELECT' fw_select 'FROM' fw_from fw_where
               INTO security_input SEPARATED BY space.
   IF lcl_query_input_validator=>is_safe( security_input ) = abap_false.
-    MESSAGE 'Cannot parse the query'(m07)
-            TYPE c_msg_success DISPLAY LIKE c_msg_error.
+    lw_mess = lcl_query_error_contract=>to_user_message( security_input ).
+    MESSAGE lw_mess TYPE c_msg_success DISPLAY LIKE c_msg_error.
     RETURN.
   ENDIF.
 
@@ -4001,7 +4011,16 @@ FORM query_generate  USING    fw_select TYPE string
   ENDIF.
 
   IF fw_display = space.
-    GENERATE SUBROUTINE POOL lt_code_string NAME fw_program.
+    CLEAR lw_mess.
+    GENERATE SUBROUTINE POOL lt_code_string NAME fw_program
+             MESSAGE lw_mess.
+    IF sy-subrc NE 0.
+      lw_mess = lcl_query_error_contract=>to_user_message(
+        CONV string( lw_mess ) ).
+      MESSAGE lw_mess TYPE c_msg_success DISPLAY LIKE c_msg_error.
+      CLEAR fw_program.
+      RETURN.
+    ENDIF.
   ELSE.
     IF lw_mess IS NOT INITIAL.
       lw_explicit = lw_line.
@@ -5174,8 +5193,8 @@ FORM query_generate_noselect  USING    fw_command TYPE string
   CONCATENATE fw_command fw_table fw_param
               INTO security_input SEPARATED BY space.
   IF lcl_query_input_validator=>is_safe( security_input ) = abap_false.
-    MESSAGE 'Cannot parse the query'(m07)
-            TYPE c_msg_success DISPLAY LIKE c_msg_error.
+    lw_mess = lcl_query_error_contract=>to_user_message( security_input ).
+    MESSAGE lw_mess TYPE c_msg_success DISPLAY LIKE c_msg_error.
     RETURN.
   ENDIF.
 
@@ -5390,7 +5409,16 @@ FORM query_generate_noselect  USING    fw_command TYPE string
   ENDIF.
 
   IF fw_display = space.
-    GENERATE SUBROUTINE POOL lt_code_string NAME fw_program.
+    CLEAR lw_mess.
+    GENERATE SUBROUTINE POOL lt_code_string NAME fw_program
+             MESSAGE lw_mess.
+    IF sy-subrc NE 0.
+      lw_mess = lcl_query_error_contract=>to_user_message(
+        CONV string( lw_mess ) ).
+      MESSAGE lw_mess TYPE c_msg_success DISPLAY LIKE c_msg_error.
+      CLEAR fw_program.
+      RETURN.
+    ENDIF.
   ELSE.
     IF lw_mess IS NOT INITIAL.
       lw_explicit = lw_line.
@@ -8698,38 +8726,29 @@ CLASS ltcl_query_execution DEFINITION FINAL
   RISK LEVEL HARMLESS.
   PRIVATE SECTION.
     METHODS contains_runtime_exception FOR TESTING.
+    METHODS keeps_successful_execution FOR TESTING.
     METHODS sanitizes_technical_detail FOR TESTING.
 ENDCLASS.
 
 CLASS ltcl_query_execution IMPLEMENTATION.
   METHOD contains_runtime_exception.
-    DATA source TYPE string_table.
-    DATA generated_program TYPE sy-repid.
+    DATA generated_program TYPE sy-repid
+      VALUE 'ZTOAD_TEST_MISSING_PROGRAM'.
     DATA result TYPE REF TO data.
     DATA runtime TYPE p LENGTH 8 DECIMALS 2.
     DATA row_count TYPE i.
     DATA execution_failed TYPE abap_bool.
     DATA exception_escaped TYPE abap_bool.
 
-    APPEND 'PROGRAM SUBPOOL.' TO source.
-    APPEND 'FORM run_sql CHANGING fo_result TYPE REF TO data' TO source.
-    APPEND '                      fw_time TYPE p' TO source.
-    APPEND '                      fw_count TYPE i.' TO source.
-    APPEND 'DATA zero TYPE i.' TO source.
-    APPEND 'fw_count = 1 / zero.' TO source.
-    APPEND 'ENDFORM.' TO source.
-
-    GENERATE SUBROUTINE POOL source NAME generated_program.
-    cl_abap_unit_assert=>assert_equals(
-      act = sy-subrc
-      exp = 0
-      msg = 'The deterministic runtime-failure fixture must compile' ).
+    CREATE DATA result TYPE i.
+    runtime = 3.
+    row_count = 4.
 
     TRY.
         PERFORM query_execute USING generated_program
                               CHANGING result runtime row_count
                                        execution_failed.
-      CATCH cx_sy_arithmetic_error.
+      CATCH cx_root.
         exception_escaped = abap_true.
     ENDTRY.
 
@@ -8739,16 +8758,67 @@ CLASS ltcl_query_execution IMPLEMENTATION.
     cl_abap_unit_assert=>assert_true(
       act = execution_failed
       msg = 'A generated-program exception needs a stable failure result' ).
+    cl_abap_unit_assert=>assert_initial(
+      act = result
+      msg = 'A failed query must not retain a partial result reference' ).
+    cl_abap_unit_assert=>assert_initial(
+      act = runtime
+      msg = 'A failed query must not retain a partial runtime' ).
+    cl_abap_unit_assert=>assert_initial(
+      act = row_count
+      msg = 'A failed query must not retain a partial row count' ).
+  ENDMETHOD.
+
+  METHOD keeps_successful_execution.
+    DATA generated_program TYPE sy-repid.
+    DATA result TYPE REF TO data.
+    DATA runtime TYPE p LENGTH 8 DECIMALS 2.
+    DATA row_count TYPE i.
+    DATA execution_failed TYPE abap_bool.
+    DATA rows TYPE n LENGTH 6 VALUE 1.
+    DATA field_list TYPE ty_fieldlist_table.
+    DATA count_query TYPE abap_bool.
+
+    PERFORM query_generate USING 'MANDT'
+                                 'T000'
+                                 space
+                                 space
+                                 space
+                           CHANGING generated_program
+                                    rows
+                                    field_list
+                                    count_query.
+    cl_abap_unit_assert=>assert_not_initial(
+      act = generated_program
+      msg = 'The successful query fixture must compile' ).
+
+    PERFORM query_execute USING generated_program
+                          CHANGING result runtime row_count
+                                   execution_failed.
+
+    cl_abap_unit_assert=>assert_initial(
+      act = execution_failed
+      msg = 'A successful generated routine must remain successful' ).
+    cl_abap_unit_assert=>assert_bound(
+      act = result
+      msg = 'A successful generated routine must retain its result' ).
+    cl_abap_unit_assert=>assert_equals(
+      act = row_count
+      exp = 1
+      msg = 'The successful query must keep its bounded result count' ).
   ENDMETHOD.
 
   METHOD sanitizes_technical_detail.
     DATA(user_message) = lcl_query_error_contract=>to_user_message(
       `Compiler detail contains SECRET_QUERY_VALUE` ).
 
-    cl_abap_unit_assert=>assert_equals(
+    cl_abap_unit_assert=>assert_not_initial(
       act = user_message
-      exp = 'Cannot parse the query'(m07)
-      msg = 'Technical query details must not reach the user message' ).
+      msg = 'A failed query must produce a stable user message' ).
+    IF user_message CS 'SECRET_QUERY_VALUE'.
+      cl_abap_unit_assert=>fail(
+        msg = 'Technical query details must not reach the user message' ).
+    ENDIF.
   ENDMETHOD.
 ENDCLASS.
 
