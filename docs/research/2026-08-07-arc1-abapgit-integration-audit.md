@@ -4,7 +4,7 @@ _Observed 2026-08-06 to 2026-08-07 with ARC-1 1.0.2, A4H SAP_BASIS 758 SP02, nat
 
 ## What works
 
-- A4H has the native abapGit ADT bridge installed and usable. Repository discovery, details, status/check, full-ref branch switching, selective staging, and selective push all worked through the bridge.
+- A4H has the native abapGit ADT bridge installed and usable. Repository discovery, details, status/check, full-ref branch switching, selective staging, selective push, and pull all work at the bridge protocol level. Several ARC-1 request/parser shapes remain incompatible with this installed backend and required direct calls using the backend's published XML contract.
 - Selective staging of `PROG ZTOAD` included only the five intended program serializer files and excluded unrelated `TABL`/`DEVC` drift.
 - Native abapGit remained the authoritative complete-object round trip, while ARC-1 was effective for source reads/writes, activation, syntax, Unit, ATC, object state, and inactive-child diagnostics.
 - The system is not missing a bridge component. The earlier clone namespace error belongs to the older ARC-1 request shape and should be retested with the current client before retaining it as an active system defect.
@@ -21,6 +21,9 @@ _Observed 2026-08-06 to 2026-08-07 with ARC-1 1.0.2, A4H SAP_BASIS 758 SP02, nat
 8. **Large-source ergonomics should be first class.** Complete report writes require callers to build a temporary JSON payload to avoid stdin `EAGAIN`. Add a `sourceFile`/`--source-file` option that reads locally inside the CLI, reports the source hash, and never logs full source or credentials.
 9. **Evidence-friendly output is incomplete.** Return staged object/file inventories, selected full ref, before/after commit IDs, and the exact remote result in stable JSON. This would make selective native-abapGit procedures auditable without scraping log previews.
 10. **Published MCP schemas can lag the installed CLI.** The connected SAPGit MCP contract exposed only read actions while the local ARC-1 1.0.2 CLI supported `stage`, `push`, and `switch_branch`; the same skew hid newer diagnostic actions. Publish the running server/client version in discovery, keep action enums generated from one source, and fail with an explicit upgrade/reload instruction instead of forcing callers to discover CLI-only capabilities experimentally.
+11. **The installed backend's XML namespaces are not modeled correctly.** Its stage response uses `http://www.sap.com/adt/abapgit/staging`, so ARC-1 returned an empty object list even though raw XML contained `PROG` and `TABL`. ARC-1's push builder emitted a different generic `<objects>` payload, and its pull builder used singular `/repository` instead of the backend-required plural `/repositories` namespace. Version or discover the bridge contract, parse the staging namespace, preserve its staged-object shape, and add integration fixtures for this backend version.
+12. **`SAPWrite(dryRun=true)` mutated TABL state.** The call returned “Successfully updated” and created an inactive `TABL ZTOAD` draft. A dry run must never acquire/save a draft; until fixed, callers must compare active/inactive state after every DDIC dry-run request and clean up or deliberately continue only after reviewing the exact draft.
+13. **NPL table object-state does not reuse endpoint discovery.** On SAP_BASIS 750, `SAPDiagnose(action="object_state", type="TABL")` requests the active table-source path and returns 404 for the installed transparent table, while `SAPRead(version="auto")`, `SAPRead(version="inactive")`, search, activation, and native abapGit all resolve it. Reuse the same table-versus-structure/version fallback in object-state diagnostics and cover this with a 7.50 integration fixture.
 
 ## Safe workflow until those gaps are fixed
 
@@ -30,6 +33,8 @@ _Observed 2026-08-06 to 2026-08-07 with ARC-1 1.0.2, A4H SAP_BASIS 758 SP02, nat
 4. Stage explicit object selections, review returned filenames, and never use **Add All** with unrelated drift.
 5. Treat native abapGit as the complete serializer and ARC-1 source writes as source-only unless the exact child-object closure is independently proven.
 6. After activation, require active/inactive main equality plus the global inactive-child inventory for `PROG/P`, `PROG/PCA`, `PROG/PS`, and `PROG/PX`.
+7. Treat `dryRun` as untrusted on current TABL writes and verify object state immediately. When the bridge wrapper returns an empty stage for known drift, inspect the raw staging document before taking any push action.
+8. On 7.50, if direct table object-state returns 404, do not call the object absent until automatic and inactive-version reads, exact metadata, object search, explicit activation, and the global inactive inventory have been reconciled.
 
 ## System-side conclusion
 

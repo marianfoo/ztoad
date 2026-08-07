@@ -2,9 +2,11 @@ import { readFile } from "node:fs/promises";
 import { strict as assert } from "node:assert";
 
 const transactionPath = new URL("../src/ztoad.tran.xml", import.meta.url);
+const tablePath = new URL("../src/ztoad.tabl.xml", import.meta.url);
 const reportPath = new URL("../src/ztoad.prog.abap", import.meta.url);
 
 let transactionXml;
+let tableXml;
 let reportSource;
 
 try {
@@ -12,6 +14,15 @@ try {
 } catch (error) {
   if (error?.code === "ENOENT") {
     throw new Error("Missing native-abapGit transaction object: src/ztoad.tran.xml");
+  }
+  throw error;
+}
+
+try {
+  tableXml = await readFile(tablePath, "utf8");
+} catch (error) {
+  if (error?.code === "ENOENT") {
+    throw new Error("Missing native-abapGit table object: src/ztoad.tabl.xml");
   }
   throw error;
 }
@@ -38,8 +49,13 @@ for (const fragment of expectedFragments) {
 }
 
 assert.ok(
+  tableXml.includes("<EXCLASS>1</EXCLASS>"),
+  "src/ztoad.tabl.xml must serialize TABL ZTOAD as #NOT_EXTENSIBLE (DD02V-EXCLASS 1)",
+);
+
+assert.ok(
   !reportSource.includes("C_DB_EXECUTE"),
   "Unsupported native SQL kernel call C_DB_EXECUTE must not exist in src/ztoad.prog.abap",
 );
 
-console.log("Repository contract passed: launcher metadata and forbidden-kernel-call checks are green.");
+console.log("Repository contract passed: launcher, table, and forbidden-kernel-call checks are green.");
