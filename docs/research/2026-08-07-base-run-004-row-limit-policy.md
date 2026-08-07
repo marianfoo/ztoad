@@ -96,4 +96,3 @@ cursor generation. No test should deliberately retrieve a large result.
   before generation, then submit a small positive-limit query and prove the
   requested row count, followed by a complete ST22 delta.
 - No persistent data, destructive SQL, or intentionally heavy query is needed.
-
