@@ -3223,7 +3223,9 @@ FORM query_parse  USING    fw_query TYPE string
   IF NOT fw_union IS INITIAL.
     lw_string = fw_select.
     TRANSLATE lw_string TO UPPER CASE.
-    IF strlen( lw_string ) GE 7 AND lw_string(7) = 'SINGLE'.
+    IF strlen( lw_string ) GT 6
+    AND lw_string(6) = 'SINGLE'
+    AND lw_string+6(1) = space.
       fw_error = abap_true.
       RETURN.
     ENDIF.
