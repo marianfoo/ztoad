@@ -72,7 +72,7 @@ dump. Full analysis is in the linked research note.
     this plan to `docs/plans/finished/`, and wait for green CI again before
     squash merge.
 
-## Pre-PR execution record
+## Execution record
 
 - Steps 1–10 are complete for frozen source commit
   `4b37b69605e88129b0cf7825b27886a8e6fa62c0`; local source SHA-256 is
@@ -104,8 +104,38 @@ dump. Full analysis is in the linked research note.
 - Both shared targets were restored to intended master `b0b4d9f`, explicitly
   activated, and verified at 109/109 Unit, expected syntax, equal source state,
   and zero inactive ZTOAD parts.
-- Step 11 remains to push/open the PR and wait for first green CI. Step 12 is
-  intentionally deferred until that first green run.
+- PR #32 was opened from the frozen branch head. Its first Quality run
+  `31194238898` passed the pinned install, configured abaplint, repository
+  contracts, and installation contract; the required abaplint check also
+  passed and the informational observations check skipped without affecting
+  the gate.
+
+## Post-green workflow audit
+
+- **Plan fidelity:** research, safe red replay, reviewed plan, smallest green
+  change, complete local/live validation, exact-candidate freeze, shared-system
+  restoration, and first green CI all followed the documented order. The only
+  discarded spike was the `sy-repid` implementation that added one Cloud ATC
+  finding; all affected gates were correctly invalidated and rerun.
+- **Implementation review:** both physical generation sinks enforce and charge
+  the same policy; source display and failed generation are uncharged; DML
+  confirmation precedes allocation; parser, authorization, fragment validation,
+  and runtime containment remain unchanged. No unresolved review finding was
+  found in the complete PR diff.
+- **Test evidence:** the permanent regression is harmless and logical, while
+  live evidence covers both supported releases, a real read-only browser path,
+  child-object state, and the complete post-smoke dump set. The incomplete
+  S/4HANA-readiness prerequisite remains explicit rather than being promoted to
+  a pass.
+- **CI:** the required job exercises the pinned dependency install, zero-warning
+  configured abaplint profile, and both repository contracts. It is green for
+  the exact pushed head. The existing abaplint observations integration skipped
+  informationally and is not a required quality gate.
+- **Durable improvement:** the ATC regression exposed that aggregate counts and
+  line positions are insufficient after source movement. The development guide
+  now requires complete baseline/candidate comparison by stable finding
+  signature, mapping a real delta back to changed source, and rerunning the
+  corrected exact candidate. No CI workflow change was necessary.
 
 ## Plan review
 
