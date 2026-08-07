@@ -4,7 +4,7 @@ This document defines the permanent test discipline for ZTOAD. The current basel
 
 ## Red–green–refactor through pull requests
 
-`master` is the stable integration and release line. Each finding uses one short-lived branch and pull request; red states may exist locally or on the branch during development, but are never merged or pushed directly to `master`. The shared SAP native-abapGit repository remains linked to `master` for normal source-only work, so testing an unmerged source candidate must be recorded as a controlled direct deployment rather than a clean abapGit branch state.
+`main` is the stable integration and release line. Each finding uses one short-lived branch and pull request; red states may exist locally or on the branch during development, but are never merged or pushed directly to `main`. The shared SAP native-abapGit repository remains linked to `main` for normal source-only work, so testing an unmerged source candidate must be recorded as a controlled direct deployment rather than a clean abapGit branch state.
 
 For every bug or feature:
 
@@ -76,9 +76,9 @@ Do not use ports 50000 or 50001. Credentials stay in the ignored `.env` file and
 
 Run this sequence after deployment:
 
-1. Confirm native abapGit points at the expected coordinated branch, refresh it, and review the complete system/Git diff. For normal source work this is `master`; a structural-object feature branch must be explicit in the evidence.
+1. Confirm native abapGit points at the expected coordinated branch, refresh it, and review the complete system/Git diff. For normal source work this is `main`; a structural-object feature branch must be explicit in the evidence.
 2. Confirm no unrelated inactive divergence and record the frozen candidate commit/source hash being tested. If unrelated drift exists, leave it unselected and list it; never use **Add All**. If source or serialized object content changes after this point, discard the affected evidence and restart deployment from this step.
-3. Deploy and explicitly activate only the intended changed objects. Do not describe an unmerged directly deployed source as a native-abapGit `master` pull, and do not rely on a write request's activation option.
+3. Deploy and explicitly activate only the intended changed objects. Do not describe an unmerged directly deployed source as a native-abapGit `main` pull, and do not rely on a write request's activation option.
 4. Confirm active and inactive main source are identical, query inactive child parts for changed composite objects, then run active SAP syntax. Screens, GUI statuses, text elements, and includes must be checked separately; main-source equality does not clear an inactive child part.
 5. Run all ABAP Unit tests; require zero failures.
 6. Run the recorded ATC variants and inspect prerequisite/check errors. A result with missing prerequisites is incomplete even when no finding rows are displayed.
@@ -86,7 +86,7 @@ Run this sequence after deployment:
 8. Verify the installed dynpro and GUI status required by the scenario, then launch ZTOAD in a fresh browser session and run only a read-only sanitized smoke query, initially `SELECT SINGLE mandt FROM t000`. Enter the query with real user-like typing/paste and complete the editor's change/blur sequence; setting a DOM value programmatically is diagnostic only because SAP WebGUI may not transfer it to the backend control. If the SAP logon framework leaves the entire page non-interactive in the selected automation browser, do not repair or submit it through DOM mutation. When the user did not require that browser, use an authenticated supported browser session; otherwise record the UI gate as unavailable.
 9. Verify the exact query reached execution through its expected UI/result state, then confirm ST22 has no dump newer than the captured marker. For an error-path smoke, a generic message proves safe presentation but not whether parsing, compilation, or runtime execution produced it; pair the smoke with a direct regression at the intended boundary and use a live fixture whose grammar is already proven on the target. Keep browser locators scoped to the query-editor control because ALV grid cells also expose textbox roles after a result renders.
 10. Do not repeat the browser portion on NPL; repeat only the ADT activation/syntax/Unit/ATC gates there.
-11. On a shared target, restore and explicitly activate the intended `master` object after evidence collection, then verify the relevant baseline tests and active/inactive state. Record an exception only when the maintainer reserves the deployed candidate for immediate follow-up work.
+11. On a shared target, restore and explicitly activate the intended `main` object after evidence collection, then verify the relevant baseline tests and active/inactive state. Record an exception only when the maintainer reserves the deployed candidate for immediate follow-up work.
 
 If FLP cannot open WebGUI because the automation browser blocks a popup, record that environmental failure and use the standalone HTTPS WebGUI URL as a secondary diagnostic path. Before interpreting a runtime failure, verify that the installed report contains the serialized dynpros and GUI statuses required by the test. Classify missing installation metadata separately from a product-code regression, but keep the overall smoke gate blocked until both are green.
 

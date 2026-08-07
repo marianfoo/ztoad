@@ -51,13 +51,13 @@ Setup procedure:
 
 1. Open transaction `ZABAPGIT`.
 2. Create an online repository for `https://github.com/marianfoo/ztoad`.
-3. Select `master` for the initial installation and bind it to the chosen empty package. Keep this shared repository on `master` during normal source-only PR testing.
+3. Select `main` for the initial installation and bind it to the chosen empty package. Keep this shared repository on `main` during normal source-only PR testing.
 4. Pull and activate all objects.
 5. Query inactive objects and require the ZTOAD installation-closure command above to pass. Main-source equality is insufficient for a composite program.
 6. Confirm that the repository status is clean.
 7. Run ZTOAD once with the read-only smoke query below.
 
-If the ARC-1 abapGit bridge is used to restore the shared branch after a coordinated round trip, pass `refs/heads/master`, not only `master`, and verify the selected branch with a fresh `list_repos` call. On the current A4H bridge the short value returned success without changing the repository, while the full ref switched it correctly. Re-run the inactive-child contract after restoration.
+If the ARC-1 abapGit bridge is used to restore the shared branch after a coordinated round trip, pass `refs/heads/main`, not only `main`, and verify the selected branch with a fresh `list_repos` call. On the current A4H bridge a short branch value previously returned success without changing the repository, while the full ref switched it correctly. Re-run the inactive-child contract after restoration.
 
 On A4H, load the private system base URL from the ignored `.env` file as
 `SAP_URL`. The Fiori-shell URL for the transaction is:
@@ -70,11 +70,11 @@ For an offline NPL refresh, create an offline repository bound to the dedicated 
 
 Current ARC-1 TABL `dryRun` requests can still create an inactive draft. After any DDIC dry-run or preflight, compare active/inactive object state immediately; never infer non-mutation from the option name or success text. The A4H abapGit ADT backend also uses version-specific staging/pull XML namespaces, so an empty ARC-1 stage result is not proof of a clean repository—verify the raw bridge result or native client before pushing.
 
-## 4. Local-first TDD flow with a stable `master`
+## 4. Local-first TDD flow with a stable `main`
 
-`master` remains the only long-lived integration/release line and the normal branch of each shared native-abapGit link. Development uses a short-lived pull-request branch so CI and review can evaluate the candidate without placing an unreviewed state on `master`.
+`main` is the only long-lived integration/release line and the normal branch of each shared native-abapGit link. Development uses a short-lived pull-request branch so CI and review can evaluate the candidate without placing an unreviewed state on `main`.
 
-1. Synchronize local `master`, create `codex/<finding-id>`, select one finding, and confirm the target systems have no unrelated differences.
+1. Synchronize local `main`, create `codex/<finding-id>`, select one finding, and confirm the target systems have no unrelated differences.
 2. Research and reproduce the problem on the oldest available affected system. Check fixture and serialized UI-metadata availability before making a spike permanent.
 3. Add the smallest test, replay the original production code, and record the intended red failure.
 4. Write and review a plan under `docs/plans/` covering implementation, ABAP 7.50, Clean ABAP/Clean Core, local/live tests, rollback, browser smoke, and ST22. A security plan must separately state actor prerequisites, proven entry-point reachability, demonstrated sink behavior, and the invariant enforced by the patch so a sink-level proof is not presented as an end-to-end exploit without evidence.
@@ -86,7 +86,7 @@ Current ARC-1 TABL `dryRun` requests can still create an inactive draft. After a
    and test every downstream representation so later generation cannot silently
    restore the bypass.
 6. Run `npm ci`, `npm test`, `git diff --check`, and the final local/security review. Reconcile the review inventory with `git diff --name-only`; generic extension classifiers can omit `.abap`, so every changed ABAP source must be added explicitly and reviewed. For generated or otherwise transformed input, compare pre- and post-transformation semantics, especially comments, quoting, escaping, length limits, and inserted line/token boundaries. Commit and freeze the exact source/object candidate before the expensive live gates, and record its commit plus source hash. Any later `src/` or serialized-object change invalidates the affected live evidence and must be redeployed and rechecked.
-7. Deploy the exact candidate source to SAP_BASIS 750 first through ARC-1/ADT when its real dependencies exist; record any missing ADT prerequisite as blocked. Keep the A4H native-abapGit link on `master` and record an unmerged candidate as a direct deployment. Follow every write with an explicit activation call, active/inactive main-object comparison, and an inactive-child-part query for affected composite objects; a write response, activation option, or equal main-source hash alone does not prove that screens, statuses, texts, and includes are active.
+7. Deploy the exact candidate source to SAP_BASIS 750 first through ARC-1/ADT when its real dependencies exist; record any missing ADT prerequisite as blocked. Keep the A4H native-abapGit link on `main` and record an unmerged candidate as a direct deployment. Follow every write with an explicit activation call, active/inactive main-object comparison, and an inactive-child-part query for affected composite objects; a write response, activation option, or equal main-source hash alone does not prove that screens, statuses, texts, and includes are active.
 8. On NPL, activate only the intended object and run active syntax, all ABAP Unit tests, and complete ATC variants through ARC-1. On A4H/SAP_BASIS 758, repeat those checks and additionally start a fresh browser session for safe smoke and ST22 delta. Verify required dynpros/GUI statuses before attributing an end-to-end failure to the source candidate.
 9. If a correction must be made in SAP, export it through native abapGit or reproduce it locally, then review every serialized/source difference. Never leave an unexported system-only fix.
 10. Perform a final review, update evidence, commit/push the short-lived branch, open the PR, and wait for CI. After the first green run, audit the process/CI, update guidance in the same PR, move the plan to `docs/plans/finished/`, push, and wait again. Put the final run link in the PR description/comment after it passes; committing that run ID would create a new unchecked head and an avoidable CI loop. After maintainer acceptance, use GitHub's squash merge so the PR lands as one Conventional Commit even though its branch preserves red/green/audit history.
@@ -95,9 +95,9 @@ Always test 7.50 first. A change that uses newer syntax may appear correct on 20
 
 Native abapGit branch switching changes real system objects, and abapGit Flow remains beta. Do not use either casually in the shared package. Structural-object PRs may require a dedicated package/system or an explicitly coordinated temporary branch procedure.
 
-A direct candidate deployment changes shared mutable state even when the native-abapGit link remains on `master`. After collecting the evidence, redeploy and explicitly activate the intended `master` object, then verify syntax, the relevant Unit baseline, and active/inactive state. The only exception is an explicit maintainer reservation for immediate follow-up work, recorded with the deployed commit/hash.
+A direct candidate deployment changes shared mutable state even when the native-abapGit link remains on `main`. After collecting the evidence, redeploy and explicitly activate the intended `main` object, then verify syntax, the relevant Unit baseline, and active/inactive state. The only exception is an explicit maintainer reservation for immediate follow-up work, recorded with the deployed commit/hash.
 
-For concurrent PRs that touch the same report, merge one at a time. Rebase the next branch onto the new `master`, combine the production logic and complete test corpus deliberately, recompute aggregate finding/test counts, and rerun affected local/live gates. Long-lived playbooks describe the policy; exact branch counts belong in the finding register and finished plan so parallel PRs do not overwrite one another with incompatible snapshots.
+For concurrent PRs that touch the same report, merge one at a time. Rebase the next branch onto the new `main`, combine the production logic and complete test corpus deliberately, recompute aggregate finding/test counts, and rerun affected local/live gates. Long-lived playbooks describe the policy; exact branch counts belong in the finding register and finished plan so parallel PRs do not overwrite one another with incompatible snapshots.
 
 If ARC-1's pre-write linter reports an incorrect ABAP release, do not weaken all write checks. After the pinned repository abaplint gate passes, disable only the mis-profiled local lint request, retain server preflight, activate explicitly, and run SAP syntax/Unit/ATC/object-state checks. Track the tool mismatch separately from the product change.
 
@@ -224,14 +224,14 @@ Run ATC security checks on the live systems. Local abaplint cannot prove runtime
 
 ## 9. Release flow
 
-Release Please runs on pushes to `master` and reads Conventional Commit messages. The repository starts from version `4.0.4`; its manifest avoids replaying old history. It maintains:
+Release Please runs on pushes to `main` and reads Conventional Commit messages. The repository starts from version `4.0.4`; its manifest avoids replaying old history. It maintains:
 
 - `CHANGELOG.md`
 - `version.txt`
 - the annotated version in `README.md`
 - the annotated version comment in `src/ztoad.prog.abap`
 
-When a `fix:` or `feat:` change reaches `master`, Release Please opens or updates one release PR. Review its version and changelog, let Quality pass, and merge it to create the unprefixed SemVer tag and GitHub Release. The action intentionally uses the repository `GITHUB_TOKEN` by default. GitHub places the resulting pull-request Quality workflow in an approval-required state; a maintainer must approve that run and wait for green CI. See [setup-evaluation.md](setup-evaluation.md) before switching to a GitHub App or fine-grained PAT for unattended triggering.
+When a `fix:` or `feat:` change reaches `main`, Release Please opens or updates one release PR targeted explicitly at `main`. Review its version and changelog, let Quality pass, and merge it to create the unprefixed SemVer tag and GitHub Release. The action intentionally uses the repository `GITHUB_TOKEN` by default. GitHub places the resulting pull-request Quality workflow in an approval-required state; a maintainer must approve that run and wait for green CI. See [setup-evaluation.md](setup-evaluation.md) before switching to a GitHub App or fine-grained PAT for unattended triggering.
 
 ## 10. Primary references
 

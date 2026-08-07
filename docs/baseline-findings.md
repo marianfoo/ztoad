@@ -2,6 +2,10 @@
 
 _Snapshot: 2026-08-07 · candidate `92946fe` from merged master `a5ad27c` · live system A4H client 001, SAP_BASIS 758 SP02 · secondary target NPL client 001, SAP_BASIS 750 SP02_
 
+The GitHub default branch was renamed from `master` to `main` after this dated
+evidence was recorded. Historical commit/branch wording in this register is
+preserved; all new work starts from `main`.
+
 This is the ordered work list for incremental TDD. It records observed defects separately from broad style debt so a new failure cannot disappear inside the legacy backlog. A finding is closed only after its regression test is green locally where possible, green on A4H, and green on the SAP_BASIS 750 target.
 
 ## Baseline evidence

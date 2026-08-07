@@ -31,7 +31,7 @@ _Updated: 2026-08-07_ · _Source: live ARC-1 discovery on A4H and NPL, native ab
 |---|---|---|---|
 | HANA | Yes | database | Database-specific paths can be tested, but tests must remain safe and sanitized |
 | RAP / CDS | Yes | ADT | Not used by the current classic report |
-| abapGit | Yes | native, online | `ZABAPGIT` 1.133.0; ZTOAD repository key `000000000017`, package `ZTOAD`, verified on full ref `refs/heads/master` after the structural-object round trip |
+| abapGit | Yes | native, online | `ZABAPGIT` 1.133.0; ZTOAD repository key `000000000017`, package `ZTOAD`, switched and freshly verified on full ref `refs/heads/main` after the GitHub default-branch migration; no pull was performed by the branch switch |
 | gCTS | Endpoint available | no ZTOAD repository | Native abapGit remains the selected round-trip mechanism |
 | Transports | Yes | CTS | Transportable package `ZTOAD`; active request `A4HK906379`, target `DEV`, layer `ZDEV` |
 | FLP / WebGUI | Yes | HTTPS | Serialized transaction `ZTOAD` resolves through both direct paths; exact `BASE-RUN-006` candidate proves the empty-editor/stream-input/ALV core mode and clean exit |
@@ -48,7 +48,7 @@ The first request created during setup, `A4HK906377`, is an empty local request 
 - **ARC-1 rule inventory**: 158 enabled, 25 disabled
 - **Repository gate**: pinned `@abaplint/cli` with the compatibility-focused rules in `abaplint.json`
 - **Compatibility floor**: SAP_BASIS 750; the separate 7.50 system is still required for the authoritative downport gate
-- **Full quality inventory**: 2,109 findings across 61 rules on exact merged master `5218476`; 2,169 across 63 rules on BASE-BUG-002; diagnostic only until the zero-findings plan is complete
+- **Full quality inventory**: 2,109 findings across 61 rules on exact merged default-branch checkpoint `5218476`; 2,169 across 63 rules on BASE-BUG-002; diagnostic only until the zero-findings plan is complete
 
 ## RAP Constraints Snapshot
 
@@ -74,7 +74,7 @@ The first request created during setup, `A4HK906377`, is an empty local request 
 | ATC `ABAP_CLOUD_READINESS` | Complete candidate run: 709 findings (490 P1, 219 P2); classic Dynpro/generated-program design is not ABAP Cloud compatible |
 | WebGUI smoke | Fresh real-input failure probe returned only the generic error; following read-only `T000` query returned three rows; complete 49-ID ST22 set unchanged |
 | Transaction launch | Standalone WebGUI and FLP `Shell-startGUI` intent both reach the complete ZTOAD transaction closure |
-| Shared target after evidence | Restored and explicitly activated to `origin/master` `a5ad27c`; active/inactive server SHA-256 `202d9d40626428ab051a36de70180985da4e845a67e237d43e1036060db9ed4e`, 106/106 master Unit, no inactive ZTOAD part; native abapGit remained on `refs/heads/master` |
+| Shared target after recorded BASE-RUN-002 evidence | Restored and explicitly activated to the then-default `origin/master` `a5ad27c`; active/inactive server SHA-256 `202d9d40626428ab051a36de70180985da4e845a67e237d43e1036060db9ed4e`, 106/106 baseline Unit, no inactive ZTOAD part. The GitHub branch was later renamed and native abapGit now selects `refs/heads/main`. |
 
 ## Coding Guidance
 
@@ -96,9 +96,9 @@ The first request created during setup, `A4HK906377`, is an empty local request 
 | Purpose | ADT-only minimum-release activation, syntax, ABAP Unit, ATC, and inactive-object gate |
 | ARC-1 | Separate `arc-1-750` profile, pinned to ARC-1 1.0.2; package ceiling configured as `*`; data preview and free SQL disabled |
 | UI boundary | No FLP, WebGUI, SAP GUI, or browser automation for validation; A4H owns UI smoke |
-| ZTOAD state | Complete object set provisioned through native abapGit 1.134.0 offline repository in local package `$ZTOAD2`: PROG, real transparent TABL, TRAN, and SUSO |
+| ZTOAD state | Complete object set provisioned through native abapGit 1.134.0 offline repository in local package `$ZTOAD2`: PROG, real transparent TABL, TRAN, and SUSO. Future reviewed offline ZIPs are generated from exact `origin/main`. |
 | Structural state | BASE-DDIC-001 candidate is active as `#NOT_EXTENSIBLE`; all seven table fields are unchanged and the offline serializer warning is resolved |
-| Completion status | BASE-RUN-002 exact source candidate `92946fe`: syntax 0 errors, 109/109 Unit, complete `DEFAULT` ATC 85 findings (3 P1, 4 P2, 78 P3), and zero inactive ZTOAD parts; restored master is 106/106 with equal active/inactive source |
+| Completion status | BASE-RUN-002 exact source candidate `92946fe`: syntax 0 errors, 109/109 Unit, complete `DEFAULT` ATC 85 findings (3 P1, 4 P2, 78 P3), and zero inactive ZTOAD parts; the restored then-default baseline is 106/106 with equal active/inactive source |
 | ARC-1 table-state caveat | Direct active `TABL` object-state returns 404 on this 7.50 endpoint; automatic and inactive-version reads resolve the active table and report no inactive draft. Explicit activation, exact metadata comparison, search, and the global inactive inventory are the compensating evidence. |
 
 See [the NPL ADT-only validation dossier](docs/research/2026-08-06-npl-adt-only-validation.md) and the [BASE-BUG-001 grammar investigation](docs/research/2026-08-07-base-bug-001-npl-count-grammar.md). No stub DDIC structure may be used to claim compatibility.
