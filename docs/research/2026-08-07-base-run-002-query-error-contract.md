@@ -59,3 +59,14 @@ The problem is not that a specific database exception class is missing from a li
 
 ABAP Unit must cover the deterministic catchable runtime failure, generic error conversion, unchanged successful execution, and empty partial outputs. Existing invalid SELECT/DML syntax tests continue to prove that compiler rejection returns no program. Live acceptance requires exact activation, syntax, all tests, ATC comparison, and inactive-object checks on 750 and 758. A fresh A4H browser session must submit a sanitized read-only statement that fails at runtime, show only the generic error, and add no ST22 entry; a normal read-only query must still produce its result.
 
+## Implemented candidate and validation
+
+Frozen source commit `92946feb19a97925851fe8e34ecb3a2b7e75085c` has local SHA-256 `ff7c4ba0f78a87605b61713e50a0d81db698485343e084b498e8868953038fd8`. Both SAP targets reported equal active/inactive source at server-normalized SHA-256 `7af6d81a2eedd2c0f61459a9e35c72f1d394da06b516e9e6dc20d51ce8db4136` and no inactive ZTOAD part.
+
+- NPL: active syntax had no finding; all 109 Unit tests passed; complete `DEFAULT` ATC returned 85 findings (3 P1, 4 P2, 78 P3), one fewer P3 than the 106-test master baseline; the focused Unit run added no dump.
+- A4H: active syntax had no error and the seven known POSIX warnings; all 109 Unit tests passed; complete `ABAP_CLOUD_READINESS` returned 709 findings (490 P1, 219 P2); `S4HANA_READINESS_2023` remained incomplete because prerequisite evidence was unavailable.
+- Fresh A4H WebGUI: real typing plus blur submitted the sanitized read-only failure probe `SELECT COUNT( * ) FROM T000 WHERE DIV( 1, 0 ) = 0`. The visible UI returned only `Cannot parse the query`, with no technical detail or result. A following `SELECT MANDT FROM T000` returned the three expected client rows and a success status. The complete recent ST22 ID set remained 49 before and after.
+
+The permanent containment regression supplies a nonexistent generated-program handle, which raises at the same external `PERFORM` boundary without allocating another temporary pool. The earlier red arithmetic fixture and the live divide-by-zero probe demonstrate an exception originating inside generated execution. This representation change avoids adding pool-consumption debt to the failure test while preserving the boundary invariant.
+
+After evidence, both shared systems were restored to master `a5ad27cc73a50101441bc2a0c0767108bc25a2fc`. Each target then had equal active/inactive source at server-normalized SHA-256 `202d9d40626428ab051a36de70180985da4e845a67e237d43e1036060db9ed4e`, 106/106 Unit, and no inactive ZTOAD part; NPL syntax was clean and A4H retained only its seven known POSIX warnings.

@@ -26,6 +26,15 @@ SAP separately states that a `GENERATE SUBROUTINE POOL` generation error can sti
 10. **Final review and PR.** Update the finding register and evidence, commit with a Conventional Commit subject, push, open the PR, and wait for required CI.
 11. **Post-green workflow audit.** Review plan fidelity, red/green evidence, exact-candidate discipline, ARC-1 behavior, GitHub output, and CI. Apply only clearly useful process/documentation improvements in the same PR, move this plan to `docs/plans/finished/`, and wait for CI again before squash merge.
 
+## Pre-PR execution record
+
+- Steps 1–9 are complete for frozen source commit `92946feb19a97925851fe8e34ecb3a2b7e75085c`; local source SHA-256 is `ff7c4ba0f78a87605b61713e50a0d81db698485343e084b498e8868953038fd8`.
+- Local configured abaplint, repository contracts, and installation contract are green. The diagnostic quality profile reports 2,483 findings across 62 rules and remains outside the merge gate.
+- NPL is green with 109/109 Unit and complete `DEFAULT` ATC at 85 findings. A4H is green with 109/109 Unit, complete `ABAP_CLOUD_READINESS` accounting at 709 findings, the expected seven syntax warnings, and an unchanged 49-ID ST22 set across the browser smoke. `S4HANA_READINESS_2023` remains explicitly incomplete.
+- The failure-path smoke exposed only the generic message; the normal read-only smoke returned three client rows. Both shared systems were then restored to exact master `a5ad27c`, verified at 106/106 Unit with no inactive ZTOAD part.
+- The final Unit regression uses a missing generated-program handle to exercise the same external-call exception boundary without creating an additional disposable pool. The red arithmetic proof and the live read-only divide-by-zero probe retain coverage of an exception raised inside generated execution. This reduced candidate ATC by one P3 finding compared with master.
+- Steps 10–11 remain: publish the PR, require first green CI, audit the completed workflow, apply any useful process improvement, move this plan to `finished/`, and require CI again.
+
 ## Plan review
 
 - **Compatibility:** `TRY`, `CATCH CX_ROOT`, boolean result flags, and the existing text symbol are supported on SAP_BASIS 750. The external `PERFORM` remains in a FORM because SAP documents this variant as forbidden in classes.

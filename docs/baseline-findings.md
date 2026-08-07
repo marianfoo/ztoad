@@ -1,6 +1,6 @@
 # ZTOAD baseline findings
 
-_Snapshot: 2026-08-07 · candidate `680d051` from merged master `15e6258` · live system A4H client 001, SAP_BASIS 758 SP02 · secondary target NPL client 001, SAP_BASIS 750 SP02_
+_Snapshot: 2026-08-07 · candidate `92946fe` from merged master `a5ad27c` · live system A4H client 001, SAP_BASIS 758 SP02 · secondary target NPL client 001, SAP_BASIS 750 SP02_
 
 This is the ordered work list for incremental TDD. It records observed defects separately from broad style debt so a new failure cannot disappear inside the legacy backlog. A finding is closed only after its regression test is green locally where possible, green on A4H, and green on the SAP_BASIS 750 target.
 
@@ -9,16 +9,16 @@ This is the ordered work list for incremental TDD. It records observed defects s
 | Gate | Result | Interpretation |
 |---|---|---|
 | Repository `npm test` | Passed, 0 configured abaplint findings | Fast compatibility/XML gate is green |
-| Full abaplint quality profile | 2,447 findings across 62 rules | Diagnostic only; the delta is concentrated in focused set-expression/test code. Configured abaplint remains the zero-finding merge gate |
-| A4H SAP syntax | 0 errors, 7 POSIX warnings | Exact `BASE-BUG-005` candidate `680d051` activated successfully; warnings remain the 758 deprecation signal for the 7.50-compatible regex API |
-| A4H ABAP Unit | 106 passed, 0 failed | Exact candidate is green, including UNION operator, duplicate, layout, limit, authorization, literal, and fixed-width-token regressions |
+| Full abaplint quality profile | 2,483 findings across 62 rules | Diagnostic only; the focused execution adapter and tests account for the current delta. Configured abaplint remains the zero-finding merge gate |
+| A4H SAP syntax | 0 errors, 7 POSIX warnings | Exact `BASE-RUN-002` candidate `92946fe` activated successfully; warnings remain the 758 deprecation signal for the 7.50-compatible regex API |
+| A4H ABAP Unit | 109 passed, 0 failed | Exact candidate is green, including generated-runtime containment, sanitized error conversion, and preserved successful execution |
 | A4H ATC `S4HANA_READINESS_2023` | Initial run displayed 0 finding rows | Later evidence shows missing prerequisites; this is not an authoritative zero gate |
-| A4H ATC `ABAP_CLOUD_READINESS` | 697 findings: 487 P1, 210 P2 | Complete run; the increase from 682 is executable report-local test code, retained under `BASE-ARCH-003`, not a Clean Core claim |
-| A4H WebGUI smoke | A fresh session received a multiline/multi-space, read-only two-branch `UNION ALL` aggregate with a final cap of one through real typing and blur; the result grid and success state reported one row | Exact BASE-BUG-005 candidate is green; complete 50-entry ST22 sets before and after had no new ID |
-| NPL SAP syntax / ABAP Unit | 0 errors or warnings; 106 passed, 0 failed | Exact candidate is green on the SAP_BASIS 750 compatibility floor |
-| NPL ATC `DEFAULT` | 86 findings: 3 P1, 4 P2, 79 P3 | Complete exact-candidate run; two fewer P3 findings than master and tracked as legacy debt |
+| A4H ATC `ABAP_CLOUD_READINESS` | 709 findings: 490 P1, 219 P2 | Complete run; the increase is classic execution/test architecture retained under `BASE-ARCH-003`, not a Clean Core claim |
+| A4H WebGUI smoke | A fresh session submitted one sanitized read-only runtime-failure probe and one normal read-only query through real typing and blur | Failure showed only the generic message; success returned three client rows; the complete 49-ID ST22 set was unchanged |
+| NPL SAP syntax / ABAP Unit | 0 errors or warnings; 109 passed, 0 failed | Exact candidate is green on the SAP_BASIS 750 compatibility floor |
+| NPL ATC `DEFAULT` | 85 findings: 3 P1, 4 P2, 78 P3 | Complete exact-candidate run; one fewer P3 finding than the 106-test master baseline |
 
-All merged fixes through `BASE-BUG-004` are preserved in this candidate. Exact source commit `680d0514461d70fbc58dac2f432485c0afec8eda` has local SHA-256 `f10cbc6505e3a3df59a4c72df8486dedbba51f8d7eaa9d2f67c5a9d4f698e5b2`; both systems reported equal active/inactive source at server-normalized SHA-256 `202d9d40626428ab051a36de70180985da4e845a67e237d43e1036060db9ed4e`. NPL and A4H each passed 106/106 Unit tests and had no inactive ZTOAD part. `S4HANA_READINESS_2023` returned no rows but remains incomplete because its prerequisite checks are unavailable. After evidence, both systems were restored to master `15e6258`: 91/91 Unit, equal active/inactive server SHA-256 `fa0332e5679236d636bece64cbb3e28b3dccf2e8b21112c69efadd550ea78d0b`, and no inactive ZTOAD part.
+All merged fixes through `BASE-BUG-005` are preserved in this candidate. Exact source commit `92946feb19a97925851fe8e34ecb3a2b7e75085c` has local SHA-256 `ff7c4ba0f78a87605b61713e50a0d81db698485343e084b498e8868953038fd8`; both systems reported equal active/inactive source at server-normalized SHA-256 `7af6d81a2eedd2c0f61459a9e35c72f1d394da06b516e9e6dc20d51ce8db4136`. NPL and A4H each passed 109/109 Unit tests and had no inactive ZTOAD part. `S4HANA_READINESS_2023` returned no rows but remains incomplete because its prerequisite checks are unavailable. After evidence, both systems were restored to master `a5ad27cc73a50101441bc2a0c0767108bc25a2fc`: 106/106 Unit, equal active/inactive server SHA-256 `202d9d40626428ab051a36de70180985da4e845a67e237d43e1036060db9ed4e`, and no inactive ZTOAD part.
 
 ## Ordered findings register
 
@@ -38,7 +38,7 @@ Priority meanings: **P0** blocks the requested test workflow or is an immediate 
 | BASE-BUG-006 | P1 | [Issue #2](https://github.com/marianfoo/ztoad/issues/2): no serialized `TRAN ZTOAD` existed, so FLP/WebGUI could not launch a stable ZTOAD transaction directly. | Repository contract, native-abapGit round trip, direct FLP and standalone WebGUI launch, ST22 delta, and ADT-only 7.50 availability check. | Fixed: local contract green; native A4H object clean; both A4H launch paths reach ZTOAD with no new dump; NPL offline installation includes `TRAN ZTOAD` and UI execution remains intentionally out of scope. |
 | BASE-BUG-007 | P1 | [Issue #5](https://github.com/marianfoo/ztoad/issues/5): source-only/manual installation was incomplete. A4H had seven inactive ZTOAD composite parts even though main-source equality was green. Native-abapGit activation restored source, CUA/GUI status, four dynpros, and texts; current abapGit also moved dynpro flow logic into four separate files. | Local repository/flow-logic closure contract plus live inactive-inventory gate; coordinated native-abapGit pull/activation; selective clean round trip; `STATUS010`/read-only dispatch and ST22 smoke. | Fixed and merged in PR #22: both systems now have the complete object set and zero inactive ZTOAD parts. The separate post-dispatch runtime defect is fixed by `BASE-RUN-006`. |
 | BASE-RUN-006 | P1 | After `STATUS010` dispatch, ZTOAD queued desktop-only editor population/selection, tree refresh, history refresh, and splitter operations in WebGUI. Automatic PBO flush then terminated with CNDP 006; result-only changes could not repair the poisoned queue. SAP's standard TextEdit diagnostic is green, and an isolated empty TextEdit/stream-read/ALV spike executed the sanitized query successfully. | Pure frontend-capability Unit tests; preserve desktop behavior; exact-candidate syntax/Unit/ATC/object state; fresh A4H query result plus ST22 delta. | Fixed: capability tests pass on both releases; A4H last-statement ALV smoke and clean exit are green with no new ST22 dump; NPL UI is not applicable |
-| BASE-RUN-002 | P1 | Generated-program failures are not isolated into a stable error contract; dumps or generated source can leak query details. | Syntax/runtime exception tests with sanitized error output and no ST22 dump for expected bad input. | Open |
+| BASE-RUN-002 | P1 | Generated-program failures crossed directly into report orchestration, while raw compiler text could expose query details. | Deterministic runtime containment, sanitized synthetic detail, preserved success, empty partial output, exact two-release gates, and a read-only WebGUI/ST22 delta. | Fixed candidate `92946fe`: 109/109 on both releases; exact activation/state and complete ATC accounting recorded; failure UI is generic, normal result is green, and ST22 is unchanged |
 | BASE-RUN-003 | P1 | The generated subroutine-pool approach has a finite per-session pool budget and encourages session restart behavior instead of bounded execution objects. | Repeated-query stress test across the documented maximum, checking graceful handling and cleanup. | Open |
 | BASE-RUN-004 | P1 | `UP TO 0 ROWS` means unlimited results. A user can accidentally run an unbounded query or expensive aggregation in an interactive tool. | Row-limit policy tests, explicit unlimited confirmation/policy test, timeout/load test on disposable data. | Open |
 | BASE-RUN-005 | P1 | INSERT parsing is quote- and whitespace-sensitive and relies on dynamic component assignment/conversion. Truncation, missing fields, and conversion failures need a defined result. | Values/SET variants, embedded quotes, numeric/date conversion, too-long values, missing/duplicate fields; isolated Z table only. | Open |
@@ -62,7 +62,7 @@ This diagnostic profile is intentionally not the merge gate yet. Run `npm run li
 
 ## Initial executable tests
 
-The program now ends with ten harmless, short ABAP Unit classes:
+The program now ends with eleven harmless, short ABAP Unit classes:
 
 - `LTCL_SQL_SET_EXPRESSION`: 3 tests for suffix attachment, source reconstruction, and top-level UNION detection.
 - `LTC_QUERY_PARSER`: 35 tests for the original SELECT contract plus set operators, set/single and limit rejection, top-level clause boundaries, multiline input, literal keyword matrices, authorized/unauthorized nested sources, two-level nesting, joins, comments, and fail-closed dynamic/CTE/path/hierarchy sources.
@@ -74,5 +74,6 @@ The program now ends with ten harmless, short ABAP Unit classes:
 - `LTC_LINE_SPLITTER`: 6 tests for short/exact/long safe lines, unsafe hard-cut and literal-space rejection, and column-one comment prevention.
 - `LTC_COMMAND_PARSER`: 7 tests for UPDATE, DELETE FROM, default/legacy-flag Native SQL rejection, DML statement-injection rejection, invalid-syntax return semantics, and preserved valid DML generation.
 - `LTCL_EDITOR_CONFIGURATION`: 4 tests selecting the supported editor and proving the restricted WebGUI capability profile plus the unchanged desktop profile.
+- `LTCL_QUERY_EXECUTION`: 3 tests for catchable generated-runtime containment, generic technical-detail conversion, empty partial output, and preserved successful execution.
 
 These are characterization tests: they make current behavior explicit without claiming that every behavior is correct. For each open bug, add the smallest failing regression test first, then implement the fix, then refactor while all earlier tests remain green.

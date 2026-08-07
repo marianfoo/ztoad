@@ -64,17 +64,17 @@ The first request created during setup, `A4HK906377`, is an empty local request 
 
 | Check | Result on A4H |
 |---|---|
-| Candidate branch / exact tested commit | `codex/fix-base-bug-001-npl` / source commit `9e8d881` |
+| Candidate branch / exact tested commit | `codex/base-run-002` / source commit `92946fe` |
 | Package / transport | `ZTOAD` / `A4HK906379` |
 | Repository objects | PROG `ZTOAD`, TABL `ZTOAD`, SUSO `ZTOAD_AUTH`, TRAN `ZTOAD` |
-| Active/inactive state | Candidate main source was equal at server SHA-256 `c7d4cbcfcb9a3af1d322e3f912c586dfee12b8af0fe608049807cfa61e94cccd`; global inactive inventory contained no ZTOAD child part |
-| SAP syntax | 0 errors; 2 pre-existing POSIX warnings |
-| ABAP Unit | 67 passed, 0 failed |
+| Active/inactive state | Candidate main source was equal at server SHA-256 `7af6d81a2eedd2c0f61459a9e35c72f1d394da06b516e9e6dc20d51ce8db4136`; global inactive inventory contained no ZTOAD child part |
+| SAP syntax | 0 errors; 7 pre-existing POSIX warnings |
+| ABAP Unit | 109 passed, 0 failed |
 | ATC `S4HANA_READINESS_2023` | 0 rows returned; non-authoritative because known prerequisites are unavailable |
-| ATC `ABAP_CLOUD_READINESS` | Complete candidate run: 682 findings (474 P1, 208 P2); classic Dynpro/GUI design is not ABAP Cloud compatible |
-| WebGUI smoke | Not rerun for the test-literal-only candidate; prior fresh editor/ALV/F3/ST22 evidence remains applicable because production and serialized UI objects are unchanged |
+| ATC `ABAP_CLOUD_READINESS` | Complete candidate run: 709 findings (490 P1, 219 P2); classic Dynpro/generated-program design is not ABAP Cloud compatible |
+| WebGUI smoke | Fresh real-input failure probe returned only the generic error; following read-only `T000` query returned three rows; complete 49-ID ST22 set unchanged |
 | Transaction launch | Standalone WebGUI and FLP `Shell-startGUI` intent both reach the complete ZTOAD transaction closure |
-| Shared target after evidence | Restored and explicitly activated to `origin/master` `d532b2e`; active/inactive server SHA-256 `e32d7d3b8bebdb38457cd81f52e90a3b00dc0e830ac537b7690b70cee4544897`, 67/67 master Unit, no inactive ZTOAD part; native abapGit remained on `refs/heads/master` |
+| Shared target after evidence | Restored and explicitly activated to `origin/master` `a5ad27c`; active/inactive server SHA-256 `202d9d40626428ab051a36de70180985da4e845a67e237d43e1036060db9ed4e`, 106/106 master Unit, no inactive ZTOAD part; native abapGit remained on `refs/heads/master` |
 
 ## Coding Guidance
 
@@ -98,7 +98,7 @@ The first request created during setup, `A4HK906377`, is an empty local request 
 | UI boundary | No FLP, WebGUI, SAP GUI, or browser automation for validation; A4H owns UI smoke |
 | ZTOAD state | Complete object set provisioned through native abapGit 1.134.0 offline repository in local package `$ZTOAD2`: PROG, real transparent TABL, TRAN, and SUSO |
 | Structural state | BASE-DDIC-001 candidate is active as `#NOT_EXTENSIBLE`; all seven table fields are unchanged and the offline serializer warning is resolved |
-| Completion status | Exact native candidate `4206a1a`: explicit table/report activation, syntax 0 errors, 67/67 Unit, complete `DEFAULT` ATC 88 unchanged findings (3 P1, 4 P2, 81 P3), and zero inactive ZTOAD parts |
+| Completion status | BASE-RUN-002 exact source candidate `92946fe`: syntax 0 errors, 109/109 Unit, complete `DEFAULT` ATC 85 findings (3 P1, 4 P2, 78 P3), and zero inactive ZTOAD parts; restored master is 106/106 with equal active/inactive source |
 | ARC-1 table-state caveat | Direct active `TABL` object-state returns 404 on this 7.50 endpoint; automatic and inactive-version reads resolve the active table and report no inactive draft. Explicit activation, exact metadata comparison, search, and the global inactive inventory are the compensating evidence. |
 
 See [the NPL ADT-only validation dossier](docs/research/2026-08-06-npl-adt-only-validation.md) and the [BASE-BUG-001 grammar investigation](docs/research/2026-08-07-base-bug-001-npl-count-grammar.md). No stub DDIC structure may be used to claim compatibility.
