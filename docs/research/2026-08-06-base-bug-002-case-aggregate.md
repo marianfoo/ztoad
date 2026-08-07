@@ -63,3 +63,10 @@ This deliberately supports direct qualified or unqualified result columns, inclu
 - The end-to-end generator regression must assert both successful pool generation and alias-preserving field metadata.
 - NPL remains unavailable for exact ZTOAD validation because its PROG/TABL objects have not been provisioned. No NPL GUI fallback is permitted.
 
+## 2026-08-07 integration review
+
+The first quoted-keyword test used the one-token literal `'THEN'`. A whitespace splitter ignores that token because its quotes remain attached, but this did not prove literal awareness. Valid literals containing spaces expose the gap: both `'X THEN Y'` and the doubled-quote form `'X'' THEN Y'` produce a standalone `THEN` token, causing the analyzer to return before reaching the real CASE branch.
+
+The integration candidate therefore masks complete single-quoted literals before looking for `CASE`/`THEN`, preserves outside characters and spacing, handles doubled SQL quotes, and returns no type reference for an unbalanced literal. Two focused analyzer regressions cover the spaced and doubled-quote lookalikes. This is a typing-only transformation; the original query text still reaches the existing validator, authorization scanner, and generated-source boundary unchanged.
+
+PR #21 predates several merged report changes. Its earlier 55/56 red, 63/63 green, 668-finding ATC run, GUI-status limitation, and candidate hashes remain useful historical evidence but are not acceptance evidence for the rebased result. The final branch must replay red/green Unit evidence, exact activation/state, both ATC variants, WebGUI core smoke, ST22 delta, and master restoration after PR #24 has merged.
