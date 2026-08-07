@@ -8518,7 +8518,10 @@ CLASS ltc_query_generator IMPLEMENTATION.
     generate_query(
       EXPORTING
         query = `SELECT COUNT( * ) FROM T000`
-             && ` UNION ALL SELECT COUNT( * ) FROM T000`
+             && cl_abap_char_utilities=>newline
+             && `UNION   ALL`
+             && cl_abap_char_utilities=>newline
+             && `SELECT COUNT( * ) FROM T000`
       IMPORTING generated_program = generated_program
                 new_syntax = new_syntax
                 count_query = count_query ).
