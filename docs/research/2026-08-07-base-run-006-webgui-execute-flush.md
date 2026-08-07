@@ -1,41 +1,83 @@
-# BASE-RUN-006 initial characterization: WebGUI execute flush
+# BASE-RUN-006: WebGUI Control Framework execution boundary
 
-_Observed 2026-08-07 on A4H client 001, SAP_BASIS 758 SP02, after the complete `BASE-BUG-007` native-abapGit activation. This note records a sanitized reproduction boundary, not a finished root-cause claim._
+_Observed 2026-08-07 on A4H client 001, SAP_BASIS/SAP_UI 758 SP02, after the complete `BASE-BUG-007` native-abapGit activation. All queries and editor contents used below are sanitized and read-only._
 
-## Reproduction
+## Reproduction and baseline
 
-1. Start a fresh FLP/WebGUI transaction `ZTOAD`.
-2. Confirm the editor, DDIC controls, title, and GUI status render without the former `STATUS010` error.
-3. Enter the read-only query `SELECT SINGLE mandt FROM t000`.
-4. Choose **Execute**.
+1. Start a fresh WebGUI transaction `ZTOAD`.
+2. Enter `SELECT SINGLE mandt FROM t000`.
+3. Choose **Execute**.
 
-The transaction leaves the application and creates a new ST22 entry. No write statement, native SQL, production data, or confidential query text is involved.
+The original program left the application and created a `MESSAGE_TYPE_X` dump at 2026-08-07 04:31:22 UTC in `SAPLOLEA`, function `AC_SYSTEM_FLUSH`, with CNDP 006, screen 0010, `STATUS010`, and `SY-UCOMM = EXECUTE`. `SY-SUBRC = 4` identified a queued property-get failure. This proves that the restored GUI status dispatches correctly and that the failure is a separate Control Framework runtime defect.
 
-## Sanitized dump evidence
+## Official SAP contract
 
-- timestamp: 2026-08-07 04:31:22 UTC;
-- runtime error: `MESSAGE_TYPE_X`;
-- termination program/form: `SAPLOLEA`, `AC_SYSTEM_FLUSH`, line 35;
-- Control Framework message: CNDP 006, error processing a control;
-- main program/event: `ZTOAD`, `START-OF-SELECTION`, with screen 0010 active;
-- command state: `SY-UCOMM = EXECUTE` and GUI status `STATUS010`.
+SAP documents `SET_TEXT_AS_STREAM`, `GET_TEXT_AS_STREAM`, `SET_TEXT_AS_R3TABLE`, and `GET_TEXT_AS_R3TABLE` as synchronous whole-text transfers. It also documents the TextEdit attribute cache and the need to flush before relying on cached state. The ALV method matrix marks `SET_TABLE_FOR_FIRST_DISPLAY` as usable in SAP GUI for HTML. These contracts support a TextEdit-plus-ALV WebGUI mode, but they do not make every desktop tree, selection, focus, or splitter operation portable.
 
-This proves the inactive GUI-status installation defect is no longer the dispatch blocker. It does not yet prove which frontend control fails.
+- [Special Considerations for the SAP Textedit](https://help.sap.com/docs/ABAP_PLATFORM_NEW/70396d7dec4c4f19b9ca3b2e47559d12/4d7c386419a00f88e10000000a42189b.html)
+- [Setting and Getting Text](https://help.sap.com/docs/ABAP_PLATFORM_NEW/70396d7dec4c4f19b9ca3b2e47559d12/4d7c35f419a00f88e10000000a42189b.html)
+- [Methods of Class CL_GUI_ALV_GRID](https://help.sap.com/docs/ABAP_PLATFORM_NEW/70396d7dec4c4f19b9ca3b2e47559d12/22a3f5ecd2fe11d2b467006094192fe3.html)
 
-## Source path and current hypothesis
+## Boundary matrix
 
-`USER_COMMAND_0010` calls `QUERY_PROCESS`. For a successful SELECT, the form generates and runs the read-only subroutine, refreshes DDIC state, and calls `RESULT_DISPLAY`. That form configures `CL_GUI_ALV_GRID`, reads splitter state, and explicitly calls `CL_GUI_CFW=>FLUSH` before revealing the result row. The dump shape makes this result/control boundary the first place to instrument, but an earlier queued editor/tree/splitter operation could also be the command that the flush reports.
+The same fresh-session query was replayed while changing one phase at a time. Each spike was syntax-checked, explicitly activated, and discarded after measurement.
 
-Do not fix this by removing every flush or by suppressing the dump. Research must isolate the first unsupported/malformed queued control operation and verify whether the WebGUI result control, splitter call, DDIC refresh, or another queued operation is responsible.
+| Boundary | Result | Interpretation |
+|---|---|---|
+| Original desktop-style workspace | `MESSAGE_TYPE_X`, property get | At least one queued control operation is not valid in this WebGUI cycle. |
+| Skip only result display | Red | ALV presentation is not the only cause. |
+| Hard-code the harmless query; omit DDIC, result, and history work | Green | SQL parsing/generation/execution and screen dispatch are sound. |
+| Re-enable DDIC refresh | Red | The dynamic DDIC tree is an independent incompatible boundary. |
+| Replace `DELETE_ALL_NODES`, then also omit root expansion | Red | The complete runtime tree rebuild, not one delete call, is unsafe here. |
+| Real ALV with splitter reads/writes omitted | Green | `CL_GUI_ALV_GRID->SET_TABLE_FOR_FIRST_DISPLAY` is usable. |
+| Re-enable result splitter get/set | Red | Splitter state/reveal operations are an independent incompatible boundary. |
+| Re-enable repository/history refresh | Red | The repository tree refresh is another independent incompatible boundary. |
+| Editor selected-text/cursor getters | Red | WebGUI cannot use the desktop active-selection algorithm. |
+| Full text via `GET_TEXT_AS_R3TABLE` | Red in the combined desktop queue | The table property path is not a safe execution adapter in this workspace. |
+| Full text via `GET_TEXT_AS_STREAM`, while desktop initialization remained queued | Red | Changing only the getter cannot repair the poisoned automation queue. |
+| SAP standard transaction `SAPTEXTEDIT_TEST_2`, edit plus **Save to R/3 table** | Green, no dump | A4H/ITS has working TextEdit transfer in general; this is not a missing system-wide TextEdit capability. |
+| ZTOAD two-pane layout, bare TextEdit construction | Green | The TextEdit control itself and the main splitter are valid. |
+| Add initial `SET_TEXT_AS_R3TABLE` population | Red, `SY-SUBRC = 2` method-call failure | Initial server-to-control text population is the remaining launch failure. |
+| Bare TextEdit plus ALV, stream read, no desktop trees/sizing/history | Green | Browser input was read, the query ran, ALV showed client `000`, and the success message reported one row. |
 
-## TDD entry criteria
+The green core execution completed after 06:27:30 UTC with no later ST22 entry. The exact UI evidence was `SELECT SINGLE mandt FROM t000`, ALV row `000 / 1`, and `Query executed in 0.00 seconds. 1 entries found`.
 
-1. Reproduce in a fresh session and capture the ST22 before/after identifiers.
-2. Spike one phase boundary at a time with the same sanitized query: execute without result presentation, result-object setup without explicit reveal, splitter height read, and explicit flush.
-3. Once the failing operation is known, add the smallest pure policy/orchestration test that is red on the original path. If the behavior is frontend-only, keep an explicit live integration regression as a required gate rather than pretending ABAP Unit can prove control support.
-4. Preserve desktop behavior and ABAP 7.50 syntax. Use ARC-1/ADT only on NPL; browser validation remains A4H-only.
-5. Accept the fix only when syntax, all Unit tests, ATC delta, fresh read-only result smoke, and ST22 delta are green.
+## Root cause
 
-## Status
+`BASE-RUN-006` is not one missing flush. ZTOAD treated SAP GUI for HTML as a drop-in replacement for a desktop Control Framework workspace and queued several operations whose execution contracts do not hold in this WebGUI lifecycle:
 
-Open. This finding independently blocks complete WebGUI query smoke; it does not reopen the structurally green `BASE-BUG-007` installation closure.
+- initial R3-table population and focus/selection behavior for the query editor;
+- runtime rebuilds of the repository and DDIC trees;
+- frontend splitter state reads and row-height changes;
+- automatic history refresh after execution.
+
+The automatic PBO flush reports whichever incompatible operation reaches the frontend first, which is why later result-path changes alone could not fix the dump. Removing the whole flush would only hide the real boundary and leave an invalid queue.
+
+## Recommended product contract
+
+Keep the complete four-pane, preloaded, multi-tab desktop workspace unchanged. Give WebGUI an explicit core mode:
+
+- a two-pane layout containing an initially empty TextEdit and the ALV result;
+- whole-text transfer through `GET_TEXT_AS_STREAM`, followed by deterministic selection of the last complete statement without reading frontend cursor state;
+- no selected-statement/cursor semantics;
+- no dynamic repository/DDIC tree, automatic history persistence, initial text preload, frontend focus request, or splitter resizing;
+- only commands whose controls and frontend services are proven in this mode.
+
+This is a deliberate capability adapter, not silent exception suppression. The missing convenience features should be visible in documentation and may be reintroduced individually only with a focused WebGUI integration test.
+
+## TDD acceptance
+
+1. A pure capability-policy Unit test must fail against the legacy desktop assumptions and turn green with the WebGUI core contract.
+2. Desktop policy tests must prove that the existing editor, workspace, selection, preload, splitter, and history behavior is retained.
+3. The exact candidate must pass local abaplint/repository tests, SAP syntax, all ABAP Unit tests, ATC comparison, activation/object-state checks, a fresh WebGUI read-only query, and an ST22 delta.
+4. NPL remains ADT-only and prerequisite-blocked until its real `ZTOAD` table exists; no browser claim is made there.
+
+## System conclusion
+
+No missing A4H system object or general TextEdit service was found. Native transaction/screen/status installation is complete, and SAP's own TextEdit diagnostic succeeds. The remaining defect is ZTOAD's unscoped desktop-control orchestration. A future SAP GUI for HTML patch may broaden supported operations, but ZTOAD must still advertise and test its frontend capabilities explicitly.
+
+## Exact-candidate acceptance
+
+Commit `31eca9936202b63874ba089e3744fe9971dfa0e4` implements the capability adapter. Its local source SHA-256 is `4b4823a5db169697696d71edf42b432ca66db0d8585c36066a3bd3817f61a2e5`. On A4H it was explicitly activated with 0 syntax errors, 2 pre-existing POSIX warnings, 57/57 Unit tests, equal active/inactive source, and no inactive ZTOAD child part.
+
+A fresh WebGUI session accepted two sanitized read-only statements and executed the final `SELECT SINGLE mandt FROM t000`, proving the cursor-free selection contract. ALV displayed `000 / 1`, the success message reported one entry, F3 exited cleanly, and ST22 remained unchanged after 06:26:10 UTC. The shared object was then restored and activated to exact `origin/master`; this source-only candidate never switched the native-abapGit repository away from `master`.

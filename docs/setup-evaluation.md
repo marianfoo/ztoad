@@ -83,7 +83,7 @@ Recommendation: retain report-local tests until parser/generator areas are extra
 
 ### 12. Full abaplint gate
 
-The pinned local default inventory is 1,857 findings across 57 rules. `npm run lint:quality` now reproduces it without making every PR red. Recommendation: burn the list down in correctness/architecture/mechanical phases and add `npm run lint:quality -- --strict` to required CI only when it reaches zero. See the [research](research/2026-08-06-abaplint-quality-roadmap.md) and [active plan](plans/abaplint-zero-findings.md).
+Exact integrated master `2360fe4` has 2,051 findings across 61 rules; the `BASE-RUN-006` candidate is 2,109 across the same 61 rules. `npm run lint:quality` reproduces the inventory without making every PR red. Recommendation: burn the list down in correctness/architecture/mechanical phases and add `npm run lint:quality -- --strict` to required CI only when it reaches zero. See the [research](research/2026-08-06-abaplint-quality-roadmap.md) and [active plan](plans/abaplint-zero-findings.md).
 
 ## Open-issue orientation for the next phase
 
@@ -95,4 +95,4 @@ The pinned local default inventory is 1,857 findings across 57 rules. `npm run l
 | #2 Transaction code | Requires a serialized `TRAN` object, not only source. | Create it in SAP, export through native abapGit, and validate on both systems. |
 | #5 Manual installation | Source-only copying is incomplete because the report has dynpros/table/auth metadata. | Native-abapGit installation and inactive-child closure are now verified; query execution failures remain separate runtime findings. |
 
-The setup also discovered `BASE-RUN-001`: WebGUI startup dumped in `CL_GUI_ABAPEDIT`. The later BASE-RUN-001 candidate fixes editor startup/render/input. `BASE-BUG-007` restores the complete active program metadata, so dispatch now reaches `EXECUTE`; the resulting `SAPLOLEA` Control Framework flush dump is independently tracked as `BASE-RUN-006`. See [baseline-findings.md](baseline-findings.md) for the complete ordered register and current evidence. No existing GitHub issue was closed during the original baseline characterization.
+The setup also discovered `BASE-RUN-001`: WebGUI startup dumped in `CL_GUI_ABAPEDIT`. The later BASE-RUN-001 candidate fixed editor startup/render/input, and merged `BASE-BUG-007` restored the complete active program metadata. `BASE-RUN-006` then isolated the remaining `SAPLOLEA` flush failures and implements a tested WebGUI core profile: empty stream-read editor, deterministic last-statement execution, ALV result, and clean exit without desktop tree/history/splitter operations. See [baseline-findings.md](baseline-findings.md) for the complete ordered register and current evidence.

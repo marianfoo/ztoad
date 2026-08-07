@@ -1,6 +1,6 @@
 # Plan: reduce the full abaplint inventory to zero
 
-_Status: active · Raw `master` baseline: 1,857 findings in 57 default rules on 2026-08-06_
+_Status: active · Initial baseline: 1,857 findings in 57 default rules on 2026-08-06 · integrated `master` `2360fe4` checkpoint: 2,051 findings in 61 rules on 2026-08-07_
 
 ## Goal
 

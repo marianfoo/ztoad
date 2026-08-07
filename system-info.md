@@ -1,6 +1,6 @@
 # System Info: A4H / ZTOAD test matrix
 
-_Updated: 2026-08-06_ · _Source: live ARC-1 discovery on A4H and NPL, native abapGit, SAP syntax/Unit/ATC runs, and A4H WebGUI smoke testing_
+_Updated: 2026-08-07_ · _Source: live ARC-1 discovery on A4H and NPL, native abapGit, SAP syntax/Unit/ATC runs, and A4H WebGUI smoke testing_
 
 ## Identity
 
@@ -31,10 +31,10 @@ _Updated: 2026-08-06_ · _Source: live ARC-1 discovery on A4H and NPL, native ab
 |---|---|---|---|
 | HANA | Yes | database | Database-specific paths can be tested, but tests must remain safe and sanitized |
 | RAP / CDS | Yes | ADT | Not used by the current classic report |
-| abapGit | Yes | native, online | `ZABAPGIT` 1.133.0; ZTOAD repository key `000000000017`, package `ZTOAD`, temporarily coordinated on branch `codex/fix-base-bug-006` for the structural-object round trip |
+| abapGit | Yes | native, online | `ZABAPGIT` 1.133.0; ZTOAD repository key `000000000017`, package `ZTOAD`, verified on full ref `refs/heads/master` after the structural-object round trip |
 | gCTS | Endpoint available | no ZTOAD repository | Native abapGit remains the selected round-trip mechanism |
 | Transports | Yes | CTS | Transportable package `ZTOAD`; active request `A4HK906379`, target `DEV`, layer `ZDEV` |
-| FLP / WebGUI | Yes | HTTPS | Serialized transaction `ZTOAD` resolves through both direct paths and reaches the editor; query dispatch is still blocked by missing `STATUS010` |
+| FLP / WebGUI | Yes | HTTPS | Serialized transaction `ZTOAD` resolves through both direct paths; exact `BASE-RUN-006` candidate proves the empty-editor/stream-input/ALV core mode and clean exit |
 | UI5 repository | Yes | ADT | Not required for ZTOAD |
 | AMDP debugging | No endpoint | — | Not required for ZTOAD |
 | Text search | No | ICF disabled | Use object search/source reads instead |
@@ -44,11 +44,11 @@ The first request created during setup, `A4HK906377`, is an empty local request 
 ## Lint Configuration
 
 - **ARC-1 preset**: `onprem`
-- **ARC-1 ABAP version**: `v758`
+- **ARC-1 system release**: SAP_BASIS 758; the pre-write local linter incorrectly selects `v702`, tracked as `BASE-TOOL-003`
 - **ARC-1 rule inventory**: 158 enabled, 25 disabled
 - **Repository gate**: pinned `@abaplint/cli` with the compatibility-focused rules in `abaplint.json`
 - **Compatibility floor**: SAP_BASIS 750; the separate 7.50 system is still required for the authoritative downport gate
-- **Baseline full-rule audit**: 1,857 findings across 57 rules on `master`; BASE-RUN-001 candidate 1,878 with 21 explained adapter diagnostics
+- **Full quality inventory**: 2,051 findings across 61 rules on exact integrated master `2360fe4`; 2,109 across the same 61 rules on `BASE-RUN-006`; diagnostic only until the zero-findings plan is complete
 
 ## RAP Constraints Snapshot
 
@@ -64,27 +64,28 @@ The first request created during setup, `A4HK906377`, is an empty local request 
 
 | Check | Result on A4H |
 |---|---|
-| Candidate branch / transaction commit | `codex/fix-base-bug-006` / `8fb3131` |
+| Candidate branch / exact tested commit | `codex/fix-base-run-006` / `31eca9936202b63874ba089e3744fe9971dfa0e4` |
 | Package / transport | `ZTOAD` / `A4HK906379` |
 | Repository objects | PROG `ZTOAD`, TABL `ZTOAD`, SUSO `ZTOAD_AUTH`, TRAN `ZTOAD` |
-| Active/inactive state | Main-source hashes are identical; ARC-1 still lists program parts/screens/texts as inactive, tracked as installation drift for the process audit/`BASE-BUG-007` |
-| SAP syntax | 0 errors; 4 warnings |
-| ABAP Unit | 19 passed, 0 failed |
+| Active/inactive state | Candidate main source was equal at server SHA-256 `138d7cf38e68649abb7d714093afc809a27f7a26ca98b511d15dec4ef68d9e36`; global inactive inventory contained no ZTOAD child part |
+| SAP syntax | 0 errors; 2 pre-existing POSIX warnings |
+| ABAP Unit | 57 passed, 0 failed |
 | ATC `S4HANA_READINESS_2023` | 0 rows returned; non-authoritative because known prerequisites are unavailable |
-| ATC `ABAP_CLOUD_READINESS` | 768 findings (463 P1, 305 P2); classic Dynpro/GUI design is not ABAP Cloud compatible |
-| WebGUI smoke | Fresh final launch renders the plain text editor and accepts `SELECT SINGLE mandt FROM t000`; no new ST22 dump |
-| Transaction launch | Standalone WebGUI and FLP `Shell-startGUI` intent both reach ZTOAD; pre/post launch ST22 lists are identical |
-| Remaining UI prerequisite | A4H installation lacks GUI status `STATUS010`, so query dispatch is blocked by `BASE-BUG-007` |
+| ATC `ABAP_CLOUD_READINESS` | Complete candidate run: 682 findings (474 P1, 208 P2); classic Dynpro/GUI design is not ABAP Cloud compatible |
+| WebGUI smoke | Fresh empty editor accepted `T002` then `T000`; the last statement executed, ALV showed `000 / 1`, F3 exited cleanly, and ST22 stayed unchanged after 06:26:10 UTC |
+| Transaction launch | Standalone WebGUI and FLP `Shell-startGUI` intent both reach the complete ZTOAD transaction closure |
+| Shared target after evidence | Restored and explicitly activated to `origin/master` `2360fe4`; active/inactive server SHA-256 `21ef81d0b925bca71182822a0e9650cb80b32c6e3fd3ae4d1d73576011cb74b7`, no inactive ZTOAD part |
 
 ## Coding Guidance
 
 - Target **SAP_BASIS 750 / ABAP 7.50** syntax and APIs unless the compatibility policy is explicitly changed.
 - Treat A4H as the **SAP_BASIS 758** compile, ATC, ABAP Unit, and modern-runtime target.
 - This application is classic Dynpro/Control Framework software. Clean-core Level A is not a realistic target without replacing the UI and execution architecture; the near-term on-premise target is Level B with internal/unsupported calls removed or isolated.
-- Never infer browser compatibility from activation. The current `CL_GUI_ABAPEDIT` path is proven to dump in WebGUI and needs a tested fallback or replacement.
+- Never infer browser compatibility from activation. WebGUI uses the tested TextEdit/ALV core capability profile; desktop keeps the complete ABAP-editor/tree/multi-tab workspace.
 - Keep native SQL disabled by default. Any parser/executor change needs explicit authorization, injection, row-limit, and error-leakage tests.
 - Use native abapGit for complete object round trips. ARC-1 remains preferred for reads, targeted source writes, activation, syntax, ABAP Unit, ATC, object state, and ST22 diagnostics.
 - ARC-1 source writes must be followed by explicit activation and an object-state comparison. `activate=true` on the write request did not activate this candidate; the separate activation call did.
+- ARC-1's native-abapGit bridge is installed and functional. Current gaps are client-side feature-cache, ref/postcondition, remote-auth diagnostics, large-source, and report-local edit ergonomics; no additional A4H component is indicated.
 
 ## Secondary Target: NPL / ABAP 7.50
 
