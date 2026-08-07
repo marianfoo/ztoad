@@ -1296,6 +1296,7 @@ CLASS lcl_sql_set_expression IMPLEMENTATION.
     CONCATENATE top_level_query space
                 INTO padded_query RESPECTING BLANKS.
     TRANSLATE padded_query TO UPPER CASE.
+    CONDENSE padded_query.
     result = xsdbool(
       padded_query CS ' UNION SELECT '
       OR padded_query CS ' UNION ALL SELECT '
