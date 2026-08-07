@@ -1,6 +1,6 @@
 # BASE-BUG-005 implementation plan
 
-Status: reviewed; red replay complete; production implementation pending.
+Status: implementation and exact live validation complete; pull request pending.
 
 ## Goal
 
@@ -97,3 +97,27 @@ compatibility to SAP while retaining a bounded fetch. The main implementation
 risk is generated target compatibility; the mismatch and runtime row-count
 tests exercise that boundary directly on both compilers.
 
+## Completed candidate evidence
+
+- Frozen candidate: `58aed8d443d3837bdc94b579e0b4f6b5bfba96df`.
+- Local source SHA-256:
+  `9848ace8fadb61ef72a0a28a7ee011e72d8e58ebebad4514d3268eafcb940a2e`.
+- Server-normalized source SHA-256 on both targets:
+  `7ab32de5518a77c996e6dc1341618df4480c928ebd6529c63a918ab199e54d63`.
+- Local: `npm ci`, `npm test`, and `git diff --check` passed; configured
+  abaplint has zero findings and all repository/installation contracts passed.
+- NPL/SAP_BASIS 750: explicit activation, zero syntax errors or warnings,
+  106/106 Unit, equal active/inactive source, no inactive ZTOAD part, and a
+  complete DEFAULT ATC run with 86 findings (3 P1, 4 P2, 79 P3).
+- A4H/SAP_BASIS 758: explicit activation, zero syntax errors, the seven known
+  POSIX-regex deprecation warnings, 106/106 Unit, equal active/inactive source,
+  and no inactive ZTOAD part.
+- A4H `ABAP_CLOUD_READINESS`: complete run with 697 findings (487 P1,
+  210 P2). The increase from 682 is in executable report-local test code and is
+  retained as architectural debt under `BASE-ARCH-003`; it does not establish
+  a Clean Core claim. `S4HANA_READINESS_2023` returned zero rows but remains
+  prerequisite-incomplete.
+- Fresh A4H WebGUI smoke: a real user-typed, read-only `UNION ALL` aggregate
+  with a final one-row cap executed successfully and returned exactly one ALV
+  row. Comparing the complete 50-entry ST22 sets before and after found no new
+  dump.
