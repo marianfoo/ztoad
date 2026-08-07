@@ -52,6 +52,13 @@ Make the SQL functions reported in GitHub issue #4 generate valid result structu
 - Browser-driver diagnostic: programmatic `fill` without a real TextEdit change/blur left the SAP backend with an empty statement. Fresh-session real typing plus blur exercised the supported stream-read contract and passed. This was test-driver behavior, not a product failure and not accepted as runtime evidence.
 - Shared-target restoration: exact master `e5ae759aa0ea8d6a2f5efb7a53fd0956ec5b3286` (local source SHA-256 `de46fab9bb8aa908c2efa66abe0c0f428f7f125b6bba81272990215964128831`) was redeployed and explicitly activated on both systems. Each reports equal active/inactive server SHA-256 `c7d4cbcfcb9a3af1d322e3f912c586dfee12b8af0fe608049807cfa61e94cccd`, 67/67 master Unit tests, clean syntax for its release, and no inactive ZTOAD part.
 
+## Post-green process audit
+
+- PR #27's first head run passed the repository Quality job and both external abaplint checks. The Quality job already exercises the pinned ABAP 7.50 lint plus repository and installation contracts, so this change identified no justified CI expansion.
+- The final security diff review found no reportable regression, but its generic extension classifier initially omitted `src/ztoad.prog.abap`. Permanent guidance now requires reconciling every review worklist with `git diff --name-only` and explicitly adding omitted ABAP source.
+- The live browser smoke showed that assigning the query through a DOM-level fill can leave the SAP TextEdit backend unchanged. Permanent guidance now requires real user-like editor input plus its change/blur sequence and acceptance based on the exact executed result, not the browser field value alone.
+- No production or serialized-object content changed after the frozen candidate, so the recorded syntax, Unit, ATC, inactive-object, browser, ST22, and restoration evidence remains valid.
+
 ## Rollback
 
 Revert the candidate source commit and deploy the exact `master` report source through ARC-1, activate explicitly, verify active/inactive equality and inactive child parts, then rerun syntax and all ABAP Unit tests. No DDIC data, customizing, screen, authorization, or serialized structural object is changed by this patch.
