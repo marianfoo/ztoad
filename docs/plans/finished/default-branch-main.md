@@ -59,6 +59,21 @@ open release PR, or leaving local and native-abapGit clients on an obsolete ref.
   language," which describes localization rather than a Git branch.
 - SAP syntax, Unit, ATC, WebGUI, and ST22 are not applicable: no file under
   `src/`, no serialized SAP object, and no live behavior changed.
+- Draft PR #34 targets `main`. First Quality run `31197841690` passed `npm ci`,
+  configured abaplint with zero findings, the default-branch repository
+  contract, and the installation contract; both external abaplint checks also
+  passed.
+- The post-green audit reconciled all 15 changed files with the PR inventory,
+  reviewed the complete Quality log, found no review comments or unresolved
+  threads, and confirmed a clean merge state. GitHub still reports `main` as
+  default, remote `master` remains absent, and PR #23 remains based on `main`.
+- The release PR's temporary `master` text is confined to its pre-migration
+  generated title/head branch. Release Please will be run from merged `main` to
+  update or replace that generated state; only one green release PR will be
+  retained.
+- The useful durable improvements—the manual Quality dispatch and automated
+  default-branch contract—were already present in the first green head. No CI
+  correction was required. This plan is archived before the second CI run.
 
 ## Compatibility and risk review
 
@@ -75,4 +90,4 @@ open release PR, or leaving local and native-abapGit clients on an obsolete ref.
 
 ## Reference
 
-- [Migration research](../research/2026-08-07-default-branch-main-migration.md)
+- [Migration research](../../research/2026-08-07-default-branch-main-migration.md)
