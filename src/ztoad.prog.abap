@@ -3022,6 +3022,7 @@ FORM query_parse  USING    fw_query TYPE string
          lo_union_regex TYPE REF TO cl_abap_regex,
          lt_sources     TYPE ty_table_names,
          lw_string      TYPE string,
+         lw_first_token TYPE c LENGTH 7,
          lw_invalid     TYPE abap_bool,
          lw_tail_found  TYPE abap_bool,
          lw_table       TYPE tabname.
@@ -3223,9 +3224,10 @@ FORM query_parse  USING    fw_query TYPE string
   IF NOT fw_union IS INITIAL.
     lw_string = fw_select.
     TRANSLATE lw_string TO UPPER CASE.
-    IF strlen( lw_string ) GT 6
-    AND lw_string(6) = 'SINGLE'
-    AND lw_string+6(1) = space.
+    IF strlen( lw_string ) GE 7.
+      lw_first_token = lw_string(7).
+    ENDIF.
+    IF lw_first_token = 'SINGLE'.
       fw_error = abap_true.
       RETURN.
     ENDIF.
