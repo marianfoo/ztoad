@@ -75,3 +75,9 @@ This is a deliberate capability adapter, not silent exception suppression. The m
 ## System conclusion
 
 No missing A4H system object or general TextEdit service was found. Native transaction/screen/status installation is complete, and SAP's own TextEdit diagnostic succeeds. The remaining defect is ZTOAD's unscoped desktop-control orchestration. A future SAP GUI for HTML patch may broaden supported operations, but ZTOAD must still advertise and test its frontend capabilities explicitly.
+
+## Exact-candidate acceptance
+
+Commit `31eca9936202b63874ba089e3744fe9971dfa0e4` implements the capability adapter. Its local source SHA-256 is `4b4823a5db169697696d71edf42b432ca66db0d8585c36066a3bd3817f61a2e5`. On A4H it was explicitly activated with 0 syntax errors, 2 pre-existing POSIX warnings, 57/57 Unit tests, equal active/inactive source, and no inactive ZTOAD child part.
+
+A fresh WebGUI session accepted two sanitized read-only statements and executed the final `SELECT SINGLE mandt FROM t000`, proving the cursor-free selection contract. ALV displayed `000 / 1`, the success message reported one entry, F3 exited cleanly, and ST22 remained unchanged after 06:26:10 UTC. The shared object was then restored and activated to exact `origin/master`; this source-only candidate never switched the native-abapGit repository away from `master`.

@@ -20,6 +20,7 @@ _Observed 2026-08-06 to 2026-08-07 with ARC-1 1.0.2, A4H SAP_BASIS 758 SP02, nat
 7. **Pre-write ABAP release propagation remains wrong.** The A4H pre-write linter selected v702 and rejected valid 7.50+ syntax although live preflight/syntax accepted it. Carry the probed/configured release into every write path, including `edit_unit`.
 8. **Large-source ergonomics should be first class.** Complete report writes require callers to build a temporary JSON payload to avoid stdin `EAGAIN`. Add a `sourceFile`/`--source-file` option that reads locally inside the CLI, reports the source hash, and never logs full source or credentials.
 9. **Evidence-friendly output is incomplete.** Return staged object/file inventories, selected full ref, before/after commit IDs, and the exact remote result in stable JSON. This would make selective native-abapGit procedures auditable without scraping log previews.
+10. **Published MCP schemas can lag the installed CLI.** The connected SAPGit MCP contract exposed only read actions while the local ARC-1 1.0.2 CLI supported `stage`, `push`, and `switch_branch`; the same skew hid newer diagnostic actions. Publish the running server/client version in discovery, keep action enums generated from one source, and fail with an explicit upgrade/reload instruction instead of forcing callers to discover CLI-only capabilities experimentally.
 
 ## Safe workflow until those gaps are fixed
 
