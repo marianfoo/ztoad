@@ -39,7 +39,7 @@ npm test
 
 `@abaplint/cli` is pinned exactly because the project does not claim semantic-version compatibility. The config uses abaplint's canonical release `v762`, which maps to on-premise SAP_BASIS 750. The initial rule set deliberately concentrates on parsing, syntax, type resolution, includes, method consistency, line endings, and abapGit XML consistency. It creates a zero-warning baseline for this legacy report. Add stricter rules only with the refactoring that resolves their existing findings.
 
-`npm test` also checks the complete native-abapGit installation closure: the source/object files, four dynpros, and three GUI statuses. For a live composite-object gate, capture `SAPRead(type="INACTIVE_OBJECTS")` as JSON and run `node scripts/installation-contract.mjs --inactive-objects <file>`. Unrelated inactive objects are ignored; any ZTOAD source, CUA, screen, or text part makes the gate fail.
+`npm test` also checks the complete native-abapGit installation closure: the source/object files, four dynpros with their separately serialized flow-logic files, and three GUI statuses. Native abapGit 1.133.0 stores each dynpro's flow logic in `ztoad.prog.screen_<number>.abap`; the program XML still carries the screen layout and CUA metadata. For a live composite-object gate, capture `SAPRead(type="INACTIVE_OBJECTS")` as JSON and run `node scripts/installation-contract.mjs --inactive-objects <file>`. Unrelated inactive objects are ignored; any ZTOAD source, CUA, screen, or text part makes the gate fail.
 
 ## 3. Native abapGit setup on the complete-object test system
 
@@ -177,7 +177,7 @@ SELECT SINGLE mandt FROM t000
 
 Then exercise the parser feature being changed with a sanitized query and verify both the generated source and result. Never use INSERT, UPDATE, DELETE, or native SQL against SAP/business tables for smoke testing. Such tests are permitted only against an isolated disposable Z table with explicit authorization.
 
-`BASE-RUN-001` is fixed at the editor boundary: a fresh A4H WebGUI launch renders the fallback editor, accepts the sanitized query, and creates no new ST22 dump. Full query execution is still not green because the current A4H installation lacks GUI status `STATUS010` (`BASE-BUG-007`). Keep product behavior failures separate from incomplete system metadata, and never run this browser protocol on NPL.
+`BASE-RUN-001` is fixed at the editor boundary: a fresh A4H WebGUI launch renders the fallback editor and accepts the sanitized query. `BASE-BUG-007` restored the complete active program installation and GUI status, so query dispatch now reaches `EXECUTE`; that action exposes the independently tracked `BASE-RUN-006` Control Framework flush dump. Keep product behavior failures separate from incomplete system metadata, and never run this browser protocol on NPL.
 
 Use `npm run lint:quality` to reproduce the non-blocking full default-rule inventory. Record exact dated totals and intentional deltas in the [baseline findings register](baseline-findings.md); do not copy volatile counts into this long-lived playbook. The raw defaults contain conflicting prefix/no-prefix naming rules, so the strict profile must resolve that configuration conflict explicitly while the raw inventory remains visible. Continue the [active zero-findings plan](plans/abaplint-zero-findings.md); only promote the resolved strict command to required CI after it is green.
 

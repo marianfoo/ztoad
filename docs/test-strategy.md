@@ -86,7 +86,7 @@ Run this sequence after deployment:
 
 If FLP cannot open WebGUI because the automation browser blocks a popup, record that environmental failure and use the standalone HTTPS WebGUI URL as a secondary diagnostic path. Before interpreting a runtime failure, verify that the installed report contains the serialized dynpros and GUI statuses required by the test. Classify missing installation metadata separately from a product-code regression, but keep the overall smoke gate blocked until both are green.
 
-For `BASE-RUN-001`, editor startup/render/input and the ST22 delta are green on A4H. `BASE-BUG-006` adds the serialized report transaction and proves both direct launch paths reach that editor. Query dispatch remains blocked because installed GUI status `STATUS010` is missing (`BASE-BUG-007`), despite being present in repository XML.
+For `BASE-RUN-001`, editor startup/render/input are green on A4H. `BASE-BUG-006` adds the serialized report transaction and proves both direct launch paths reach that editor. `BASE-BUG-007` restores the active dynpros and GUI status, allowing `EXECUTE` to dispatch; the resulting `SAPLOLEA` Control Framework flush dump is a separate runtime finding, `BASE-RUN-006`, and keeps the complete query smoke red.
 
 For GUI-control changes, a green policy Unit test proves only the selection decision. The chosen control remains a spike until a fresh live session renders it, the intended interaction works, and ST22 stays unchanged. If a spike merely moves the dump to another constructor or event path, reject it and update the root-cause model before implementation continues.
 

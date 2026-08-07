@@ -7,12 +7,31 @@ const repositoryRoot = new URL("../", import.meta.url);
 const repositoryObjects = [
   ["src/ztoad.prog.abap"],
   ["src/ztoad.prog.xml", 'serializer="LCL_OBJECT_PROG"'],
+  ["src/ztoad.prog.screen_0010.abap"],
+  ["src/ztoad.prog.screen_0100.abap"],
+  ["src/ztoad.prog.screen_0200.abap"],
+  ["src/ztoad.prog.screen_0300.abap"],
   ["src/ztoad.tabl.xml", 'serializer="LCL_OBJECT_TABL"'],
   ["src/ztoad.tran.xml", 'serializer="LCL_OBJECT_TRAN"'],
   ["src/ztoad_auth.suso.xml", 'serializer="LCL_OBJECT_SUSO"'],
 ];
 
-const requiredScreens = ["0010", "0100", "0200", "0300"];
+const requiredScreens = [
+  [
+    "0010",
+    ["MODULE STATUS_0010.", "CALL SUBSCREEN SUB.", "MODULE USER_COMMAND_0010."],
+  ],
+  ["0100", []],
+  [
+    "0200",
+    [
+      "MODULE STATUS_0200.",
+      "MODULE USER_COMMAND_0200 AT EXIT-COMMAND.",
+      "MODULE USER_COMMAND_0200.",
+    ],
+  ],
+  ["0300", ["MODULE STATUS_0300.", "MODULE USER_COMMAND_0300."]],
+];
 const requiredStatuses = ["STATUS010", "STATUS200", "STATUS300"];
 
 async function readRequiredFile(relativePath) {
@@ -43,11 +62,24 @@ export async function assertRepositoryInstallationClosure() {
   const reportSource = files.get("src/ztoad.prog.abap");
   const programXml = files.get("src/ztoad.prog.xml");
 
-  for (const screen of requiredScreens) {
+  for (const [screen, requiredFlowStatements] of requiredScreens) {
     assert.ok(
       programXml.includes(`<SCREEN>${screen}</SCREEN>`),
       `src/ztoad.prog.xml is missing required dynpro ${screen}`,
     );
+
+    const flowPath = `src/ztoad.prog.screen_${screen}.abap`;
+    const flowLogic = files.get(flowPath).toUpperCase();
+    for (const statement of [
+      "PROCESS BEFORE OUTPUT.",
+      "PROCESS AFTER INPUT.",
+      ...requiredFlowStatements,
+    ]) {
+      assert.ok(
+        flowLogic.includes(statement),
+        `${flowPath} is missing required flow-logic statement ${statement}`,
+      );
+    }
   }
 
   for (const status of requiredStatuses) {
