@@ -13,6 +13,6 @@
     "node": ">=18"
   },
   "devDependencies": {
-    "@abaplint/cli": "2.120.18"
+    "@abaplint/cli": "2.120.39"
   }
 }
