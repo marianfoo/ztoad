@@ -25,7 +25,7 @@ The local repository and SAP systems must not diverge silently. Every system-sid
 Prerequisites:
 
 - Git
-- Node.js 18 or newer (CI currently uses Node.js 24)
+- Node.js 22 or newer (required by abaplint; CI currently uses Node.js 24)
 - npm
 - Access to native abapGit in each test system
 - Optional but recommended: ARC-1 connections for both test systems, one server instance per SAP destination

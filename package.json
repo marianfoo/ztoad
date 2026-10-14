@@ -10,9 +10,9 @@
     "test": "npm run lint && npm run test:repository && npm run test:installation"
   },
   "engines": {
-    "node": ">=18"
+    "node": ">=22"
   },
   "devDependencies": {
-    "@abaplint/cli": "2.120.18"
+    "@abaplint/cli": "2.120.60"
   }
 }

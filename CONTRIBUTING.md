@@ -4,7 +4,7 @@ ZTOAD is an abapGit repository for a classic executable ABAP report with screens
 
 ## Local setup
 
-Install Node.js 18 or newer, clone the repository, and run:
+Install Node.js 22 or newer, clone the repository, and run:
 
 ```sh
 npm ci
